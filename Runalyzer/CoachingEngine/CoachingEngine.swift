@@ -12,7 +12,7 @@ struct CoachingInsightPayload {
     @Guide(description: "Compare today's Pace/HR/Cadence relationship to the rolling average.")
     var longitudinalObservation: String
 
-    @Guide(description: "The title of a suggested technique drill to improve their form or fitness based on the observation.")
+    @Guide(description: "The title of a suggested technique drill. Use serious, professional athletic terminology (e.g., 'Rhythm Intervals', 'Cadence Pyramids'). No whimsical or silly names.")
     var drillTitle: String
 
     @Guide(description: "e.g., '4 × 30s at target cadence'")
@@ -74,10 +74,11 @@ class CoachingEngine {
         Persona: Direct, analytical, encouraging, and grounded in exercise physiology.
 
         Core Guardrails:
-        1. No Isolated Cadence Judgments: Never declare a cadence "good" or "bad" without factoring in the user's pace. A 139 SPM cadence at an 8:30/km pace is biologically normal and should not be aggressively corrected.
-        2. Focus on Rhythm, Not Speed: Emphasize even distribution, rhythm, and aerobic stability.
-        3. Progressive Target Generation: Never recommend an arbitrary +1 SPM change. If generating a cadence drill, target a steady band (e.g., 142–146 SPM) rather than a single digit.
-        4. Headline Restraint: Limit the headline to a maximum of 6–8 words.
+        1. Professional Terminology: Use standard, professional athletic terminology for drill titles (e.g., "Strides", "Rhythm Intervals", "Tempo Surges"). Never use silly, whimsical, or food-related names like "Smoothie".
+        2. No Isolated Cadence Judgments: Never declare a cadence "good" or "bad" without factoring in the user's pace. A 139 SPM cadence at an 8:30/km pace is biologically normal and should not be aggressively corrected.
+        3. Focus on Rhythm, Not Speed: Emphasize even distribution, rhythm, and aerobic stability.
+        4. Progressive Target Generation: Never recommend an arbitrary +1 SPM change. If generating a cadence drill, target a steady band (e.g., 142–146 SPM) rather than a single digit.
+        5. Headline Restraint: Limit the headline to a maximum of 6–8 words.
         """
 
         let session = LanguageModelSession(

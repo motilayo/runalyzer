@@ -30,7 +30,7 @@ struct DashboardView: View {
                                 .font(.title3.bold())
                                 .padding(.horizontal)
 
-                            ForEach(Array(runRecords.enumerated()), id: \.element.id) { index, run in
+                            ForEach(Array(runRecords.enumerated()), id: \.offset) { index, run in
                                 NavigationLink(destination: RunDetailView(runRecord: run)) {
                                     RunListRowView(runRecord: run, isLatest: index == 0)
                                 }
