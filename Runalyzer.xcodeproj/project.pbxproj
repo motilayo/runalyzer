@@ -11,32 +11,35 @@
 		1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */; };
 		30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B51607F39154844B5E46210 /* CoachingInsight.swift */; };
 		9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */; };
-		CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
-		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
-
+		9DEC99887D72772D3AB524D1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
 		A2B3C4D5E6F7G8H9I0J1K2L3 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7G8H9I0J1K2 /* DashboardView.swift */; };
-		Q2W3E4R5T6Y7U8I9O0P1A2S3 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6G7H8I9J0K1L2 /* OnboardingView.swift */; };
-		Z2X3C4V5B6N7M8L9K0J1H2G3 /* RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* RunDetailView.swift */; };
+		A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */; };
+		CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
+		E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */; };
+		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
 		M1N2B3V4C5X6Z7A8S9D0F1G2 /* CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = Z1X2C3V4B5N6M7L8K9J0H1G2 /* CoachingEngine.swift */; };
 		P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1N2M3L4K5J6H7G8F9D0S1A2 /* Assets.xcassets */; };
-
+		Q2W3E4R5T6Y7U8I9O0P1A2S3 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6G7H8I9J0K1L2 /* OnboardingView.swift */; };
+		Z2X3C4V5B6N7M8L9K0J1H2G3 /* RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* RunDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyzer/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
 		376830066BD295E24C449FB2 /* RunRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunRecord.swift; path = Runalyzer/Models/RunRecord.swift; sourceTree = "<group>"; };
+		3EF4AE46EBF2F38F6B44624C /* RunalyzerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunalyzerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunalyzerApp.swift; path = Runalyzer/RunalyzerApp.swift; sourceTree = "<group>"; };
+		580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		8B51607F39154844B5E46210 /* CoachingInsight.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoachingInsight.swift; path = Runalyzer/Models/CoachingInsight.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6G7H8I9J0K1L2 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/OnboardingView.swift; sourceTree = SOURCE_ROOT; };
+		B1N2M3L4K5J6H7G8F9D0S1A2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Runalyzer/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		B29A62CEEC0D478BA7CAB794 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Runalyzer/ContentView.swift; sourceTree = "<group>"; };
 		DD66FA54810DAEAB1B57337A /* Runalyzer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runalyzer.app; sourceTree = BUILT_PRODUCTS_DIR; };
-
+		DDA2195BBF9ED0F85905F31B /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = XCTest.framework; sourceTree = "<group>"; };
 		F1A2B3C4D5E6F7G8H9I0J1K2 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/DashboardView.swift; sourceTree = SOURCE_ROOT; };
-		A1B2C3D4E5F6G7H8I9J0K1L2 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/OnboardingView.swift; sourceTree = SOURCE_ROOT; };
+		FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunalyzerTests.swift; sourceTree = "<group>"; };
 		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
-		B1N2M3L4K5J6H7G8F9D0S1A2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Runalyzer/Assets.xcassets; sourceTree = SOURCE_ROOT; };
-
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +48,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2D36AE3348032F85981F45B2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9DEC99887D72772D3AB524D1 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -59,10 +70,20 @@
 			name = iOS;
 			sourceTree = "<group>";
 		};
+		10AA26382422973E1F322C8D /* RunalyzerTests */ = {
+			isa = PBXGroup;
+			children = (
+				FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */,
+			);
+			name = RunalyzerTests;
+			path = RunalyzerTests;
+			sourceTree = "<group>";
+		};
 		1C9E876BBB1092C707E7856D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				00729FC10D7EDD63EB546527 /* iOS */,
+				DDA2195BBF9ED0F85905F31B /* XCTest.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -70,6 +91,7 @@
 		54B19B6DFF797ACC20446E48 /* Runalyzer */ = {
 			isa = PBXGroup;
 			children = (
+				580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */,
 			);
 			name = Runalyzer;
 			sourceTree = SOURCE_ROOT;
@@ -78,6 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				DD66FA54810DAEAB1B57337A /* Runalyzer.app */,
+				3EF4AE46EBF2F38F6B44624C /* RunalyzerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,13 +116,12 @@
 				2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */,
 				52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */,
 				C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */,
-
 				F1A2B3C4D5E6F7G8H9I0J1K2 /* DashboardView.swift */,
 				A1B2C3D4E5F6G7H8I9J0K1L2 /* OnboardingView.swift */,
 				Q1W2E3R4T5Y6U7I8O9P0A1S2 /* RunDetailView.swift */,
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* CoachingEngine.swift */,
 				B1N2M3L4K5J6H7G8F9D0S1A2 /* Assets.xcassets */,
-
+				10AA26382422973E1F322C8D /* RunalyzerTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,6 +144,24 @@
 			productName = Runalyzer;
 			productReference = DD66FA54810DAEAB1B57337A /* Runalyzer.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F8945871DD242B1F3C041378 /* RunalyzerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CF80848869A78F551497607B /* Build configuration list for PBXNativeTarget "RunalyzerTests" */;
+			buildPhases = (
+				913E5F14D322A8B0572A3D92 /* Sources */,
+				2D36AE3348032F85981F45B2 /* Frameworks */,
+				A6DCF436D5C326BA17944D99 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7564C1715440F9D6ED11D05A /* PBXTargetDependency */,
+			);
+			name = RunalyzerTests;
+			productName = RunalyzerTests;
+			productReference = 3EF4AE46EBF2F38F6B44624C /* RunalyzerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -148,6 +188,7 @@
 			projectRoot = "";
 			targets = (
 				8116EBABCB75011FBB77F3DF /* Runalyzer */,
+				F8945871DD242B1F3C041378 /* RunalyzerTests */,
 			);
 		};
 /* End PBXProject section */
@@ -158,6 +199,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Assets.xcassets in Resources */,
+				E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6DCF436D5C326BA17944D99 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -173,16 +222,29 @@
 				9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */,
 				1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */,
 				075FD91D330B77E5867419C9 /* ContentView.swift in Sources */,
-
 				A2B3C4D5E6F7G8H9I0J1K2L3 /* DashboardView.swift in Sources */,
 				Q2W3E4R5T6Y7U8I9O0P1A2S3 /* OnboardingView.swift in Sources */,
 				Z2X3C4V5B6N7M8L9K0J1H2G3 /* RunDetailView.swift in Sources */,
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* CoachingEngine.swift in Sources */,
-
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		913E5F14D322A8B0572A3D92 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7564C1715440F9D6ED11D05A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8116EBABCB75011FBB77F3DF /* Runalyzer */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4C7F5C7F7E16C92FC2B82B12 /* Release */ = {
@@ -318,6 +380,35 @@
 			};
 			name = Release;
 		};
+		B365700798A206FD36799107 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalyzerTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runalyzer.app/Runalyzer";
+			};
+			name = Debug;
+		};
+		C86468A6FB9816D89E64C94F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalyzerTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runalyzer.app/Runalyzer";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		FA660FB7A9C265CDDCB41CB1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -343,6 +434,15 @@
 			buildConfigurations = (
 				4E82C97C86136D9FD88EBE8F /* Debug */,
 				872937956E3B1EF4BFA5F513 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CF80848869A78F551497607B /* Build configuration list for PBXNativeTarget "RunalyzerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C86468A6FB9816D89E64C94F /* Release */,
+				B365700798A206FD36799107 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

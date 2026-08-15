@@ -70,6 +70,12 @@ struct RunDetailView: View {
                                 .font(.subheadline.bold())
                         }
                         .tint(.blue)
+                        .onChange(of: insight.isDrillCompleted) { _, newValue in
+                            if newValue {
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                            }
+                        }
                     }
                     .padding()
                     .background(Color(.secondarySystemGroupedBackground))
@@ -119,5 +125,7 @@ struct StatBox: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(value) \(unit)")
     }
 }

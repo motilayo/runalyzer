@@ -91,6 +91,8 @@ struct HeroCardView: View {
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(runRecord.insight != nil ? "Latest Insight. \(runRecord.insight!.headline)." : "Analyzing your run...")
     }
 }
 
