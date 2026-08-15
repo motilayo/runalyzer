@@ -20,6 +20,8 @@
 	<string>1</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Runalyzer needs to read your workout data to provide AI coaching insights.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Runalyzer needs permission to save workout data to your HealthKit to update your fitness records.</string>
 
 	<key>UILaunchScreen</key>
 	<dict/>
