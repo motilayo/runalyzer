@@ -21,7 +21,7 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>Runalyzer needs to read your workout data to provide AI coaching insights.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Runalyzer needs permission to save workout data to your HealthKit to update your fitness records.</string>
+	<string>Runalyzer does not write data to HealthKit, but this permission is required by the system for HealthKit integration.</string>
 
 	<key>UILaunchScreen</key>
 	<dict/>
