@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */; };
 		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
 		1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */; };
 		30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B51607F39154844B5E46210 /* CoachingInsight.swift */; };
@@ -34,6 +35,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyzer/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyzer/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
 		376830066BD295E24C449FB2 /* RunRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunRecord.swift; path = Runalyzer/Models/RunRecord.swift; sourceTree = "<group>"; };
 		3EF4AE46EBF2F38F6B44624C /* RunalyzerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunalyzerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,6 +123,7 @@
 				1C9E876BBB1092C707E7856D /* Frameworks */,
 				54B19B6DFF797ACC20446E48 /* Runalyzer */,
 				8B51607F39154844B5E46210 /* CoachingInsight.swift */,
+				0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */,
 				376830066BD295E24C449FB2 /* RunRecord.swift */,
 				2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */,
 				52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */,
@@ -230,6 +233,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */,
+				31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */,
 				E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */,
 				9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */,
 				1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */,
