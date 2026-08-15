@@ -35,7 +35,7 @@ struct RunDetailView: View {
                             .font(.title3.bold())
                             .foregroundColor(.primary)
 
-                        Text(insight.observation)
+                        Text(insight.longitudinalObservation)
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
@@ -46,41 +46,56 @@ struct RunDetailView: View {
                     .padding(.horizontal)
 
                     // Bottom: Drill Card
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "figure.run")
-                                .foregroundColor(.blue)
-                            Text("Suggested Drill")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.blue)
-                        }
+                    if let drill = insight.drillRecommendation {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "figure.run")
+                                    .foregroundColor(.blue)
+                                Text("Suggested Drill")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.blue)
+                            }
 
-                        Text(insight.drillTitle)
-                            .font(.headline)
+                            Text(drill.title)
+                                .font(.headline)
 
-                        Text(insight.drillInstructions)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            VStack(alignment: .leading, spacing: 12) {
+                                DrillRow(icon: "repeat", text: drill.reps)
+                                DrillRow(icon: "lungs", text: drill.recovery)
+                                DrillRow(icon: "brain.head.profile", text: drill.cues)
+                            }
 
-                        Divider()
+                            if let target = drill.targetCadence, let prev = drill.previousCadence {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Cadence Goal")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("Current: \(prev) SPM → Target: \(target) SPM")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.primary)
+                                }
+                                .padding(.top, 4)
+                            }
 
-                        Toggle(isOn: Bindable(insight).isDrillCompleted) {
-                            Text("Mark as Completed")
-                                .font(.subheadline.bold())
-                        }
-                        .tint(.blue)
-                        .onChange(of: insight.isDrillCompleted) { _, newValue in
-                            if newValue {
-                                let generator = UIImpactFeedbackGenerator(style: .medium)
-                                generator.impactOccurred()
+                            Divider()
+
+                            Toggle(isOn: Bindable(drill).isCompleted) {
+                                Text("Mark as Completed")
+                                    .font(.subheadline.bold())
+                            }
+                            .tint(.blue)
+                            .onChange(of: drill.isCompleted) { _, newValue in
+                                if newValue {
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                }
                             }
                         }
+                        .padding()
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(20)
+                        .padding(.horizontal)
                     }
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .cornerRadius(20)
-                    .padding(.horizontal)
 
                 } else {
                     VStack(spacing: 16) {
@@ -127,5 +142,22 @@ struct StatBox: View {
         .cornerRadius(16)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(value) \(unit)")
+    }
+}
+
+struct DrillRow: View {
+    var icon: String
+    var text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

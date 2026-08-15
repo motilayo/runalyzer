@@ -5,35 +5,25 @@ import SwiftData
 /// Persisted locally via SwiftData.
 @Model
 final class CoachingInsight {
-    /// A short, catchy headline summarizing the run analysis.
+    /// A short, catchy headline summarizing the run analysis. Max 8 words.
     var headline: String
 
-    /// An observation specifically about aerobic effort or biomechanics (e.g., cadence).
-    var observation: String
+    /// Compare today's Pace/HR/Cadence relationship to the rolling average.
+    var longitudinalObservation: String
 
-    /// The title of the suggested technique drill.
-    var drillTitle: String
-
-    /// Step-by-step instructions on how to perform the drill.
-    var drillInstructions: String
-
-    /// Indicates whether the user has completed this drill. Defaults to false.
-    var isDrillCompleted: Bool
+    /// The structured drill recommendation.
+    var drillRecommendation: DrillRecommendation?
 
     /// The inverse one-to-one relationship back to the `RunRecord` that generated this insight.
     var runRecord: RunRecord?
 
     init(
         headline: String,
-        observation: String,
-        drillTitle: String,
-        drillInstructions: String,
-        isDrillCompleted: Bool = false
+        longitudinalObservation: String,
+        drillRecommendation: DrillRecommendation? = nil
     ) {
         self.headline = headline
-        self.observation = observation
-        self.drillTitle = drillTitle
-        self.drillInstructions = drillInstructions
-        self.isDrillCompleted = isDrillCompleted
+        self.longitudinalObservation = longitudinalObservation
+        self.drillRecommendation = drillRecommendation
     }
 }

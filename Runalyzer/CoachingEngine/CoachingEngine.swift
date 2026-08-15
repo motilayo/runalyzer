@@ -5,18 +5,27 @@ import FoundationModels
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
 @available(iOS 26.0, *)
 @Generable
-struct GeneratedCoachingInsight {
-    @Guide(description: "A short, catchy headline summarizing the run analysis")
+struct CoachingInsightPayload {
+    @Guide(description: "A short, catchy headline summarizing the run analysis. Strict max 8 words.")
     var headline: String
 
-    @Guide(description: "An observation specifically about the runner's aerobic effort (heart rate) or biomechanics (specifically cadence/SPM).")
-    var observation: String
+    @Guide(description: "Compare today's Pace/HR/Cadence relationship to the rolling average.")
+    var longitudinalObservation: String
 
     @Guide(description: "The title of a suggested technique drill to improve their form or fitness based on the observation.")
     var drillTitle: String
 
-    @Guide(description: "A short, actionable step-by-step instruction on how to perform the drill.")
-    var drillInstructions: String
+    @Guide(description: "e.g., '4 × 30s at target cadence'")
+    var drillReps: String
+
+    @Guide(description: "e.g., '60s easy walk between sets'")
+    var drillRecovery: String
+
+    @Guide(description: "Specific form cues (e.g., 'Focus on quick foot turnover')")
+    var drillCues: String
+
+    @Guide(description: "Target cadence as a steady band or target value, if applicable. Return null if no specific target.")
+    var targetCadence: Int?
 }
 
 @available(iOS 26.0, *)
@@ -27,7 +36,7 @@ class CoachingEngine {
     private init() {}
 
     /// Analyzes a run record and generates a CoachingInsight using on-device FoundationModels
-    func generateInsight(for runRecord: RunRecord) async throws -> CoachingInsight {
+    func generateInsight(for runRecord: RunRecord, history: [RunRecord]) async throws -> CoachingInsight {
 
         // Ensure Foundation Models are available on device
         guard SystemLanguageModel.default.isAvailable else {
@@ -39,19 +48,36 @@ class CoachingEngine {
         let distanceKm = runRecord.distance / 1000.0
         let distanceFormatted = String(format: "%.2f", distanceKm)
 
+        // Calculate rolling 5-run average
+        let recentRuns = Array(history.prefix(5))
+        var rollingAvgPrompt = "Rolling 5-Run Avg: None"
+        if !recentRuns.isEmpty {
+            let avgPace = recentRuns.map { $0.avgPace }.reduce(0, +) / Double(recentRuns.count)
+            let avgHR = recentRuns.map { $0.avgHeartRate }.reduce(0, +) / recentRuns.count
+            let avgCadence = recentRuns.map { $0.avgCadence }.reduce(0, +) / recentRuns.count
+
+            rollingAvgPrompt = """
+            Rolling 5-Run Avg: Pace \(String(format: "%.2f", avgPace)) min/km, HR \(avgHR) BPM, Cadence \(avgCadence) SPM
+            """
+        }
+
         let runStatsPrompt = """
-        Distance: \(distanceFormatted) km
-        Average Pace: \(paceFormatted) min/km
-        Average Heart Rate: \(runRecord.avgHeartRate) BPM
-        Average Cadence: \(runRecord.avgCadence) SPM
+        Current Run: Pace \(paceFormatted) min/km, HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
+        \(rollingAvgPrompt)
         """
 
         let instructions = """
-        Act as an elite running coach.
-        Analyze the provided run statistics.
-        Provide a short headline, an observation about their aerobic effort or biomechanics (specifically cadence), and suggest one actionable technique drill.
-        If the suggested drill involves cadence, explicitly call out tools that can be used to achieve and maintain the desired cadence (e.g., using a metronome).
-        Your tone should be professional and encouraging.
+        Act as an elite running coach providing longitudinal, evidence-based coaching.
+        Analyze the provided run statistics against the rolling average baseline.
+        Provide a structured drill routine rather than arbitrary numeric shifts.
+
+        Persona: Direct, analytical, encouraging, and grounded in exercise physiology.
+
+        Core Guardrails:
+        1. No Isolated Cadence Judgments: Never declare a cadence "good" or "bad" without factoring in the user's pace. A 139 SPM cadence at an 8:30/km pace is biologically normal and should not be aggressively corrected.
+        2. Focus on Rhythm, Not Speed: Emphasize even distribution, rhythm, and aerobic stability.
+        3. Progressive Target Generation: Never recommend an arbitrary +1 SPM change. If generating a cadence drill, target a steady band (e.g., 142–146 SPM) rather than a single digit.
+        4. Headline Restraint: Limit the headline to a maximum of 6–8 words.
         """
 
         let session = LanguageModelSession(
@@ -60,20 +86,28 @@ class CoachingEngine {
         )
 
         let prompt = """
-        Analyze this run:
+        Context Payload:
         \(runStatsPrompt)
         """
 
         // Execute the prompt expecting the @Generable struct output
-        let generatedInsight = try await session.respond(to: prompt, generating: GeneratedCoachingInsight.self)
+        let generatedInsight = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
+
+        let drillRecommendation = DrillRecommendation(
+            title: generatedInsight.content.drillTitle,
+            reps: generatedInsight.content.drillReps,
+            recovery: generatedInsight.content.drillRecovery,
+            cues: generatedInsight.content.drillCues,
+            targetCadence: generatedInsight.content.targetCadence,
+            previousCadence: runRecord.avgCadence,
+            isCompleted: false
+        )
 
         // Map the generated struct to our SwiftData model
         let newInsight = CoachingInsight(
             headline: generatedInsight.content.headline,
-            observation: generatedInsight.content.observation,
-            drillTitle: generatedInsight.content.drillTitle,
-            drillInstructions: generatedInsight.content.drillInstructions,
-            isDrillCompleted: false
+            longitudinalObservation: generatedInsight.content.longitudinalObservation,
+            drillRecommendation: drillRecommendation
         )
 
         return newInsight
