@@ -83,6 +83,16 @@ struct ContentView: View {
 }
 
 #Preview {
+    let previewContainer: ModelContainer = {
+        do {
+            let schema = Schema([RunRecord.self, CoachingInsight.self])
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }()
+
     ContentView()
-        .modelContainer(for: RunRecord.self, CoachingInsight.self, inMemory: true)
+        .modelContainer(previewContainer)
 }
