@@ -7,6 +7,6 @@ struct RunalyzerApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [RunRecord.self, CoachingInsight.self])
+        .modelContainer(for: RunRecord.self, CoachingInsight.self)
     }
 }

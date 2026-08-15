@@ -8,30 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
-		0E57CB9EF215824E4A2EAFA1 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 818C50081B55FF5E5124CC05 /* DashboardView.swift */; };
 		1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */; };
 		30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B51607F39154844B5E46210 /* CoachingInsight.swift */; };
-		4392F17630309A5600B7BA8F /* DeveloperSettings.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 4392F17530309A5600B7BA8F /* DeveloperSettings.xcconfig */; };
-		4392F1783030A36700B7BA8F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4392F1773030A36700B7BA8F /* Assets.xcassets */; };
-		530FD8FC831BCE791BE0261C /* CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD5C251F578EFD352839536 /* CoachingEngine.swift */; };
-		55D1177AA2296FFCD64ADA77 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453682CF24CA18D3B9352BE9 /* OnboardingView.swift */; };
 		9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */; };
 		CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
 		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
-		E8DA217826887B1997DF923A /* RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3372D780FDA9E1ACABDC2C /* RunDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyzer/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
-		2AD5C251F578EFD352839536 /* CoachingEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoachingEngine.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = "<group>"; };
 		376830066BD295E24C449FB2 /* RunRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunRecord.swift; path = Runalyzer/Models/RunRecord.swift; sourceTree = "<group>"; };
-		4392F1743030974900B7BA8F /* Runalyzer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Runalyzer.entitlements; path = Runalyzer/Runalyzer.entitlements; sourceTree = "<group>"; };
-		4392F17530309A5600B7BA8F /* DeveloperSettings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DeveloperSettings.xcconfig; sourceTree = "<group>"; };
-		4392F1773030A36700B7BA8F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		453682CF24CA18D3B9352BE9 /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OnboardingView.swift; path = Runalyzer/Views/OnboardingView.swift; sourceTree = "<group>"; };
-		4D3372D780FDA9E1ACABDC2C /* RunDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunDetailView.swift; path = Runalyzer/Views/RunDetailView.swift; sourceTree = "<group>"; };
 		52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunalyzerApp.swift; path = Runalyzer/RunalyzerApp.swift; sourceTree = "<group>"; };
-		818C50081B55FF5E5124CC05 /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DashboardView.swift; path = Runalyzer/Views/DashboardView.swift; sourceTree = "<group>"; };
 		8B51607F39154844B5E46210 /* CoachingInsight.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoachingInsight.swift; path = Runalyzer/Models/CoachingInsight.swift; sourceTree = "<group>"; };
 		B29A62CEEC0D478BA7CAB794 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Runalyzer/ContentView.swift; sourceTree = "<group>"; };
@@ -69,8 +56,6 @@
 		54B19B6DFF797ACC20446E48 /* Runalyzer */ = {
 			isa = PBXGroup;
 			children = (
-				4392F1773030A36700B7BA8F /* Assets.xcassets */,
-				4392F1743030974900B7BA8F /* Runalyzer.entitlements */,
 			);
 			name = Runalyzer;
 			sourceTree = SOURCE_ROOT;
@@ -86,7 +71,6 @@
 		AECDF6AF529E503EF8331ED7 = {
 			isa = PBXGroup;
 			children = (
-				4392F17530309A5600B7BA8F /* DeveloperSettings.xcconfig */,
 				86C3E3CDC03F671C6EE600C2 /* Products */,
 				1C9E876BBB1092C707E7856D /* Frameworks */,
 				54B19B6DFF797ACC20446E48 /* Runalyzer */,
@@ -95,10 +79,6 @@
 				2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */,
 				52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */,
 				C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */,
-				2AD5C251F578EFD352839536 /* CoachingEngine.swift */,
-				818C50081B55FF5E5124CC05 /* DashboardView.swift */,
-				453682CF24CA18D3B9352BE9 /* OnboardingView.swift */,
-				4D3372D780FDA9E1ACABDC2C /* RunDetailView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -130,11 +110,6 @@
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-					8116EBABCB75011FBB77F3DF = {
-						DevelopmentTeam = GFC8G9A3MX;
-					};
-				};
 			};
 			buildConfigurationList = 095CFD5C876655FA9BB51339 /* Build configuration list for PBXProject "Runalyzer" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -145,6 +120,8 @@
 				Base,
 			);
 			mainGroup = AECDF6AF529E503EF8331ED7;
+			minimizedProjectReferenceProxies = 0;
+			preferredProjectObjectVersion = 100;
 			productRefGroup = 86C3E3CDC03F671C6EE600C2 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -159,8 +136,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4392F1783030A36700B7BA8F /* Assets.xcassets in Resources */,
-				4392F17630309A5600B7BA8F /* DeveloperSettings.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,10 +151,6 @@
 				9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */,
 				1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */,
 				075FD91D330B77E5867419C9 /* ContentView.swift in Sources */,
-				530FD8FC831BCE791BE0261C /* CoachingEngine.swift in Sources */,
-				0E57CB9EF215824E4A2EAFA1 /* DashboardView.swift in Sources */,
-				55D1177AA2296FFCD64ADA77 /* OnboardingView.swift in Sources */,
-				E8DA217826887B1997DF923A /* RunDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -206,7 +177,6 @@
 		};
 		4E82C97C86136D9FD88EBE8F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4392F17530309A5600B7BA8F /* DeveloperSettings.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -268,7 +238,6 @@
 		};
 		872937956E3B1EF4BFA5F513 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4392F17530309A5600B7BA8F /* DeveloperSettings.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -315,7 +284,8 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -327,7 +297,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = Runalyzer/Runalyzer.entitlements;
-				DEVELOPMENT_TEAM = GFC8G9A3MX;
 				INFOPLIST_FILE = Runalyzer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
