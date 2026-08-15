@@ -28,7 +28,7 @@ class CoachingEngine {
     func generateInsight(for runRecord: RunRecord) async throws -> CoachingInsight {
 
         // Ensure Foundation Models are available on device
-        guard SystemLanguageModel.isAvailable else {
+        guard SystemLanguageModel.default.isAvailable else {
             throw NSError(domain: "CoachingEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foundation Models are not available on this device."])
         }
 
@@ -51,28 +51,33 @@ class CoachingEngine {
         Your tone should be professional and encouraging.
         """
 
-        let session = LanguageModelSession(
-            model: SystemLanguageModel.default,
-            instructions: instructions
-        )
+        if #available(iOS 18.0, *) {
+            let session = LanguageModelSession(
+                model: SystemLanguageModel.default,
+                instructions: instructions
+            )
 
-        let prompt = """
-        Analyze this run:
-        \(runStatsPrompt)
-        """
+            let prompt = """
+            Analyze this run:
+            \(runStatsPrompt)
+            """
 
-        // Execute the prompt expecting the @Generable struct output
-        let generatedInsight: GeneratedCoachingInsight = try await session.respond(to: prompt)
+            // Execute the prompt expecting the @Generable struct output
+            let generatedInsight = try await session.respond(to: prompt, generating: GeneratedCoachingInsight.self)
 
-        // Map the generated struct to our SwiftData model
-        let newInsight = CoachingInsight(
-            headline: generatedInsight.headline,
-            observation: generatedInsight.observation,
-            drillTitle: generatedInsight.drillTitle,
-            drillInstructions: generatedInsight.drillInstructions,
-            isDrillCompleted: false
-        )
+            // Map the generated struct to our SwiftData model
+            let newInsight = CoachingInsight(
+                headline: generatedInsight.headline,
+                observation: generatedInsight.observation,
+                drillTitle: generatedInsight.drillTitle,
+                drillInstructions: generatedInsight.drillInstructions,
+                isDrillCompleted: false
+            )
 
-        return newInsight
+            return newInsight
+        } else {
+            throw NSError(domain: "CoachingEngine", code: 2, userInfo: [NSLocalizedDescriptionKey: "Requires iOS 18.0 or later."])
+        }
+
     }
 }
