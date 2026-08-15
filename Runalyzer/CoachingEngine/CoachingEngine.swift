@@ -3,6 +3,7 @@ import FoundationModels
 
 /// A structured response definition mapping to what we want the Foundation Model to return.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
+@available(iOS 26.0, *)
 @Generable
 struct GeneratedCoachingInsight {
     @Guide(description: "A short, catchy headline summarizing the run analysis")
@@ -18,6 +19,7 @@ struct GeneratedCoachingInsight {
     var drillInstructions: String
 }
 
+@available(iOS 26.0, *)
 @MainActor
 class CoachingEngine {
     static let shared = CoachingEngine()
@@ -51,33 +53,28 @@ class CoachingEngine {
         Your tone should be professional and encouraging.
         """
 
-        if #available(iOS 18.0, *) {
-            let session = LanguageModelSession(
-                model: SystemLanguageModel.default,
-                instructions: instructions
-            )
+        let session = LanguageModelSession(
+            model: SystemLanguageModel.default,
+            instructions: instructions
+        )
 
-            let prompt = """
-            Analyze this run:
-            \(runStatsPrompt)
-            """
+        let prompt = """
+        Analyze this run:
+        \(runStatsPrompt)
+        """
 
-            // Execute the prompt expecting the @Generable struct output
-            let generatedInsight = try await session.respond(to: prompt, generating: GeneratedCoachingInsight.self)
+        // Execute the prompt expecting the @Generable struct output
+        let generatedInsight = try await session.respond(to: prompt, generating: GeneratedCoachingInsight.self)
 
-            // Map the generated struct to our SwiftData model
-            let newInsight = CoachingInsight(
-                headline: generatedInsight.headline,
-                observation: generatedInsight.observation,
-                drillTitle: generatedInsight.drillTitle,
-                drillInstructions: generatedInsight.drillInstructions,
-                isDrillCompleted: false
-            )
+        // Map the generated struct to our SwiftData model
+        let newInsight = CoachingInsight(
+            headline: generatedInsight.content.headline,
+            observation: generatedInsight.content.observation,
+            drillTitle: generatedInsight.content.drillTitle,
+            drillInstructions: generatedInsight.content.drillInstructions,
+            isDrillCompleted: false
+        )
 
-            return newInsight
-        } else {
-            throw NSError(domain: "CoachingEngine", code: 2, userInfo: [NSLocalizedDescriptionKey: "Requires iOS 18.0 or later."])
-        }
-
+        return newInsight
     }
 }

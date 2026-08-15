@@ -57,13 +57,17 @@ struct ContentView: View {
                     modelContext.insert(newRun)
 
                     // Generate AI insight locally
-                    do {
-                        let insight = try await CoachingEngine.shared.generateInsight(for: newRun)
-                        // Link the insight
-                        newRun.insight = insight
-                    } catch {
-                        print("Failed to generate AI insight for run \(newRun.id): \(error)")
-                        // Even if AI fails, we keep the run record.
+                    if #available(iOS 26.0, *) {
+                        do {
+                            let insight = try await CoachingEngine.shared.generateInsight(for: newRun)
+                            // Link the insight
+                            newRun.insight = insight
+                        } catch {
+                            print("Failed to generate AI insight for run \(newRun.id): \(error)")
+                            // Even if AI fails, we keep the run record.
+                        }
+                    } else {
+                        print("AI insights require iOS 26.0+")
                     }
                 }
             }
