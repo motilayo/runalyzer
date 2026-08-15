@@ -68,11 +68,7 @@ class HealthKitManager: ObservableObject {
         let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
 
         // Pace (minutes per km)
-        var avgPace = 0.0
-        if distance > 0 && duration > 0 {
-            // (duration in seconds / 60) / (distance in meters / 1000)
-            avgPace = (duration / 60.0) / (distance / 1000.0)
-        }
+        let avgPace = Self.calculatePace(duration: duration, distance: distance)
 
         // Query average heart rate
         let avgHeartRate = try await fetchAverageQuantity(
@@ -88,11 +84,7 @@ class HealthKitManager: ObservableObject {
             unit: HKUnit.count()
         )
 
-        var avgCadence = 0
-        if duration > 0 {
-            // Steps per minute
-            avgCadence = Int(totalSteps / (duration / 60.0))
-        }
+        let avgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
 
         return RunRecord(
             id: workout.uuid,
@@ -103,6 +95,24 @@ class HealthKitManager: ObservableObject {
             avgHeartRate: Int(avgHeartRate),
             avgCadence: avgCadence
         )
+    }
+
+    // MARK: - Calculation Helpers
+
+    static func calculatePace(duration: TimeInterval, distance: Double) -> Double {
+        if distance > 0 && duration > 0 {
+            // (duration in seconds / 60) / (distance in meters / 1000)
+            return (duration / 60.0) / (distance / 1000.0)
+        }
+        return 0.0
+    }
+
+    static func calculateCadence(duration: TimeInterval, steps: Double) -> Int {
+        if duration > 0 {
+            // Steps per minute
+            return Int(steps / (duration / 60.0))
+        }
+        return 0
     }
 
     // MARK: - Private Helpers

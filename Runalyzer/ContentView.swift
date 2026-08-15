@@ -10,6 +10,8 @@ struct ContentView: View {
     @Query private var existingRuns: [RunRecord]
 
     @State private var isSyncing = false
+    @State private var syncError: String? = nil
+    @State private var showError = false
 
     var body: some View {
         Group {
@@ -17,6 +19,11 @@ struct ContentView: View {
                 DashboardView()
                     .task {
                         await syncData()
+                    }
+                    .alert("Sync Error", isPresented: $showError) {
+                        Button("OK", role: .cancel) { }
+                    } message: {
+                        Text(syncError ?? "An unknown error occurred while syncing.")
                     }
                     .overlay(alignment: .bottom) {
                         if isSyncing {
@@ -78,6 +85,10 @@ struct ContentView: View {
 
         } catch {
             print("Failed to sync data: \(error)")
+            await MainActor.run {
+                self.syncError = error.localizedDescription
+                self.showError = true
+            }
         }
     }
 }
