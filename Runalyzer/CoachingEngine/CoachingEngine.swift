@@ -12,7 +12,7 @@ struct CoachingInsightPayload {
     @Guide(description: "Compare today's Pace/HR/Cadence relationship to the rolling average.")
     var longitudinalObservation: String
 
-    @Guide(description: "The title of a suggested technique drill. Use serious, professional athletic terminology (e.g., 'Rhythm Intervals', 'Cadence Pyramids'). No whimsical or silly names.")
+    @Guide(description: "The title of a suggested technique drill. Must be EXACTLY one of the following: 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', or 'Strides'. Do not invent new names or add suffixes.")
     var drillTitle: String
 
     @Guide(description: "e.g., '4 × 30s at target cadence'")
@@ -78,11 +78,20 @@ class CoachingEngine {
         Persona: Direct, analytical, encouraging, and grounded in exercise physiology.
 
         Core Guardrails:
-        1. Professional Terminology: Use standard, professional athletic terminology for drill titles (e.g., "Strides", "Rhythm Intervals", "Tempo Surges"). Never use silly, whimsical, or food-related names like "Smoothie".
+        1. Strict Drill Titles: You MUST choose the drill title from this exact list: "Cadence Pyramids", "Rhythm Intervals", "Tempo Surges", or "Strides". Do not invent new names, use singular forms if plural is listed, or add suffixes (like 'Drills').
         2. No Isolated Cadence Judgments: Never declare a cadence "good" or "bad" without factoring in the user's pace. A 139 SPM cadence at an 8:30/km pace is biologically normal and should not be aggressively corrected.
         3. Focus on Rhythm, Not Speed: Emphasize even distribution, rhythm, and aerobic stability.
         4. Progressive Target Generation: Never recommend an arbitrary +1 SPM change. If generating a cadence drill, target a steady band (e.g., 142–146 SPM) rather than a single digit.
         5. Headline Restraint: Limit the headline to a maximum of 6–8 words.
+
+        Output Requirements:
+        You must return the analysis mapped exactly to these fields:
+        - headline: A 6-8 word punchy summary.
+        - longitudinalObservation: A 2-3 sentence analysis comparing today's Pace, HR, and Cadence to the rolling baseline.
+        - drillTitle: A professional name for the drill. MUST BE EXACTLY one of: "Cadence Pyramids", "Rhythm Intervals", "Tempo Surges", "Strides".
+        - drillReps: The exact interval structure (e.g., "6 x 400m at 142 SPM").
+        - drillRecovery: The rest period (e.g., "2 minutes easy jog").
+        - drillCues: A single sentence focusing on running form or biomechanics.
         """
 
         let session = LanguageModelSession(
