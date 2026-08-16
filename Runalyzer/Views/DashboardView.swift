@@ -30,9 +30,10 @@ struct DashboardView: View {
                                 .font(.title3.bold())
                                 .padding(.horizontal)
 
-                            ForEach(runRecords.dropFirst()) { run in
+                            ForEach(runRecords.indices, id: \.self) { index in
+                                let run = runRecords[index]
                                 NavigationLink(destination: RunDetailView(runRecord: run)) {
-                                    RunListRowView(runRecord: run)
+                                    RunListRowView(runRecord: run, isLatest: index == 0)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -70,9 +71,10 @@ struct HeroCardView: View {
                     .font(.title2.bold())
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.9)
                     .foregroundColor(.primary)
 
-                Text(insight.observation)
+                Text(insight.longitudinalObservation)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(3)
@@ -98,6 +100,7 @@ struct HeroCardView: View {
 
 struct RunListRowView: View {
     var runRecord: RunRecord
+    var isLatest: Bool = false
 
     var body: some View {
         HStack {
@@ -105,7 +108,7 @@ struct RunListRowView: View {
                 Text(runRecord.date, style: .date)
                     .font(.headline)
 
-                Text(String(format: "%.2f km • %.2f min/km", runRecord.distance / 1000.0, runRecord.avgPace))
+                Text(String(format: "%.2f km • %@ min/km", runRecord.distance / 1000.0, runRecord.formattedPace))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -113,10 +116,12 @@ struct RunListRowView: View {
             Spacer()
 
             // Dynamic Pill Tag
-            if let insight = runRecord.insight {
-                if insight.observation.lowercased().contains("cadence") {
+            if isLatest {
+                PillTagView(text: "Latest", color: .purple)
+            } else if let insight = runRecord.insight {
+                if insight.longitudinalObservation.lowercased().contains("cadence") {
                     PillTagView(text: "Cadence: \(runRecord.avgCadence)", color: .red)
-                } else if insight.observation.lowercased().contains("heart") || insight.observation.lowercased().contains("aerobic") {
+                } else if insight.longitudinalObservation.lowercased().contains("heart") || insight.longitudinalObservation.lowercased().contains("aerobic") {
                     PillTagView(text: "HR: \(runRecord.avgHeartRate)", color: .green)
                 } else {
                     PillTagView(text: "Analyzed", color: .blue)

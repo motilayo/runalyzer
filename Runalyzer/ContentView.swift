@@ -66,7 +66,9 @@ struct ContentView: View {
                     // Generate AI insight locally
                     if #available(iOS 26.0, *) {
                         do {
-                            let insight = try await CoachingEngine.shared.generateInsight(for: newRun)
+                            // Pass recent history for longitudinal analysis, sorting by date descending
+                            let history = existingRuns.sorted(by: { $0.date > $1.date })
+                            let insight = try await CoachingEngine.shared.generateInsight(for: newRun, history: history)
                             // Link the insight
                             newRun.insight = insight
                         } catch {
@@ -96,7 +98,7 @@ struct ContentView: View {
 #Preview {
     let previewContainer: ModelContainer = {
         do {
-            let schema = Schema([RunRecord.self, CoachingInsight.self])
+            let schema = Schema([RunRecord.self, CoachingInsight.self, DrillRecommendation.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             return try ModelContainer(for: schema, configurations: [config])
         } catch {

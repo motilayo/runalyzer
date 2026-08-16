@@ -31,6 +31,13 @@ final class RunRecord {
     @Relationship(deleteRule: .cascade, inverse: \CoachingInsight.runRecord)
     var insight: CoachingInsight?
 
+    /// A computed property to format `avgPace` as MM:SS (e.g., 7.50 Double -> "7:30")
+    var formattedPace: String {
+        let minutes = Int(avgPace)
+        let seconds = Int((avgPace - Double(minutes)) * 60)
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
     init(
         id: UUID = UUID(),
         date: Date,

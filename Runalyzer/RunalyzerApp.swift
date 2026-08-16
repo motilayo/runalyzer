@@ -7,7 +7,8 @@ struct RunalyzerApp: App {
     let container: ModelContainer = {
         let schema = Schema([
             RunRecord.self,
-            CoachingInsight.self
+            CoachingInsight.self,
+            DrillRecommendation.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
