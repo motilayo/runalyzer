@@ -24,8 +24,8 @@ struct CoachingInsightPayload {
     @Guide(description: "Specific form cues (e.g., 'Focus on quick foot turnover')")
     var drillCues: String
 
-    @Guide(description: "Target cadence as a steady band or target value, if applicable. Return null if no specific target.")
-    var targetCadence: Int?
+    @Guide(description: "Target cadence as a steady band (e.g. '142-146'), if applicable. Return null if no specific target.")
+    var targetCadence: String?
 }
 
 @available(iOS 26.0, *)

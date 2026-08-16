@@ -8,7 +8,7 @@ final class DrillRecommendation {
     var recovery: String
     var cues: String
 
-    var targetCadence: Int?
+    var targetCadence: String?
     var previousCadence: Int?
     var isCompleted: Bool
 
@@ -20,7 +20,7 @@ final class DrillRecommendation {
         reps: String,
         recovery: String,
         cues: String,
-        targetCadence: Int? = nil,
+        targetCadence: String? = nil,
         previousCadence: Int? = nil,
         isCompleted: Bool = false
     ) {
