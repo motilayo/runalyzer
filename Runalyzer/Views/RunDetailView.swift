@@ -15,7 +15,7 @@ struct RunDetailView: View {
                     let seconds = Int(runRecord.duration) % 60
                     StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
 
-                    StatBox(title: "Avg Pace", value: String(format: "%.2f", runRecord.avgPace), unit: "/km")
+                    StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "/km")
                     StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM")
                 }
                 .padding(.horizontal)

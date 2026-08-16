@@ -44,7 +44,7 @@ class CoachingEngine {
         }
 
         // Define the prompt string
-        let paceFormatted = String(format: "%.2f", runRecord.avgPace)
+        let paceFormatted = runRecord.formattedPace
         let distanceKm = runRecord.distance / 1000.0
         let distanceFormatted = String(format: "%.2f", distanceKm)
 
@@ -53,11 +53,15 @@ class CoachingEngine {
         var rollingAvgPrompt = "Rolling 5-Run Avg: None"
         if !recentRuns.isEmpty {
             let avgPace = recentRuns.map { $0.avgPace }.reduce(0, +) / Double(recentRuns.count)
+            let avgPaceMinutes = Int(avgPace)
+            let avgPaceSeconds = Int((avgPace - Double(avgPaceMinutes)) * 60)
+            let formattedAvgPace = String(format: "%d:%02d", avgPaceMinutes, avgPaceSeconds)
+
             let avgHR = recentRuns.map { $0.avgHeartRate }.reduce(0, +) / recentRuns.count
             let avgCadence = recentRuns.map { $0.avgCadence }.reduce(0, +) / recentRuns.count
 
             rollingAvgPrompt = """
-            Rolling 5-Run Avg: Pace \(String(format: "%.2f", avgPace)) min/km, HR \(avgHR) BPM, Cadence \(avgCadence) SPM
+            Rolling 5-Run Avg: Pace \(formattedAvgPace) min/km, HR \(avgHR) BPM, Cadence \(avgCadence) SPM
             """
         }
 
