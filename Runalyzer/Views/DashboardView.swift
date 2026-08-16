@@ -108,7 +108,7 @@ struct RunListRowView: View {
                 Text(runRecord.date, style: .date)
                     .font(.headline)
 
-                Text(String(format: "%.2f km • %@ min/km", runRecord.distance / 1000.0, runRecord.formattedPace))
+                Text(String(format: "%.2f km • %@", runRecord.distance / 1000.0, runRecord.formattedPace))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

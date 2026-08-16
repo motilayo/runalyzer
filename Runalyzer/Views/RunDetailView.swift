@@ -15,7 +15,7 @@ struct RunDetailView: View {
                     let seconds = Int(runRecord.duration) % 60
                     StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
 
-                    StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "/km")
+                    StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "")
                     StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM")
                 }
                 .padding(.horizontal)
@@ -56,13 +56,13 @@ struct RunDetailView: View {
                                     .foregroundColor(.blue)
                             }
 
-                            Text(drill.title)
+                            Text(drill.drillTitle)
                                 .font(.headline)
 
                             VStack(alignment: .leading, spacing: 12) {
-                                DrillRow(icon: "repeat", text: drill.reps)
-                                DrillRow(icon: "lungs", text: drill.recovery)
-                                DrillRow(icon: "brain.head.profile", text: drill.cues)
+                                DrillRow(icon: "repeat", text: drill.drillReps)
+                                DrillRow(icon: "lungs", text: drill.drillRecovery)
+                                DrillRow(icon: "brain.head.profile", text: drill.drillCues)
                             }
 
                             if let target = drill.targetCadence, let prev = drill.previousCadence {

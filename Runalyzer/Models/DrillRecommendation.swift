@@ -3,10 +3,10 @@ import SwiftData
 
 @Model
 final class DrillRecommendation {
-    var title: String
-    var reps: String
-    var recovery: String
-    var cues: String
+    var drillTitle: String
+    var drillReps: String
+    var drillRecovery: String
+    var drillCues: String
 
     var targetCadence: String?
     var previousCadence: Int?
@@ -16,18 +16,18 @@ final class DrillRecommendation {
     var insight: CoachingInsight?
 
     init(
-        title: String,
-        reps: String,
-        recovery: String,
-        cues: String,
+        drillTitle: String,
+        drillReps: String,
+        drillRecovery: String,
+        drillCues: String,
         targetCadence: String? = nil,
         previousCadence: Int? = nil,
         isCompleted: Bool = false
     ) {
-        self.title = title
-        self.reps = reps
-        self.recovery = recovery
-        self.cues = cues
+        self.drillTitle = drillTitle
+        self.drillReps = drillReps
+        self.drillRecovery = drillRecovery
+        self.drillCues = drillCues
         self.targetCadence = targetCadence
         self.previousCadence = previousCadence
         self.isCompleted = isCompleted
