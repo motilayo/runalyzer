@@ -50,8 +50,8 @@ struct ContentView: View {
         defer { isSyncing = false }
 
         do {
-            // 1. Fetch the last 5 workouts from HealthKit
-            let workouts = try await healthKitManager.fetchLastFiveRunningWorkouts()
+            // 1. Fetch recent workouts from HealthKit
+            let workouts = try await healthKitManager.fetchRecentRunningWorkouts()
 
             // 2. Cross-reference with SwiftData, extract and generate AI insight if new
             for workout in workouts {

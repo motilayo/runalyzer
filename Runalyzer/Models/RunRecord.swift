@@ -31,11 +31,9 @@ final class RunRecord {
     @Relationship(deleteRule: .cascade, inverse: \CoachingInsight.runRecord)
     var insight: CoachingInsight?
 
-    /// A computed property to format `avgPace` as MM:SS (e.g., 7.50 Double -> "7:30")
+    /// A computed property to format `avgPace` as MM:SS (e.g., 7.50 Double -> "7:30/km")
     var formattedPace: String {
-        let minutes = Int(avgPace)
-        let seconds = Int((avgPace - Double(minutes)) * 60)
-        return String(format: "%d:%02d", minutes, seconds)
+        return avgPace.formattedPaceString
     }
 
     init(
@@ -56,5 +54,34 @@ final class RunRecord {
         self.avgHeartRate = avgHeartRate
         self.avgCadence = avgCadence
         self.insight = insight
+    }
+}
+import Foundation
+
+extension Double {
+    /// Formats decimal pace (e.g., 8.33) into standard m:ss/km format (e.g., 8:20/km)
+    var formattedPaceString: String {
+        let minutes = Int(self)
+        let seconds = Int((self - Double(minutes)) * 60)
+        return String(format: "%d:%02d/km", minutes, seconds)
+    }
+}
+
+extension Array where Element == RunRecord {
+    /// Calculates the 30-day baseline stats
+    func thirtyDayBaseline(from date: Date = Date()) -> (avgPace: Double, avgHeartRate: Int, avgCadence: Int)? {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: date) else { return nil }
+
+        let validRuns = self.filter { $0.date >= thirtyDaysAgo && $0.date <= date }
+
+        guard validRuns.count >= 3 else {
+            return nil
+        }
+
+        let avgPace = validRuns.map { $0.avgPace }.reduce(0, +) / Double(validRuns.count)
+        let avgHeartRate = validRuns.map { $0.avgHeartRate }.reduce(0, +) / validRuns.count
+        let avgCadence = validRuns.map { $0.avgCadence }.reduce(0, +) / validRuns.count
+
+        return (avgPace, avgHeartRate, avgCadence)
     }
 }

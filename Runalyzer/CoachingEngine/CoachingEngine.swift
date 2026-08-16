@@ -48,26 +48,17 @@ class CoachingEngine {
         let distanceKm = runRecord.distance / 1000.0
         let distanceFormatted = String(format: "%.2f", distanceKm)
 
-        // Calculate rolling 5-run average
-        let recentRuns = Array(history.prefix(5))
-        var rollingAvgPrompt = "Rolling 5-Run Avg: None"
-        if !recentRuns.isEmpty {
-            let avgPace = recentRuns.map { $0.avgPace }.reduce(0, +) / Double(recentRuns.count)
-            let avgPaceMinutes = Int(avgPace)
-            let avgPaceSeconds = Int((avgPace - Double(avgPaceMinutes)) * 60)
-            let formattedAvgPace = String(format: "%d:%02d", avgPaceMinutes, avgPaceSeconds)
-
-            let avgHR = recentRuns.map { $0.avgHeartRate }.reduce(0, +) / recentRuns.count
-            let avgCadence = recentRuns.map { $0.avgCadence }.reduce(0, +) / recentRuns.count
-
-            rollingAvgPrompt = """
-            Rolling 5-Run Avg: Pace \(formattedAvgPace) min/km, HR \(avgHR) BPM, Cadence \(avgCadence) SPM
+        // Calculate 30-day baseline
+        var baselinePrompt = "Insufficient baseline history. Analyze this run individually."
+        if let baseline = history.thirtyDayBaseline() {
+            baselinePrompt = """
+            30-Day Baseline: Pace \(baseline.avgPace.formattedPaceString), HR \(baseline.avgHeartRate) BPM, Cadence \(baseline.avgCadence) SPM
             """
         }
 
         let runStatsPrompt = """
-        Current Run: Pace \(paceFormatted) min/km, HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
-        \(rollingAvgPrompt)
+        Current Run: Pace \(paceFormatted), HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
+        \(baselinePrompt)
         """
 
         let instructions = """
@@ -108,10 +99,10 @@ class CoachingEngine {
         let generatedInsight = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
 
         let drillRecommendation = DrillRecommendation(
-            title: generatedInsight.content.drillTitle,
-            reps: generatedInsight.content.drillReps,
-            recovery: generatedInsight.content.drillRecovery,
-            cues: generatedInsight.content.drillCues,
+            drillTitle: generatedInsight.content.drillTitle,
+            drillReps: generatedInsight.content.drillReps,
+            drillRecovery: generatedInsight.content.drillRecovery,
+            drillCues: generatedInsight.content.drillCues,
             targetCadence: generatedInsight.content.targetCadence,
             previousCadence: runRecord.avgCadence,
             isCompleted: false

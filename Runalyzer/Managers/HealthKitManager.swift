@@ -34,16 +34,23 @@ class HealthKitManager: ObservableObject {
         self.isAuthorized = true
     }
 
-    /// Fetch the last 5 running workouts
-    func fetchLastFiveRunningWorkouts() async throws -> [HKWorkout] {
-        let predicate = HKQuery.predicateForWorkouts(with: .running)
+    /// Fetch running workouts from the last 30 days
+    func fetchRecentRunningWorkouts() async throws -> [HKWorkout] {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else {
+            return []
+        }
+
+        let typePredicate = HKQuery.predicateForWorkouts(with: .running)
+        let datePredicate = HKQuery.predicateForSamples(withStart: thirtyDaysAgo, end: nil, options: .strictStartDate)
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [typePredicate, datePredicate])
+
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
 
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
                 sampleType: .workoutType(),
                 predicate: predicate,
-                limit: 5,
+                limit: HKObjectQueryNoLimit,
                 sortDescriptors: [sortDescriptor]
             ) { _, samples, error in
                 if let error = error {

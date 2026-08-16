@@ -4,11 +4,18 @@ import SwiftData
 struct DashboardView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
+    private var recentRunRecords: [RunRecord] {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else {
+            return runRecords
+        }
+        return runRecords.filter { $0.date >= thirtyDaysAgo }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    if runRecords.isEmpty {
+                    if recentRunRecords.isEmpty {
                         ContentUnavailableView(
                             "No Runs Found",
                             systemImage: "figure.run.circle",
@@ -17,7 +24,7 @@ struct DashboardView: View {
                         .padding(.top, 60)
                     } else {
                         // Hero Card for the latest run insight
-                        if let latestRun = runRecords.first {
+                        if let latestRun = recentRunRecords.first {
                             NavigationLink(destination: RunDetailView(runRecord: latestRun)) {
                                 HeroCardView(runRecord: latestRun)
                             }
@@ -30,8 +37,8 @@ struct DashboardView: View {
                                 .font(.title3.bold())
                                 .padding(.horizontal)
 
-                            ForEach(runRecords.indices, id: \.self) { index in
-                                let run = runRecords[index]
+                            ForEach(recentRunRecords.indices, id: \.self) { index in
+                                let run = recentRunRecords[index]
                                 NavigationLink(destination: RunDetailView(runRecord: run)) {
                                     RunListRowView(runRecord: run, isLatest: index == 0)
                                 }
@@ -108,7 +115,7 @@ struct RunListRowView: View {
                 Text(runRecord.date, style: .date)
                     .font(.headline)
 
-                Text(String(format: "%.2f km • %@ min/km", runRecord.distance / 1000.0, runRecord.formattedPace))
+                Text(String(format: "%.2f km • %@", runRecord.distance / 1000.0, runRecord.formattedPace))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
