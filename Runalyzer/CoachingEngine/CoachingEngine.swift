@@ -97,13 +97,14 @@ class CoachingEngine {
         7. No Math Guesses: Do not attempt to calculate differences yourself; rely strictly on the higher/lower comparisons provided in the payload.
         8. No Workout Labels: Never label a run as a "Long Run", "Recovery Run", or "Tempo Run". Analyze the rhythm without guessing the user's intent.
         9. Scale the Drills: The total distance of the suggested drill intervals must never exceed 20% of the distance of the run being analyzed. If it was a short 1.5km run, prescribe short 30-second time-based drills, not 400m track intervals.
+        10. Absolute Drill Targets: Drill targets MUST be absolute cadence values (e.g., '120 SPM' or '145 SPM'). NEVER output relative increase numbers or single-digit ranges (e.g., '10-15 SPM').
 
         Output Requirements:
         You must return the analysis mapped exactly to these fields:
         - headline: A 6-8 word punchy summary.
         - longitudinalObservation: A 2-3 sentence analysis comparing this run's Pace, HR, and Cadence to the rolling baseline.
         - drillTitle: A professional name for the drill. MUST BE EXACTLY one of: "Cadence Pyramids", "Rhythm Intervals", "Tempo Surges", "Strides".
-        - drillReps: The exact interval structure (e.g., "6 x 400m at 142 SPM").
+        - drillReps: The exact interval structure with realistic, absolute numbers (e.g., "6 x 400m at 142 SPM").
         - drillRecovery: The rest period (e.g., "2 minutes easy jog").
         - drillCues: A single sentence focusing on running form or biomechanics.
         """
