@@ -31,14 +31,19 @@ struct RunDetailView: View {
                                 .foregroundColor(.purple)
                         }
 
-                        Text(insight.headline)
-                            .font(.title3.bold())
-                            .foregroundColor(.primary)
+                        if !insight.headline.isEmpty {
+                            Text(insight.headline)
+                                .font(.title3.bold())
+                                .foregroundColor(.primary)
+                        }
 
-                        Text(insight.longitudinalObservation)
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                        if !insight.longitudinalObservation.isEmpty {
+                            Text(insight.longitudinalObservation)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
                     }
+                    .frame(minHeight: 1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                     .background(Color(.secondarySystemGroupedBackground))
@@ -56,8 +61,10 @@ struct RunDetailView: View {
                                     .foregroundColor(.blue)
                             }
 
-                            Text(drill.drillTitle)
-                                .font(.headline)
+                            if !drill.drillTitle.isEmpty {
+                                Text(drill.drillTitle)
+                                    .font(.headline)
+                            }
 
                             VStack(alignment: .leading, spacing: 12) {
                                 DrillRow(icon: "repeat", text: drill.drillReps)
@@ -65,19 +72,22 @@ struct RunDetailView: View {
                                 DrillRow(icon: "brain.head.profile", text: drill.drillCues)
                             }
 
-                            if let target = drill.targetCadence, let prev = drill.previousCadence {
+                            if let target = drill.targetCadence, let prev = drill.previousCadence, !target.isEmpty {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Cadence Goal")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                    Text("Current: \(prev) SPM → Target: \(target) SPM")
+                                    Text("Current: \(prev) SPM → Target: \(target)")
                                         .font(.subheadline.bold())
                                         .foregroundColor(.primary)
                                 }
                                 .padding(.top, 4)
                             }
 
-                            Divider()
+                            VStack(spacing: 0) {
+                                Divider()
+                            }
+                            .padding(.vertical, 4)
 
                             Toggle(isOn: Bindable(drill).isCompleted) {
                                 Text("Mark as Completed")
@@ -91,6 +101,7 @@ struct RunDetailView: View {
                                 }
                             }
                         }
+                        .frame(minHeight: 1)
                         .padding()
                         .background(Color(.secondarySystemGroupedBackground))
                         .cornerRadius(20)
@@ -105,6 +116,7 @@ struct RunDetailView: View {
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                     }
+                    .frame(minHeight: 1)
                     .padding(32)
                 }
             }
@@ -150,14 +162,16 @@ struct DrillRow: View {
     var text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .foregroundColor(.secondary)
-                .frame(width: 24)
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+        if !text.isEmpty {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: icon)
+                    .foregroundColor(.secondary)
+                    .frame(width: 24)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

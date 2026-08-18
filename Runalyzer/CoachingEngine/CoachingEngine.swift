@@ -9,7 +9,7 @@ struct CoachingInsightPayload {
     @Guide(description: "A short, catchy headline summarizing the run analysis. Strict max 8 words.")
     var headline: String
 
-    @Guide(description: "Compare today's Pace/HR/Cadence relationship to the rolling average.")
+    @Guide(description: "Compare this run's Pace/HR/Cadence relationship to the rolling average.")
     var longitudinalObservation: String
 
     @Guide(description: "The title of a suggested technique drill. Must be EXACTLY one of the following: 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', or 'Strides'. Do not invent new names or add suffixes.")
@@ -48,18 +48,37 @@ class CoachingEngine {
         let distanceKm = runRecord.distance / 1000.0
         let distanceFormatted = String(format: "%.2f", distanceKm)
 
-        // Calculate 30-day baseline
-        var baselinePrompt = "Insufficient baseline history. Analyze this run individually."
+        // Format the run date
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .none
+        let dateFormatted = dateFormatter.string(from: runRecord.date)
+
+        // Calculate 30-day baseline and deltas
+        var runStatsPrompt = """
+        Run Date: \(dateFormatted)
+        Distance: \(distanceFormatted) km
+        Current Run: Pace \(paceFormatted), HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
+        """
+
         if let baseline = history.thirtyDayBaseline() {
-            baselinePrompt = """
+            let hrDelta = runRecord.avgHeartRate - baseline.avgHeartRate
+            let hrDeltaString = hrDelta == 0 ? "same as baseline" : (hrDelta > 0 ? "\(hrDelta) BPM higher than baseline" : "\(abs(hrDelta)) BPM lower than baseline")
+
+            let cadenceDelta = runRecord.avgCadence - baseline.avgCadence
+            let cadenceDeltaString = cadenceDelta == 0 ? "same as baseline" : (cadenceDelta > 0 ? "\(cadenceDelta) SPM higher than baseline" : "\(abs(cadenceDelta)) SPM lower than baseline")
+
+            runStatsPrompt += """
+
             30-Day Baseline: Pace \(baseline.avgPace.formattedPaceString), HR \(baseline.avgHeartRate) BPM, Cadence \(baseline.avgCadence) SPM
+            Deltas: HR is \(hrDeltaString). Cadence is \(cadenceDeltaString).
+            """
+        } else {
+            runStatsPrompt += """
+
+            Baseline: Insufficient baseline history. Analyze this run individually.
             """
         }
-
-        let runStatsPrompt = """
-        Current Run: Pace \(paceFormatted), HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
-        \(baselinePrompt)
-        """
 
         let instructions = """
         Act as an elite running coach providing longitudinal, evidence-based coaching.
@@ -74,13 +93,20 @@ class CoachingEngine {
         3. Focus on Rhythm, Not Speed: Emphasize even distribution, rhythm, and aerobic stability.
         4. Progressive Target Generation: Never recommend an arbitrary +1 SPM change. If generating a cadence drill, target a steady band (e.g., 142–146 SPM) rather than a single digit.
         5. Headline Restraint: Limit the headline to a maximum of 6–8 words.
+        6. Temporal Awareness: Never use the words "today" or "today's run." Default to "This run" or reference the specific date provided.
+        7. No Math Guesses: Do not attempt to calculate differences yourself; rely strictly on the higher/lower comparisons provided in the payload.
+        8. No Workout Labels: Never label a run as a "Long Run", "Recovery Run", or "Tempo Run". Analyze the rhythm without guessing the user's intent.
+        9. Scale the Drills: The total distance of the suggested drill intervals must never exceed 20% of the distance of the run being analyzed. If it was a short 1.5km run, prescribe short 30-second time-based drills, not 400m track intervals.
+        10. Absolute Drill Targets: Drill targets MUST be absolute cadence values (e.g., '120 SPM' or '145 SPM'). NEVER output relative increase numbers or single-digit ranges (e.g., '10-15 SPM').
+        11. Actionable Headlines: Never use the date or phrases like "Analyzing Run" as the headline. The headline MUST be an actionable coaching insight or directive.
+        12. Human Coaching Persona: Speak like a human coach, not a calculator. NEVER quote exact decimal percentages (e.g., "2.5% improvement"). Summarize trends naturally (e.g., "a slight improvement", "steady progress").
 
         Output Requirements:
         You must return the analysis mapped exactly to these fields:
         - headline: A 6-8 word punchy summary.
-        - longitudinalObservation: A 2-3 sentence analysis comparing today's Pace, HR, and Cadence to the rolling baseline.
+        - longitudinalObservation: A 2-3 sentence analysis comparing this run's Pace, HR, and Cadence to the rolling baseline.
         - drillTitle: A professional name for the drill. MUST BE EXACTLY one of: "Cadence Pyramids", "Rhythm Intervals", "Tempo Surges", "Strides".
-        - drillReps: The exact interval structure (e.g., "6 x 400m at 142 SPM").
+        - drillReps: The exact interval structure with realistic, absolute numbers (e.g., "6 x 400m at 142 SPM").
         - drillRecovery: The rest period (e.g., "2 minutes easy jog").
         - drillCues: A single sentence focusing on running form or biomechanics.
         """

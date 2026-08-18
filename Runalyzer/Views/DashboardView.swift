@@ -74,27 +74,35 @@ struct HeroCardView: View {
             }
 
             if let insight = runRecord.insight {
-                Text(insight.headline)
-                    .font(.title2.bold())
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.9)
-                    .foregroundColor(.primary)
+                if !insight.headline.isEmpty {
+                    Text(insight.headline)
+                        .font(.title2.bold())
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.9)
+                        .foregroundColor(.primary)
+                }
 
-                Text(insight.longitudinalObservation)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
+                if !insight.longitudinalObservation.isEmpty {
+                    Text(insight.longitudinalObservation)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                }
             } else {
-                Text("Analyzing your run...")
-                    .font(.title2.bold())
-                    .foregroundColor(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Analyzing your run...")
+                        .font(.title2.bold())
+                        .foregroundColor(.primary)
 
-                ProgressView()
-                    .padding(.top, 4)
+                    ProgressView()
+                        .padding(.top, 4)
+                }
+                .frame(minHeight: 1)
             }
         }
+        .frame(minHeight: 1)
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(20)
