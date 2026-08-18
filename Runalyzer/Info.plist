@@ -20,7 +20,8 @@
 	<string>1</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Runalyzer needs to read your workout data to provide AI coaching insights.</string>
-
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Runalyzer requires this permission to safely integrate with the Apple Health framework, though the app only reads your workout data and does not write or modify any health records.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
