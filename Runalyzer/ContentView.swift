@@ -21,13 +21,18 @@ struct ContentView: View {
                 })
                 .task {
                     await syncData()
+
+                    healthKitManager.onWorkoutsUpdated = {
+                        await syncData()
+                    }
+                    healthKitManager.startObservingWorkouts()
                 }
                 .alert("Sync Error", isPresented: $showError) {
                     Button("OK", role: .cancel) { }
-                    } message: {
-                        Text(syncError ?? "An unknown error occurred while syncing.")
-                    }
-                    .overlay(alignment: .bottom) {
+                } message: {
+                    Text(syncError ?? "An unknown error occurred while syncing.")
+                }
+                .overlay(alignment: .bottom) {
                         if isSyncing {
                             HStack {
                                 ProgressView()
@@ -108,6 +113,10 @@ struct ContentView: View {
             // Final save for any remaining records
             try modelContext.save()
 
+        } catch is CancellationError {
+            // Task was cancelled, likely due to a view refresh or termination.
+            // We can safely ignore this and let the next sync handle the rest.
+            print("Sync data task cancelled.")
         } catch {
             print("Failed to sync data: \(error)")
             await MainActor.run {

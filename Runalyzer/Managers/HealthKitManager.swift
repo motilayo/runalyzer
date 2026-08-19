@@ -9,6 +9,10 @@ class HealthKitManager: ObservableObject {
     // Published so views can react to permission changes if needed
     @Published var isAuthorized: Bool = false
 
+    var onWorkoutsUpdated: (() async -> Void)?
+
+    private var observerQuery: HKObserverQuery?
+
     private init() {}
 
     /// Request read access for required running data
@@ -32,6 +36,30 @@ class HealthKitManager: ObservableObject {
         self.isAuthorized = (workoutStatus == .sharingAuthorized) || (workoutStatus == .notDetermined)
         // Note: we can't accurately check READ permission status. Assuming authorized if no error thrown.
         self.isAuthorized = true
+
+        try await enableBackgroundDelivery()
+    }
+
+    /// Enable background delivery for workouts
+    func enableBackgroundDelivery() async throws {
+        try await healthStore.enableBackgroundDelivery(for: .workoutType(), frequency: .immediate)
+    }
+
+    /// Start observing workouts
+    func startObservingWorkouts() {
+        guard observerQuery == nil else { return }
+        let query = HKObserverQuery(sampleType: .workoutType(), predicate: nil) { [weak self] _, completionHandler, error in
+            if error == nil {
+                Task {
+                    await self?.onWorkoutsUpdated?()
+                    completionHandler()
+                }
+            } else {
+                completionHandler()
+            }
+        }
+        observerQuery = query
+        healthStore.execute(query)
     }
 
     /// Fetch running workouts from the last 30 days
