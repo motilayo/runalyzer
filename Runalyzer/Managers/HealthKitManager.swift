@@ -69,7 +69,11 @@ class HealthKitManager: ObservableObject {
         }
 
         let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-        let minimumRunDistance = UserDefaults.standard.object(forKey: "minimumRunDistance") as? Double ?? 1.0
+
+        // When using @AppStorage with a default, if it hasn't been set by the user, UserDefaults might return nil.
+        // We ensure we fallback to the same default (1.0) we set in SettingsView.
+        let minDistanceRaw = UserDefaults.standard.object(forKey: "minimumRunDistance")
+        let minimumRunDistance = minDistanceRaw as? Double ?? 1.0
 
         // Convert minimum run distance to meters
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
@@ -99,7 +103,8 @@ class HealthKitManager: ObservableObject {
 
                 let filteredWorkouts = workouts.filter { workout in
                     let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
-                    return distance >= minDistanceInMeters
+                    // Add a tiny tolerance for floating point comparisons to avoid dropping edge cases
+                    return distance >= (minDistanceInMeters - 0.01)
                 }
 
                 continuation.resume(returning: filteredWorkouts)
