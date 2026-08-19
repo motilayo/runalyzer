@@ -4,11 +4,16 @@ import SwiftData
 struct DashboardView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
+    @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
+
     private var recentRunRecords: [RunRecord] {
+        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else {
-            return runRecords
+            return runRecords.filter { $0.distance >= (minDistanceInMeters - 0.01) }
         }
-        return runRecords.filter { $0.date >= thirtyDaysAgo }
+        return runRecords.filter { $0.date >= thirtyDaysAgo && $0.distance >= (minDistanceInMeters - 0.01) }
     }
 
     var onSync: (() async -> Void)? = nil
