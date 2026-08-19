@@ -38,8 +38,11 @@ struct ContentView: View {
                                 ProgressView()
                                 Text("Syncing Health Data & AI...")
                                     .font(.caption)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
-                            .padding()
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
                             .background(Capsule().fill(Color(.systemBackground)))
                             .shadow(radius: 5)
                             .padding(.bottom, 20)

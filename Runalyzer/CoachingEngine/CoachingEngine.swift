@@ -92,8 +92,7 @@ class CoachingEngine {
 
         let instructions = """
         Act as an elite running coach providing longitudinal, evidence-based coaching.
-        The user uses \(useMetricSystem ? "metric" : "imperial") units.
-        Pace is in \(useMetricSystem ? "min/km" : "min/mi") and distance is in \(distanceUnit).
+        The user uses \(useMetricSystem ? "metric" : "imperial") units. Express all paces in \(useMetricSystem ? "min/km" : "min/mi") and distances in \(useMetricSystem ? "km" : "miles").
         You are an expert running coach. Analyze the user's latest run against their rolling 30-day baseline and provide a short, encouraging insight.
         Provide a structured drill routine rather than arbitrary numeric shifts.
 
