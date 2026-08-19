@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-\t\t98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */; };
+		98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */; };
 		31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */; };
 		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
 		1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */; };
@@ -36,7 +36,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-\t\t768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyzer/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyzer/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
 		376830066BD295E24C449FB2 /* RunRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunRecord.swift; path = Runalyzer/Models/RunRecord.swift; sourceTree = "<group>"; };
@@ -131,7 +131,7 @@
 				52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */,
 				C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */,
 				F1A2B3C4D5E6F7G8H9I0J1K2 /* Runalyzer/Views/DashboardView.swift */,
-\t\t\t\t768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */,
+				768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */,
 				A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyzer/Views/OnboardingView.swift */,
 				Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */,
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */,
@@ -242,7 +242,7 @@
 				1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */,
 				075FD91D330B77E5867419C9 /* ContentView.swift in Sources */,
 				A2B3C4D5E6F7G8H9I0J1K2L3 /* Runalyzer/Views/DashboardView.swift in Sources */,
-\t\t\t\t98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */,
+				98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */,
 				Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyzer/Views/OnboardingView.swift in Sources */,
 				Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyzer/Views/RunDetailView.swift in Sources */,
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */,
