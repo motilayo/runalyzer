@@ -16,12 +16,14 @@ struct ContentView: View {
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                DashboardView()
-                    .task {
-                        await syncData()
-                    }
-                    .alert("Sync Error", isPresented: $showError) {
-                        Button("OK", role: .cancel) { }
+                DashboardView(onSync: {
+                    await syncData()
+                })
+                .task {
+                    await syncData()
+                }
+                .alert("Sync Error", isPresented: $showError) {
+                    Button("OK", role: .cancel) { }
                     } message: {
                         Text(syncError ?? "An unknown error occurred while syncing.")
                     }

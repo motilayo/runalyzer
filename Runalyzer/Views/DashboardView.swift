@@ -11,6 +11,8 @@ struct DashboardView: View {
         return runRecords.filter { $0.date >= thirtyDaysAgo }
     }
 
+    var onSync: (() async -> Void)? = nil
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -48,6 +50,11 @@ struct DashboardView: View {
                     }
                 }
                 .padding(.vertical)
+            }
+            .refreshable {
+                if let onSync {
+                    await onSync()
+                }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Dashboard")
