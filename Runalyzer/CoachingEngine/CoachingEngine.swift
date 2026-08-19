@@ -44,9 +44,11 @@ class CoachingEngine {
         }
 
         // Define the prompt string
+        let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
         let paceFormatted = runRecord.formattedPace
-        let distanceKm = runRecord.distance / 1000.0
-        let distanceFormatted = String(format: "%.2f", distanceKm)
+        let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
+        let distanceFormatted = String(format: "%.2f", distanceConverted)
+        let distanceUnit = useMetricSystem ? "km" : "miles"
 
         // Format the run date
         let dateFormatter = DateFormatter()
@@ -58,8 +60,12 @@ class CoachingEngine {
         var runStatsPrompt = ""
 
         if let baseline = history.thirtyDayBaseline(from: runRecord.date) {
+            let baselineDistanceConverted = useMetricSystem ? (baseline.avgDistance / 1000.0) : (baseline.avgDistance / 1609.344)
+            let baselineDistanceFormatted = String(format: "%.2f", baselineDistanceConverted)
+
             runStatsPrompt += """
             <BASELINE_30_DAYS>
+            Average Distance: \(baselineDistanceFormatted) \(distanceUnit)
             Average Pace: \(baseline.avgPace.formattedPaceString)
             Average Heart Rate: \(baseline.avgHeartRate) BPM
             Average Cadence: \(baseline.avgCadence) SPM
@@ -77,7 +83,7 @@ class CoachingEngine {
 
         <CURRENT_RUN>
         Run Date: \(dateFormatted)
-        Distance: \(distanceFormatted) km
+        Distance: \(distanceFormatted) \(distanceUnit)
         Pace: \(paceFormatted)
         Heart Rate: \(runRecord.avgHeartRate) BPM
         Cadence: \(runRecord.avgCadence) SPM
@@ -86,6 +92,8 @@ class CoachingEngine {
 
         let instructions = """
         Act as an elite running coach providing longitudinal, evidence-based coaching.
+        The user uses \(useMetricSystem ? "metric" : "imperial") units.
+        Pace is in \(useMetricSystem ? "min/km" : "min/mi") and distance is in \(distanceUnit).
         You are an expert running coach. Analyze the user's latest run against their rolling 30-day baseline and provide a short, encouraging insight.
         Provide a structured drill routine rather than arbitrary numeric shifts.
 

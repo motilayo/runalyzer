@@ -68,6 +68,12 @@ class HealthKitManager: ObservableObject {
             return []
         }
 
+        let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+        let minimumRunDistance = UserDefaults.standard.object(forKey: "minimumRunDistance") as? Double ?? 1.0
+
+        // Convert minimum run distance to meters
+        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+
         let typePredicate = HKQuery.predicateForWorkouts(with: .running)
         let datePredicate = HKQuery.predicateForSamples(withStart: thirtyDaysAgo, end: nil, options: .strictStartDate)
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [typePredicate, datePredicate])
@@ -91,7 +97,12 @@ class HealthKitManager: ObservableObject {
                     return
                 }
 
-                continuation.resume(returning: workouts)
+                let filteredWorkouts = workouts.filter { workout in
+                    let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
+                    return distance >= minDistanceInMeters
+                }
+
+                continuation.resume(returning: filteredWorkouts)
             }
             healthStore.execute(query)
         }

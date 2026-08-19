@@ -64,6 +64,13 @@ struct DashboardView: View {
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Dashboard")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: SettingsView(onForceSync: onSync)) {
+                        Image(systemName: "gear")
+                    }
+                }
+            }
         }
     }
 }

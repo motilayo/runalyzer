@@ -61,15 +61,24 @@ import Foundation
 extension Double {
     /// Formats decimal pace (e.g., 8.33) into standard m:ss/km format (e.g., 8:20/km)
     var formattedPaceString: String {
-        let minutes = Int(self)
-        let seconds = Int((self - Double(minutes)) * 60)
-        return String(format: "%d:%02d/km", minutes, seconds)
+        let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+        if useMetricSystem {
+            let minutes = Int(self)
+            let seconds = Int((self - Double(minutes)) * 60)
+            return String(format: "%d:%02d/km", minutes, seconds)
+        } else {
+            // Convert min/km to min/mi
+            let paceInMiles = self * 1.609344
+            let minutes = Int(paceInMiles)
+            let seconds = Int((paceInMiles - Double(minutes)) * 60)
+            return String(format: "%d:%02d/mi", minutes, seconds)
+        }
     }
 }
 
 extension Array where Element == RunRecord {
     /// Calculates the 30-day baseline stats
-    func thirtyDayBaseline(from date: Date = Date()) -> (avgPace: Double, avgHeartRate: Int, avgCadence: Int)? {
+    func thirtyDayBaseline(from date: Date = Date()) -> (avgDistance: Double, avgPace: Double, avgHeartRate: Int, avgCadence: Int)? {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: date) else { return nil }
 
         let validRuns = self.filter { $0.date >= thirtyDaysAgo && $0.date < date }
@@ -78,10 +87,11 @@ extension Array where Element == RunRecord {
             return nil
         }
 
+        let avgDistance = validRuns.map { $0.distance }.reduce(0, +) / Double(validRuns.count)
         let avgPace = validRuns.map { $0.avgPace }.reduce(0, +) / Double(validRuns.count)
         let avgHeartRate = validRuns.map { $0.avgHeartRate }.reduce(0, +) / validRuns.count
         let avgCadence = validRuns.map { $0.avgCadence }.reduce(0, +) / validRuns.count
 
-        return (avgPace, avgHeartRate, avgCadence)
+        return (avgDistance, avgPace, avgHeartRate, avgCadence)
     }
 }
