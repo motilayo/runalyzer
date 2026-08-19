@@ -61,7 +61,7 @@ class CoachingEngine {
         Current Run: Pace \(paceFormatted), HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
         """
 
-        if let baseline = history.thirtyDayBaseline() {
+        if let baseline = history.thirtyDayBaseline(from: runRecord.date) {
             let hrDelta = runRecord.avgHeartRate - baseline.avgHeartRate
             let hrDeltaString = hrDelta == 0 ? "same as baseline" : (hrDelta > 0 ? "\(hrDelta) BPM higher than baseline" : "\(abs(hrDelta)) BPM lower than baseline")
 
