@@ -39,8 +39,7 @@ struct DashboardView: View {
                                 .font(.title3.bold())
                                 .padding(.horizontal)
 
-                            ForEach(recentRunRecords.indices, id: \.self) { index in
-                                let run = recentRunRecords[index]
+                            ForEach(Array(recentRunRecords.enumerated()), id: \.offset) { index, run in
                                 NavigationLink(destination: RunDetailView(runRecord: run)) {
                                     RunListRowView(runRecord: run, isLatest: index == 0)
                                 }
@@ -143,7 +142,11 @@ struct RunListRowView: View {
                 Text(runRecord.date, style: .date)
                     .font(.headline)
 
-                Text(String(format: "%.2f km • %@", runRecord.distance / 1000.0, runRecord.formattedPace))
+                let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+                let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
+                let distanceUnit = useMetricSystem ? "km" : "mi"
+
+                Text(String(format: "%.2f %@ • %@", distanceConverted, distanceUnit, runRecord.formattedPace))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

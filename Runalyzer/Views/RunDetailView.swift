@@ -9,7 +9,10 @@ struct RunDetailView: View {
 
                 // Top: 2x2 Grid of Raw Stats
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    StatBox(title: "Distance", value: String(format: "%.2f", runRecord.distance / 1000.0), unit: "km")
+                    let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+                    let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
+                    let distanceUnit = useMetricSystem ? "km" : "mi"
+                    StatBox(title: "Distance", value: String(format: "%.2f", distanceConverted), unit: distanceUnit)
 
                     let minutes = Int(runRecord.duration) / 60
                     let seconds = Int(runRecord.duration) % 60
