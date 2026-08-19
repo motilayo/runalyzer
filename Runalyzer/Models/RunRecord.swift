@@ -72,7 +72,7 @@ extension Array where Element == RunRecord {
     func thirtyDayBaseline(from date: Date = Date()) -> (avgPace: Double, avgHeartRate: Int, avgCadence: Int)? {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: date) else { return nil }
 
-        let validRuns = self.filter { $0.date >= thirtyDaysAgo && $0.date <= date }
+        let validRuns = self.filter { $0.date >= thirtyDaysAgo && $0.date < date }
 
         guard validRuns.count >= 3 else {
             return nil

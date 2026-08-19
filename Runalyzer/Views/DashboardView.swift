@@ -11,6 +11,8 @@ struct DashboardView: View {
         return runRecords.filter { $0.date >= thirtyDaysAgo }
     }
 
+    var onSync: (() async -> Void)? = nil
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -48,6 +50,17 @@ struct DashboardView: View {
                     }
                 }
                 .padding(.vertical)
+            }
+            .refreshable {
+                if let onSync {
+                    // Detach the sync operation from the refreshable task's strict lifecycle
+                    // so it doesn't get cancelled when the view re-renders upon saving the first run.
+                    let task = Task {
+                        await onSync()
+                    }
+                    // Await its completion so the refresh indicator stays active
+                    _ = await task.result
+                }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Dashboard")

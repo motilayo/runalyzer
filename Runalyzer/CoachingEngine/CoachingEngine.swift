@@ -55,34 +55,38 @@ class CoachingEngine {
         let dateFormatted = dateFormatter.string(from: runRecord.date)
 
         // Calculate 30-day baseline and deltas
-        var runStatsPrompt = """
-        Run Date: \(dateFormatted)
-        Distance: \(distanceFormatted) km
-        Current Run: Pace \(paceFormatted), HR \(runRecord.avgHeartRate) BPM, Cadence \(runRecord.avgCadence) SPM
-        """
+        var runStatsPrompt = ""
 
-        if let baseline = history.thirtyDayBaseline() {
-            let hrDelta = runRecord.avgHeartRate - baseline.avgHeartRate
-            let hrDeltaString = hrDelta == 0 ? "same as baseline" : (hrDelta > 0 ? "\(hrDelta) BPM higher than baseline" : "\(abs(hrDelta)) BPM lower than baseline")
-
-            let cadenceDelta = runRecord.avgCadence - baseline.avgCadence
-            let cadenceDeltaString = cadenceDelta == 0 ? "same as baseline" : (cadenceDelta > 0 ? "\(cadenceDelta) SPM higher than baseline" : "\(abs(cadenceDelta)) SPM lower than baseline")
-
+        if let baseline = history.thirtyDayBaseline(from: runRecord.date) {
             runStatsPrompt += """
-
-            30-Day Baseline: Pace \(baseline.avgPace.formattedPaceString), HR \(baseline.avgHeartRate) BPM, Cadence \(baseline.avgCadence) SPM
-            Deltas: HR is \(hrDeltaString). Cadence is \(cadenceDeltaString).
+            <BASELINE_30_DAYS>
+            Average Pace: \(baseline.avgPace.formattedPaceString)
+            Average Heart Rate: \(baseline.avgHeartRate) BPM
+            Average Cadence: \(baseline.avgCadence) SPM
+            </BASELINE_30_DAYS>
             """
         } else {
             runStatsPrompt += """
-
-            Baseline: Insufficient baseline history. Analyze this run individually.
+            <BASELINE_30_DAYS>
+            Insufficient baseline history. Analyze this run individually.
+            </BASELINE_30_DAYS>
             """
         }
 
+        runStatsPrompt += """
+
+        <CURRENT_RUN>
+        Run Date: \(dateFormatted)
+        Distance: \(distanceFormatted) km
+        Pace: \(paceFormatted)
+        Heart Rate: \(runRecord.avgHeartRate) BPM
+        Cadence: \(runRecord.avgCadence) SPM
+        </CURRENT_RUN>
+        """
+
         let instructions = """
         Act as an elite running coach providing longitudinal, evidence-based coaching.
-        Analyze the provided run statistics against the rolling average baseline.
+        You are an expert running coach. Analyze the user's latest run against their rolling 30-day baseline and provide a short, encouraging insight.
         Provide a structured drill routine rather than arbitrary numeric shifts.
 
         Persona: Direct, analytical, encouraging, and grounded in exercise physiology.
@@ -94,7 +98,7 @@ class CoachingEngine {
         4. Progressive Target Generation: Never recommend an arbitrary +1 SPM change. If generating a cadence drill, target a steady band (e.g., 142–146 SPM) rather than a single digit.
         5. Headline Restraint: Limit the headline to a maximum of 6–8 words.
         6. Temporal Awareness: Never use the words "today" or "today's run." Default to "This run" or reference the specific date provided.
-        7. No Math Guesses: Do not attempt to calculate differences yourself; rely strictly on the higher/lower comparisons provided in the payload.
+        7. Direction of Change: Always state the direction of change correctly by strictly comparing <CURRENT_RUN> against <BASELINE_30_DAYS>. Do not attempt to calculate exact numerical differences yourself.
         8. No Workout Labels: Never label a run as a "Long Run", "Recovery Run", or "Tempo Run". Analyze the rhythm without guessing the user's intent.
         9. Scale the Drills: The total distance of the suggested drill intervals must never exceed 20% of the distance of the run being analyzed. If it was a short 1.5km run, prescribe short 30-second time-based drills, not 400m track intervals.
         10. Absolute Drill Targets: Drill targets MUST be absolute cadence values (e.g., '120 SPM' or '145 SPM'). NEVER output relative increase numbers or single-digit ranges (e.g., '10-15 SPM').
