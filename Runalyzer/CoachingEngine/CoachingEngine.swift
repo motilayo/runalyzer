@@ -1,10 +1,22 @@
 import Foundation
 import FoundationModels
+import SwiftData
 
 /// A structured response definition mapping to what we want the Foundation Model to return.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
 @available(iOS 26.0, *)
 @Generable
+
+struct RunDataForAI: Sendable {
+    let date: Date
+    let distance: Double
+    let avgPace: Double
+    let avgHeartRate: Int
+    let avgCadence: Int
+    let formattedPace: String
+    let baseline: BaselineStats?
+}
+
 struct CoachingInsightPayload {
     @Guide(description: "A short, catchy headline summarizing the run analysis. Strict max 8 words.")
     var headline: String
@@ -36,7 +48,7 @@ class CoachingEngine {
     private init() {}
 
     /// Analyzes a run record and generates a CoachingInsight using on-device FoundationModels
-    func generateInsight(for runRecord: RunRecord, history: [RunRecord]) async throws -> CoachingInsight {
+    func generateInsight(for runData: RunDataForAI) async throws -> CoachingInsightPayload {
 
         // Ensure Foundation Models are available on device
         guard SystemLanguageModel.default.isAvailable else {
@@ -45,8 +57,8 @@ class CoachingEngine {
 
         // Define the prompt string
         let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-        let paceFormatted = runRecord.formattedPace
-        let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
+        let paceFormatted = runData.formattedPace
+        let distanceConverted = useMetricSystem ? (runData.distance / 1000.0) : (runData.distance / 1609.344)
         let distanceFormatted = String(format: "%.2f", distanceConverted)
         let distanceUnit = useMetricSystem ? "km" : "miles"
 
@@ -54,12 +66,12 @@ class CoachingEngine {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
-        let dateFormatted = dateFormatter.string(from: runRecord.date)
+        let dateFormatted = dateFormatter.string(from: runData.date)
 
         // Calculate 30-day baseline and deltas
         var runStatsPrompt = ""
 
-        if let baseline = history.thirtyDayBaseline(from: runRecord.date) {
+        if let baseline = runData.baseline {
             let baselineDistanceConverted = useMetricSystem ? (baseline.avgDistance / 1000.0) : (baseline.avgDistance / 1609.344)
             let baselineDistanceFormatted = String(format: "%.2f", baselineDistanceConverted)
 
@@ -70,6 +82,12 @@ class CoachingEngine {
             Average Heart Rate: \(baseline.avgHeartRate) BPM
             Average Cadence: \(baseline.avgCadence) SPM
             </BASELINE_30_DAYS>
+
+            <DELTAS>
+            Pace Delta: \(String(format: "%+.2f", (useMetricSystem ? runData.avgPace : runData.avgPace * 1.609344) - (useMetricSystem ? baseline.avgPace : baseline.avgPace * 1.609344))) min/\(distanceUnit)
+            Heart Rate Delta: \(runData.avgHeartRate - baseline.avgHeartRate) BPM
+            Cadence Delta: \(runData.avgCadence - baseline.avgCadence) SPM
+            </DELTAS>
             """
         } else {
             runStatsPrompt += """
@@ -85,8 +103,8 @@ class CoachingEngine {
         Run Date: \(dateFormatted)
         Distance: \(distanceFormatted) \(distanceUnit)
         Pace: \(paceFormatted)
-        Heart Rate: \(runRecord.avgHeartRate) BPM
-        Cadence: \(runRecord.avgCadence) SPM
+        Heart Rate: \(runData.avgHeartRate) BPM
+        Cadence: \(runData.avgCadence) SPM
         </CURRENT_RUN>
         """
 
@@ -120,6 +138,7 @@ class CoachingEngine {
         - drillReps: The exact interval structure with realistic, absolute numbers (e.g., "6 x 400m at 142 SPM").
         - drillRecovery: The rest period (e.g., "2 minutes easy jog").
         - drillCues: A single sentence focusing on running form or biomechanics.
+        - targetCadence: Target cadence as a steady band (e.g. '142-146'), if applicable. Return null if no specific target.
         """
 
         let session = LanguageModelSession(
@@ -142,7 +161,7 @@ class CoachingEngine {
                 drillRecovery: generatedInsight.content.drillRecovery,
                 drillCues: generatedInsight.content.drillCues,
                 targetCadence: generatedInsight.content.targetCadence,
-                previousCadence: runRecord.avgCadence,
+                previousCadence: runData.avgCadence,
                 isCompleted: false
             )
 
@@ -156,20 +175,14 @@ class CoachingEngine {
             print("FoundationModels Generation Error: \(error.localizedDescription)")
 
             // Graceful fallback for unsupported languages/locales or generation failures
-            let fallbackDrill = DrillRecommendation(
+            return CoachingInsightPayload(
+                headline: "Run Analyzed Successfully",
+                longitudinalObservation: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days.",
                 drillTitle: "Strides",
                 drillReps: "4 × 20s",
                 drillRecovery: "60s easy walk",
                 drillCues: "Focus on relaxed shoulders and quick turnover.",
-                targetCadence: nil,
-                previousCadence: runRecord.avgCadence,
-                isCompleted: false
-            )
-
-            return CoachingInsight(
-                headline: "Run Analyzed Successfully",
-                longitudinalObservation: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days.",
-                drillRecommendation: fallbackDrill
+                targetCadence: nil
             )
         }
     }
