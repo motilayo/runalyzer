@@ -133,25 +133,44 @@ class CoachingEngine {
         """
 
         // Execute the prompt expecting the @Generable struct output
-        let generatedInsight = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
+        do {
+            let generatedInsight = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
 
-        let drillRecommendation = DrillRecommendation(
-            drillTitle: generatedInsight.content.drillTitle,
-            drillReps: generatedInsight.content.drillReps,
-            drillRecovery: generatedInsight.content.drillRecovery,
-            drillCues: generatedInsight.content.drillCues,
-            targetCadence: generatedInsight.content.targetCadence,
-            previousCadence: runRecord.avgCadence,
-            isCompleted: false
-        )
+            let drillRecommendation = DrillRecommendation(
+                drillTitle: generatedInsight.content.drillTitle,
+                drillReps: generatedInsight.content.drillReps,
+                drillRecovery: generatedInsight.content.drillRecovery,
+                drillCues: generatedInsight.content.drillCues,
+                targetCadence: generatedInsight.content.targetCadence,
+                previousCadence: runRecord.avgCadence,
+                isCompleted: false
+            )
 
-        // Map the generated struct to our SwiftData model
-        let newInsight = CoachingInsight(
-            headline: generatedInsight.content.headline,
-            longitudinalObservation: generatedInsight.content.longitudinalObservation,
-            drillRecommendation: drillRecommendation
-        )
+            // Map the generated struct to our SwiftData model
+            return CoachingInsight(
+                headline: generatedInsight.content.headline,
+                longitudinalObservation: generatedInsight.content.longitudinalObservation,
+                drillRecommendation: drillRecommendation
+            )
+        } catch {
+            print("FoundationModels Generation Error: \(error.localizedDescription)")
 
-        return newInsight
+            // Graceful fallback for unsupported languages/locales or generation failures
+            let fallbackDrill = DrillRecommendation(
+                drillTitle: "Strides",
+                drillReps: "4 × 20s",
+                drillRecovery: "60s easy walk",
+                drillCues: "Focus on relaxed shoulders and quick turnover.",
+                targetCadence: nil,
+                previousCadence: runRecord.avgCadence,
+                isCompleted: false
+            )
+
+            return CoachingInsight(
+                headline: "Run Analyzed Successfully",
+                longitudinalObservation: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days.",
+                drillRecommendation: fallbackDrill
+            )
+        }
     }
 }
