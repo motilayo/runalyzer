@@ -58,11 +58,12 @@ class CoachingEngine {
         let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
         let paceFormatted = runData.formattedPace
         let distanceConverted = useMetricSystem ? (runData.distance / 1000.0) : (runData.distance / 1609.344)
-        let distanceFormatted = String(format: "%.2f", distanceConverted)
+        let distanceFormatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), distanceConverted)
         let distanceUnit = useMetricSystem ? "km" : "miles"
 
         // Format the run date
         let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
         let dateFormatted = dateFormatter.string(from: runData.date)
@@ -72,7 +73,7 @@ class CoachingEngine {
 
         if let baseline = runData.baseline {
             let baselineDistanceConverted = useMetricSystem ? (baseline.avgDistance / 1000.0) : (baseline.avgDistance / 1609.344)
-            let baselineDistanceFormatted = String(format: "%.2f", baselineDistanceConverted)
+            let baselineDistanceFormatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), baselineDistanceConverted)
 
             runStatsPrompt += """
             <BASELINE_30_DAYS>
@@ -83,7 +84,7 @@ class CoachingEngine {
             </BASELINE_30_DAYS>
 
             <DELTAS>
-            Pace Delta: \(String(format: "%+.2f", (useMetricSystem ? runData.avgPace : runData.avgPace * 1.609344) - (useMetricSystem ? baseline.avgPace : baseline.avgPace * 1.609344))) min/\(distanceUnit)
+            Pace Delta: \(String(format: "%+.2f", locale: Locale(identifier: "en_US_POSIX"), (useMetricSystem ? runData.avgPace : runData.avgPace * 1.609344) - (useMetricSystem ? baseline.avgPace : baseline.avgPace * 1.609344))) min/\(distanceUnit)
             Heart Rate Delta: \(runData.avgHeartRate - baseline.avgHeartRate) BPM
             Cadence Delta: \(runData.avgCadence - baseline.avgCadence) SPM
             </DELTAS>
@@ -111,6 +112,7 @@ class CoachingEngine {
         Act as an elite running coach providing longitudinal, evidence-based coaching.
         The user uses \(useMetricSystem ? "metric" : "imperial") units. Express all paces in \(useMetricSystem ? "min/km" : "min/mi") and distances in \(useMetricSystem ? "km" : "miles").
         You are an expert running coach. Analyze the user's latest run against their rolling 30-day baseline and provide a short, encouraging insight.
+        IMPORTANT: You must translate your final response and answer entirely in the language corresponding to this language code: \(Locale.current.language.languageCode?.identifier ?? "en").
         Provide a structured drill routine rather than arbitrary numeric shifts.
 
         Persona: Direct, analytical, encouraging, and grounded in exercise physiology.
@@ -160,12 +162,12 @@ class CoachingEngine {
 
             // Graceful fallback for unsupported languages/locales or generation failures
             return CoachingInsightPayload(
-                headline: "Run Analyzed Successfully",
-                longitudinalObservation: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days.",
-                drillTitle: "Strides",
-                drillReps: "4 × 20s",
-                drillRecovery: "60s easy walk",
-                drillCues: "Focus on relaxed shoulders and quick turnover.",
+                headline: String(localized: "Run Analyzed Successfully"),
+                longitudinalObservation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
+                drillTitle: String(localized: "Strides"),
+                drillReps: String(localized: "4 × 20s"),
+                drillRecovery: String(localized: "60s easy walk"),
+                drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                 targetCadence: nil
             )
         }
