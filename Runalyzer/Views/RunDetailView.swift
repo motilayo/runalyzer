@@ -1,7 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
+    @Environment(\.modelContext) private var modelContext
+    @Query private var existingRuns: [RunRecord]
 
     var body: some View {
         ScrollView {
@@ -121,6 +124,18 @@ struct RunDetailView: View {
                     }
                     .frame(minHeight: 1)
                     .padding(32)
+                    .task {
+                        if runRecord.insight == nil {
+                            do {
+                                let history = existingRuns.sorted(by: { $0.date > $1.date })
+                                let insight = try await CoachingEngine.shared.generateInsight(for: runRecord, history: history)
+                                runRecord.insight = insight
+                                try modelContext.save()
+                            } catch {
+                                print("Failed to generate AI insight for run \(runRecord.id): \(error)")
+                            }
+                        }
+                    }
                 }
             }
             .padding(.vertical)

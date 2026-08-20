@@ -7,6 +7,8 @@ struct DashboardView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
 
+    @State private var isSyncing: Bool = true
+
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
         return runRecords.filter { $0.distance >= (minDistanceInMeters - 0.01) }
@@ -17,9 +19,9 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     if filteredRunRecords.isEmpty {
-                        if runRecords.isEmpty {
+                        if isSyncing && runRecords.isEmpty {
                             VStack(spacing: 16) {
                                 ProgressView()
                                     .scaleEffect(1.5)
@@ -39,7 +41,7 @@ struct DashboardView: View {
                     } else {
                         // Hero Card for the latest run insight
                         if let latestRun = filteredRunRecords.first {
-                            NavigationLink(destination: RunDetailView(runRecord: latestRun)) {
+                            NavigationLink(value: latestRun) {
                                 HeroCardView(runRecord: latestRun)
                             }
                             .buttonStyle(.plain)
@@ -47,14 +49,13 @@ struct DashboardView: View {
 
                         // List of past runs
                         if filteredRunRecords.count > 1 {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Past Runs")
-                                    .font(.title3.bold())
-                                    .padding(.horizontal)
-
+                            Section(header: Text("Past Runs")
+                                                .font(.title3.bold())
+                                                .padding(.horizontal)
+                                                .frame(maxWidth: .infinity, alignment: .leading)) {
                                 let pastRuns = Array(filteredRunRecords.dropFirst())
-                                ForEach(Array(pastRuns.enumerated()), id: \.offset) { index, run in
-                                    NavigationLink(destination: RunDetailView(runRecord: run)) {
+                                ForEach(pastRuns) { run in
+                                    NavigationLink(value: run) {
                                         RunListRowView(runRecord: run)
                                     }
                                     .buttonStyle(.plain)
@@ -65,8 +66,18 @@ struct DashboardView: View {
                 }
                 .padding(.vertical)
             }
+            .navigationDestination(for: RunRecord.self) { runRecord in
+                RunDetailView(runRecord: runRecord)
+            }
+            .task {
+                if let onSync {
+                    await onSync()
+                    isSyncing = false
+                }
+            }
             .refreshable {
                 if let onSync {
+                    isSyncing = true
                     // Detach the sync operation from the refreshable task's strict lifecycle
                     // so it doesn't get cancelled when the view re-renders upon saving the first run.
                     let task = Task {
@@ -74,6 +85,7 @@ struct DashboardView: View {
                     }
                     // Await its completion so the refresh indicator stays active
                     _ = await task.result
+                    isSyncing = false
                 }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
@@ -251,7 +263,7 @@ struct RunListRowView: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption)
-                .foregroundColor(.tertiaryLabel)
+                .foregroundColor(Color(uiColor: .tertiaryLabel))
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
