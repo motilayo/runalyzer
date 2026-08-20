@@ -69,13 +69,10 @@ struct ContentView: View {
             }
 
             // 3. Extract and insert new runs
-            // We only generate an AI insight for the most recent run (the Hero Run).
-            // Historical runs will have AI insights generated on-demand when viewed.
-
-            // Sort new workouts ascending (oldest first) so we can insert them in order
+            // Sort new workouts ascending (oldest first) so we can insert them in order and calculate correct rolling baselines.
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
-            let newestWorkoutId = sortedNewWorkouts.last?.uuid
 
+            var runCount = 0
             for workout in sortedNewWorkouts {
                 // Extract stats
                 let newRun = try await healthKitManager.extractRunRecord(from: workout)
@@ -86,29 +83,36 @@ struct ContentView: View {
                 // Save context so history is updated for subsequent runs
                 try modelContext.save()
 
-                // Generate AI insight locally ONLY for the most recent run
-                if workout.uuid == newestWorkoutId {
-                    if #available(iOS 26.0, *) {
-                        let runId = newRun.persistentModelID
-                        let container = modelContext.container
+                // Generate AI insight locally for EACH run so baseline context is strictly temporal
+                if #available(iOS 26.0, *) {
+                    let runId = newRun.persistentModelID
+                    let container = modelContext.container
 
-                        Task.detached {
-                            let backgroundContext = ModelContext(container)
-                            if let backgroundRun = backgroundContext.model(for: runId) as? RunRecord {
-                                do {
-                                    let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
-                                    let history = (try? backgroundContext.fetch(descriptor)) ?? []
-                                    let insight = try await CoachingEngine.shared.generateInsight(for: backgroundRun, history: history)
-                                    backgroundRun.insight = insight
-                                    try backgroundContext.save()
-                                } catch {
-                                    print("Failed to generate AI insight for hero run \(backgroundRun.id): \(error)")
-                                }
+                    // Await the detached task to ensure sequential processing
+                    await Task.detached {
+                        let backgroundContext = ModelContext(container)
+                        if let backgroundRun = backgroundContext.model(for: runId) as? RunRecord {
+                            do {
+                                let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+                                let history = (try? backgroundContext.fetch(descriptor)) ?? []
+                                let insight = try await CoachingEngine.shared.generateInsight(for: backgroundRun, history: history)
+                                backgroundRun.insight = insight
+                                try backgroundContext.save()
+                            } catch {
+                                print("Failed to generate AI insight for run \(backgroundRun.id): \(error)")
                             }
                         }
+                    }.value
+
+                    // Delay between generations to avoid overloading the model
+                    runCount += 1
+                    if runCount % 5 == 0 {
+                        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds longer pause
                     } else {
-                        print("AI insights require iOS 26.0+")
+                        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds default pause
                     }
+                } else {
+                    print("AI insights require iOS 26.0+")
                 }
             }
 

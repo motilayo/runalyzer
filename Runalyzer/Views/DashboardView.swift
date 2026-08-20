@@ -42,7 +42,7 @@ struct DashboardView: View {
                         // Hero Card for the latest run insight
                         if let latestRun = filteredRunRecords.first {
                             NavigationLink(value: latestRun) {
-                                HeroCardView(runRecord: latestRun)
+                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing)
                             }
                             .buttonStyle(.plain)
                         }
@@ -105,6 +105,7 @@ struct DashboardView: View {
 
 struct HeroCardView: View {
     var runRecord: RunRecord
+    var isSyncing: Bool
     @Environment(\.modelContext) private var modelContext
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
@@ -205,7 +206,7 @@ struct HeroCardView: View {
                 .frame(minHeight: 1)
                 .task {
                     if #available(iOS 26.0, *) {
-                        if runRecord.insight == nil {
+                        if runRecord.insight == nil && !isSyncing {
                             let runId = runRecord.persistentModelID
                             let container = modelContext.container
 
