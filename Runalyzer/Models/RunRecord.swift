@@ -78,14 +78,14 @@ extension Double {
 
 extension Array where Element == RunRecord {
     /// Calculates the 30-day baseline stats
-    func thirtyDayBaseline(from date: Date = Date()) -> (avgDistance: Double, avgPace: Double, avgHeartRate: Int, avgCadence: Int)? {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: date) else { return nil }
+    func thirtyDayBaseline(from targetDate: Date = Date()) -> (avgDistance: Double, avgPace: Double, avgHeartRate: Int, avgCadence: Int)? {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) else { return nil }
 
         let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
         let minDistanceRaw = UserDefaults.standard.object(forKey: "minimumRunDistance") as? Double ?? 1.0
         let minDistanceInMeters = useMetricSystem ? (minDistanceRaw * 1000.0) : (minDistanceRaw * 1609.344)
 
-        let validRuns = self.filter { $0.date >= thirtyDaysAgo && $0.date < date && $0.distance >= (minDistanceInMeters - 0.01) }
+        let validRuns = self.filter { $0.date >= thirtyDaysAgo && $0.date < targetDate && $0.distance >= (minDistanceInMeters - 0.01) }
 
         guard validRuns.count >= 3 else {
             return nil

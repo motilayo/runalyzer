@@ -68,51 +68,40 @@ struct ContentView: View {
                 !existingRuns.contains(where: { $0.id == workout.uuid })
             }
 
-            // 3. Extract and generate AI insight for new runs
-            // We process them all but introduce a small delay between LLM calls to prevent overwhelming the device.
-            // Additionally, we save the context after every 5 runs to ensure progress is persisted.
-            var processedCount = 0
+            // 3. Extract and insert new runs
+            // We only generate an AI insight for the most recent run (the Hero Run).
+            // Historical runs will have AI insights generated on-demand when viewed.
 
-            for workout in newWorkouts {
+            // Sort new workouts ascending (oldest first) so we can insert them in order
+            let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
+            let newestWorkoutId = sortedNewWorkouts.last?.uuid
+
+            for workout in sortedNewWorkouts {
                 // Extract stats
                 let newRun = try await healthKitManager.extractRunRecord(from: workout)
 
                 // Insert into SwiftData context immediately so it appears on Dashboard
                 modelContext.insert(newRun)
 
-                // Generate AI insight locally
-                if #available(iOS 26.0, *) {
-                    do {
-                        if processedCount > 0 {
-                            // 1.5-second delay between LLM invocations to prevent thermal throttling / memory spikes
-                            try await Task.sleep(nanoseconds: 1_500_000_000)
-                        }
-
-                        // Pass recent history for longitudinal analysis, sorting by date descending
-                        let history = existingRuns.sorted(by: { $0.date > $1.date })
-                        let insight = try await CoachingEngine.shared.generateInsight(for: newRun, history: history)
-                        // Link the insight
-                        newRun.insight = insight
-
-                        processedCount += 1
-                    } catch {
-                        print("Failed to generate AI insight for run \(newRun.id): \(error)")
-                        // Even if AI fails, we keep the run record.
-                        processedCount += 1
-                    }
-                } else {
-                    print("AI insights require iOS 26.0+")
-                    processedCount += 1
-                }
-
-                // Save progress periodically to handle large backlogs safely
-                // For the AI baseline context issue, we should actually ensure EVERY new
-                // run is saved sequentially so the *next* run sees it in the history array.
+                // Save context so history is updated for subsequent runs
                 try modelContext.save()
 
-                if processedCount % 5 == 0 {
-                    // Add a slightly longer breather between batches of 5
-                    try await Task.sleep(nanoseconds: 3_000_000_000)
+                // Generate AI insight locally ONLY for the most recent run
+                if workout.uuid == newestWorkoutId {
+                    if #available(iOS 26.0, *) {
+                        do {
+                            // Pass recent history for longitudinal analysis, sorting by date descending
+                            let history = existingRuns.sorted(by: { $0.date > $1.date })
+                            let insight = try await CoachingEngine.shared.generateInsight(for: newRun, history: history)
+                            // Link the insight
+                            newRun.insight = insight
+                            try modelContext.save()
+                        } catch {
+                            print("Failed to generate AI insight for hero run \(newRun.id): \(error)")
+                        }
+                    } else {
+                        print("AI insights require iOS 26.0+")
+                    }
                 }
             }
 

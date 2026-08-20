@@ -253,10 +253,18 @@ struct RunListRowView: View {
             Spacer()
 
             if let insight = runRecord.insight {
-                if insight.longitudinalObservation.lowercased().contains("cadence") {
-                    PillTagView(text: "Cadence", color: .red)
-                } else if insight.longitudinalObservation.lowercased().contains("heart") || insight.longitudinalObservation.lowercased().contains("aerobic") {
-                    PillTagView(text: "HR", color: .green)
+                if let drillTitle = insight.drillRecommendation?.drillTitle.lowercased() {
+                    if drillTitle.contains("cadence") {
+                        PillTagView(text: "Cadence", color: .red)
+                    } else if drillTitle.contains("tempo") {
+                        PillTagView(text: "Tempo", color: .orange)
+                    } else if drillTitle.contains("rhythm") {
+                        PillTagView(text: "Rhythm", color: .purple)
+                    } else if drillTitle.contains("stride") {
+                        PillTagView(text: "Form", color: .blue)
+                    } else {
+                        PillTagView(text: "Analyzed", color: .blue)
+                    }
                 } else {
                     PillTagView(text: "Analyzed", color: .blue)
                 }
