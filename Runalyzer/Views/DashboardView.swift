@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 
-@available(iOS 26.0, *)
 struct DashboardView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
@@ -127,6 +126,9 @@ struct HeroCardView: View {
                 Text(runRecord.date, style: .date)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(Color(uiColor: .tertiaryLabel))
             }
 
             // Metrics Row

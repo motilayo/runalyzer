@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 import HealthKit
 
-@available(iOS 26.0, *)
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @StateObject private var healthKitManager = HealthKitManager.shared
@@ -33,22 +32,22 @@ struct ContentView: View {
                 } message: {
                     Text(syncError ?? "An unknown error occurred while syncing.")
                 }
-                .overlay(alignment: .bottom) {
-                        if isSyncing {
-                            HStack {
-                                ProgressView()
-                                Text("Syncing Health Data & AI...")
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Capsule().fill(Color(.systemBackground)))
-                            .shadow(radius: 5)
-                            .padding(.bottom, 20)
+                .safeAreaInset(edge: .bottom) {
+                    if isSyncing {
+                        HStack {
+                            ProgressView()
+                            Text("Syncing Health Data & AI...")
+                                .font(.caption)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(Color(.systemBackground)))
+                        .shadow(radius: 5)
+                        .padding(.bottom, 20)
                     }
+                }
             } else {
                 OnboardingView()
             }
@@ -142,10 +141,6 @@ struct ContentView: View {
         }
     }()
 
-    if #available(iOS 26.0, *) {
-        ContentView()
-            .modelContainer(previewContainer)
-    } else {
-        // Fallback on earlier versions
-    }
+    ContentView()
+        .modelContainer(previewContainer)
 }

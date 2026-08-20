@@ -3,7 +3,6 @@ import FoundationModels
 
 /// A structured response definition mapping to what we want the Foundation Model to return.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
-@available(iOS 26.0, *)
 @Generable
 struct CoachingInsightPayload {
     @Guide(description: "A short, catchy headline summarizing the run analysis. Strict max 8 words.")
@@ -28,7 +27,6 @@ struct CoachingInsightPayload {
     var targetCadence: String?
 }
 
-@available(iOS 26.0, *)
 @MainActor
 class CoachingEngine {
     static let shared = CoachingEngine()

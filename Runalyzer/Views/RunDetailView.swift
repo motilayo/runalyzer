@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 
-@available(iOS 26.0, *)
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
     @Environment(\.modelContext) private var modelContext

@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 
-@available(iOS 26.0, *)
 @main
 struct RunalyzerApp: App {
 
