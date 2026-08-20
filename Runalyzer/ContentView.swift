@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import HealthKit
 
+@available(iOS 26.0, *)
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @StateObject private var healthKitManager = HealthKitManager.shared
@@ -141,6 +142,10 @@ struct ContentView: View {
         }
     }()
 
-    ContentView()
-        .modelContainer(previewContainer)
+    if #available(iOS 26.0, *) {
+        ContentView()
+            .modelContainer(previewContainer)
+    } else {
+        // Fallback on earlier versions
+    }
 }

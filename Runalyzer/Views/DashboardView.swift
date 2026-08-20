@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 
+@available(iOS 26.0, *)
 struct DashboardView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
