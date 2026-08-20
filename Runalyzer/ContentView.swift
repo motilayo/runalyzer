@@ -89,15 +89,22 @@ struct ContentView: View {
                 // Generate AI insight locally ONLY for the most recent run
                 if workout.uuid == newestWorkoutId {
                     if #available(iOS 26.0, *) {
-                        do {
-                            // Pass recent history for longitudinal analysis, sorting by date descending
-                            let history = existingRuns.sorted(by: { $0.date > $1.date })
-                            let insight = try await CoachingEngine.shared.generateInsight(for: newRun, history: history)
-                            // Link the insight
-                            newRun.insight = insight
-                            try modelContext.save()
-                        } catch {
-                            print("Failed to generate AI insight for hero run \(newRun.id): \(error)")
+                        let runId = newRun.persistentModelID
+                        let container = modelContext.container
+
+                        Task.detached {
+                            let backgroundContext = ModelContext(container)
+                            if let backgroundRun = backgroundContext.model(for: runId) as? RunRecord {
+                                do {
+                                    let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+                                    let history = (try? backgroundContext.fetch(descriptor)) ?? []
+                                    let insight = try await CoachingEngine.shared.generateInsight(for: backgroundRun, history: history)
+                                    backgroundRun.insight = insight
+                                    try backgroundContext.save()
+                                } catch {
+                                    print("Failed to generate AI insight for hero run \(backgroundRun.id): \(error)")
+                                }
+                            }
                         }
                     } else {
                         print("AI insights require iOS 26.0+")

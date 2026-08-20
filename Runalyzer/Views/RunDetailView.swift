@@ -127,13 +127,23 @@ struct RunDetailView: View {
                     .task {
                         if #available(iOS 26.0, *) {
                             if runRecord.insight == nil {
-                                do {
-                                    let history = existingRuns.sorted(by: { $0.date > $1.date })
-                                    let insight = try await CoachingEngine.shared.generateInsight(for: runRecord, history: history)
-                                    runRecord.insight = insight
-                                    try modelContext.save()
-                                } catch {
-                                    print("Failed to generate AI insight for run \(runRecord.id): \(error)")
+                                let runId = runRecord.persistentModelID
+                                let container = modelContext.container
+
+                                Task.detached {
+                                    let backgroundContext = ModelContext(container)
+                                    if let backgroundRun = backgroundContext.model(for: runId) as? RunRecord {
+                                        do {
+                                            let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+                                            let history = (try? backgroundContext.fetch(descriptor)) ?? []
+
+                                            let insight = try await CoachingEngine.shared.generateInsight(for: backgroundRun, history: history)
+                                            backgroundRun.insight = insight
+                                            try backgroundContext.save()
+                                        } catch {
+                                            print("Failed to generate AI insight for run \(backgroundRun.id): \(error)")
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -105,6 +105,7 @@ struct DashboardView: View {
 
 struct HeroCardView: View {
     var runRecord: RunRecord
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var formattedDuration: String {
@@ -202,6 +203,30 @@ struct HeroCardView: View {
                         .padding(.top, 4)
                 }
                 .frame(minHeight: 1)
+                .task {
+                    if #available(iOS 26.0, *) {
+                        if runRecord.insight == nil {
+                            let runId = runRecord.persistentModelID
+                            let container = modelContext.container
+
+                            Task.detached {
+                                let backgroundContext = ModelContext(container)
+                                if let backgroundRun = backgroundContext.model(for: runId) as? RunRecord {
+                                    do {
+                                        let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+                                        let history = (try? backgroundContext.fetch(descriptor)) ?? []
+
+                                        let insight = try await CoachingEngine.shared.generateInsight(for: backgroundRun, history: history)
+                                        backgroundRun.insight = insight
+                                        try backgroundContext.save()
+                                    } catch {
+                                        print("Failed to generate AI insight for run \(backgroundRun.id): \(error)")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         .frame(minHeight: 1)
