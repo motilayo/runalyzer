@@ -122,15 +122,8 @@ class CoachingEngine {
         - drillCues: A single sentence focusing on running form or biomechanics.
         """
 
-        // Explicitly set the locale to en_US. Early beta SDKs for on-device FoundationModels
-        // often fail with `unsupportedLanguageOrLocale` if the device is set to other
-        // English variants (like en_GB or en_CA) because only US English is bundled locally.
-        var config = LanguageModelSession.Configuration()
-        config.locale = Locale(identifier: "en_US")
-
         let session = LanguageModelSession(
             model: SystemLanguageModel.default,
-            configuration: config,
             instructions: instructions
         )
 
