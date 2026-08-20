@@ -106,15 +106,15 @@ struct ContentView: View {
                 }
 
                 // Save progress periodically to handle large backlogs safely
+                // For the AI baseline context issue, we should actually ensure EVERY new
+                // run is saved sequentially so the *next* run sees it in the history array.
+                try modelContext.save()
+
                 if processedCount % 5 == 0 {
-                    try modelContext.save()
                     // Add a slightly longer breather between batches of 5
                     try await Task.sleep(nanoseconds: 3_000_000_000)
                 }
             }
-
-            // Final save for any remaining records
-            try modelContext.save()
 
         } catch is CancellationError {
             // Task was cancelled, likely due to a view refresh or termination.

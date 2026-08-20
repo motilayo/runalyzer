@@ -72,7 +72,7 @@ class HealthKitManager: ObservableObject {
         let datePredicate = HKQuery.predicateForSamples(withStart: thirtyDaysAgo, end: nil, options: .strictStartDate)
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [typePredicate, datePredicate])
 
-        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
 
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
