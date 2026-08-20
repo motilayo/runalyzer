@@ -4,9 +4,6 @@ import SwiftData
 
 /// A structured response definition mapping to what we want the Foundation Model to return.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
-@available(iOS 26.0, *)
-@Generable
-
 struct RunDataForAI: Sendable {
     let date: Date
     let distance: Double
@@ -17,6 +14,8 @@ struct RunDataForAI: Sendable {
     let baseline: BaselineStats?
 }
 
+@available(iOS 26.0, *)
+@Generable
 struct CoachingInsightPayload {
     @Guide(description: "A short, catchy headline summarizing the run analysis. Strict max 8 words.")
     var headline: String
@@ -155,22 +154,7 @@ class CoachingEngine {
         do {
             let generatedInsight = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
 
-            let drillRecommendation = DrillRecommendation(
-                drillTitle: generatedInsight.content.drillTitle,
-                drillReps: generatedInsight.content.drillReps,
-                drillRecovery: generatedInsight.content.drillRecovery,
-                drillCues: generatedInsight.content.drillCues,
-                targetCadence: generatedInsight.content.targetCadence,
-                previousCadence: runData.avgCadence,
-                isCompleted: false
-            )
-
-            // Map the generated struct to our SwiftData model
-            return CoachingInsight(
-                headline: generatedInsight.content.headline,
-                longitudinalObservation: generatedInsight.content.longitudinalObservation,
-                drillRecommendation: drillRecommendation
-            )
+            return generatedInsight.content
         } catch {
             print("FoundationModels Generation Error: \(error.localizedDescription)")
 
