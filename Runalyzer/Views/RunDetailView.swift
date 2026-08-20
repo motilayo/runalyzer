@@ -125,14 +125,16 @@ struct RunDetailView: View {
                     .frame(minHeight: 1)
                     .padding(32)
                     .task {
-                        if runRecord.insight == nil {
-                            do {
-                                let history = existingRuns.sorted(by: { $0.date > $1.date })
-                                let insight = try await CoachingEngine.shared.generateInsight(for: runRecord, history: history)
-                                runRecord.insight = insight
-                                try modelContext.save()
-                            } catch {
-                                print("Failed to generate AI insight for run \(runRecord.id): \(error)")
+                        if #available(iOS 26.0, *) {
+                            if runRecord.insight == nil {
+                                do {
+                                    let history = existingRuns.sorted(by: { $0.date > $1.date })
+                                    let insight = try await CoachingEngine.shared.generateInsight(for: runRecord, history: history)
+                                    runRecord.insight = insight
+                                    try modelContext.save()
+                                } catch {
+                                    print("Failed to generate AI insight for run \(runRecord.id): \(error)")
+                                }
                             }
                         }
                     }
