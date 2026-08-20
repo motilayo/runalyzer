@@ -4,6 +4,14 @@ import FoundationModels
 
 /// A structured response definition mapping to what we want the Foundation Model to return.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
+
+struct BaselineStats: Sendable {
+    let avgDistance: Double
+    let avgPace: Double
+    let avgHeartRate: Int
+    let avgCadence: Int
+}
+
 struct RunDataForAI: Sendable {
     let date: Date
     let distance: Double
