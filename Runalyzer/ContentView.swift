@@ -130,9 +130,9 @@ struct ContentView: View {
                     // Delay between generations to avoid overloading the model
                     runCount += 1
                     if runCount % 5 == 0 {
-                        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds longer pause
+                        try await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds longer pause
                     } else {
-                        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds default pause
+                        try await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 seconds default pause
                     }
                 } else {
                     print("AI insights require iOS 26.0+")
