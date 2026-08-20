@@ -127,46 +127,12 @@ struct RunDetailView: View {
                     .task {
                         if #available(iOS 26.0, *) {
                             if runRecord.insight == nil {
-                                let baseline = RunRecord.thirtyDayBaseline(from: runRecord.date, in: modelContext)
-                                let runData = RunDataForAI(
-                                    date: runRecord.date,
-                                    distance: runRecord.distance,
-                                    avgPace: runRecord.avgPace,
-                                    avgHeartRate: runRecord.avgHeartRate,
-                                    avgCadence: runRecord.avgCadence,
-                                    formattedPace: runRecord.formattedPace,
-                                    baseline: baseline
-                                )
-                                let runId = runRecord.persistentModelID
                                 let container = modelContext.container
-                                let previousCadence = runRecord.avgCadence
+                                let runId = runRecord.persistentModelID
 
-                                do {
-                                    let payload = try await CoachingEngine.shared.generateInsight(for: runData)
-
-                                    await MainActor.run {
-                                        let mainContext = container.mainContext
-                                        if let mainRun = mainContext.model(for: runId) as? RunRecord {
-                                            let drill = DrillRecommendation(
-                                                drillTitle: payload.drillTitle,
-                                                drillReps: payload.drillReps,
-                                                drillRecovery: payload.drillRecovery,
-                                                drillCues: payload.drillCues,
-                                                targetCadence: payload.targetCadence,
-                                                previousCadence: previousCadence,
-                                                isCompleted: false
-                                            )
-                                            let insight = CoachingInsight(
-                                                headline: payload.headline,
-                                                longitudinalObservation: payload.longitudinalObservation,
-                                                drillRecommendation: drill
-                                            )
-                                            mainRun.insight = insight
-                                            try? mainContext.save()
-                                        }
-                                    }
-                                } catch {
-                                    print("Failed to generate AI insight for run \(runData.date): \(error)")
+                                Task.detached {
+                                    let analyzer = RunAnalyzerActor(modelContainer: container)
+                                    await analyzer.generateAnalysis(for: runId)
                                 }
                             }
                         }

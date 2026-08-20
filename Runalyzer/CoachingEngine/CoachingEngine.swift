@@ -1,6 +1,6 @@
 import Foundation
-import FoundationModels
 import SwiftData
+import FoundationModels
 
 /// A structured response definition mapping to what we want the Foundation Model to return.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map text to this struct.
@@ -170,6 +170,75 @@ class CoachingEngine {
                 drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                 targetCadence: nil
             )
+        }
+    }
+}
+
+@available(iOS 26.0, *)
+@ModelActor
+actor RunAnalyzerActor {
+    func generateAnalysis(for runID: PersistentIdentifier) async {
+        // 1. Safely fetch the target run on the background thread
+        guard let run = modelContext.model(for: runID) as? RunRecord else { return }
+
+        // 2. Calculate Relative Window
+        let targetDate = run.date
+        let targetID = run.id
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) else { return }
+
+        // 3. Fetch past 30 days relative ONLY to this run
+        let descriptor = FetchDescriptor<RunRecord>(
+            predicate: #Predicate { $0.date >= thirtyDaysAgo && $0.date < targetDate && $0.id != targetID }
+        )
+        let priorRuns = (try? modelContext.fetch(descriptor)) ?? []
+
+        // 4. Swift calculates the baseline math (No AI involved)
+        var baseline: BaselineStats? = nil
+        if priorRuns.count >= 3 {
+            let avgDistance = priorRuns.map(\.distance).reduce(0, +) / Double(priorRuns.count)
+            let avgPace = priorRuns.map(\.avgPace).reduce(0, +) / Double(priorRuns.count)
+            let avgHR = priorRuns.map(\.avgHeartRate).reduce(0, +) / priorRuns.count
+            let avgCadence = priorRuns.map(\.avgCadence).reduce(0, +) / priorRuns.count
+            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence)
+        }
+
+        // 5. Run the LLM Prompt
+        do {
+            let runData = RunDataForAI(
+                date: run.date,
+                distance: run.distance,
+                avgPace: run.avgPace,
+                avgHeartRate: run.avgHeartRate,
+                avgCadence: run.avgCadence,
+                formattedPace: run.formattedPace,
+                baseline: baseline
+            )
+
+            // Execute prompt asynchronously
+            let payload = try await CoachingEngine.shared.generateInsight(for: runData)
+
+            // 6. Save directly to the background context (Main UI updates automatically)
+            let drill = DrillRecommendation(
+                drillTitle: payload.drillTitle,
+                drillReps: payload.drillReps,
+                drillRecovery: payload.drillRecovery,
+                drillCues: payload.drillCues,
+                targetCadence: payload.targetCadence,
+                previousCadence: run.avgCadence,
+                isCompleted: false
+            )
+
+            let insight = CoachingInsight(
+                headline: payload.headline,
+                longitudinalObservation: payload.longitudinalObservation,
+                drillRecommendation: drill
+            )
+
+            run.insight = insight
+            try modelContext.save()
+
+        } catch {
+            print("AI Generation Failed: \(error)")
         }
     }
 }

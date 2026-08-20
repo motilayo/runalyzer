@@ -85,47 +85,13 @@ struct ContentView: View {
 
                 // Generate AI insight locally for EACH run so baseline context is strictly temporal
                 if #available(iOS 26.0, *) {
-                    let baseline = RunRecord.thirtyDayBaseline(from: newRun.date, in: modelContext)
-                    let runData = RunDataForAI(
-                        date: newRun.date,
-                        distance: newRun.distance,
-                        avgPace: newRun.avgPace,
-                        avgHeartRate: newRun.avgHeartRate,
-                        avgCadence: newRun.avgCadence,
-                        formattedPace: newRun.formattedPace,
-                        baseline: baseline
-                    )
                     let runId = newRun.persistentModelID
                     let container = modelContext.container
-                    let previousCadence = newRun.avgCadence
 
-                    do {
-                        let payload = try await CoachingEngine.shared.generateInsight(for: runData)
-
-                        await MainActor.run {
-                            let mainContext = container.mainContext
-                            if let mainRun = mainContext.model(for: runId) as? RunRecord {
-                                let drill = DrillRecommendation(
-                                    drillTitle: payload.drillTitle,
-                                    drillReps: payload.drillReps,
-                                    drillRecovery: payload.drillRecovery,
-                                    drillCues: payload.drillCues,
-                                    targetCadence: payload.targetCadence,
-                                    previousCadence: previousCadence,
-                                    isCompleted: false
-                                )
-                                let insight = CoachingInsight(
-                                    headline: payload.headline,
-                                    longitudinalObservation: payload.longitudinalObservation,
-                                    drillRecommendation: drill
-                                )
-                                mainRun.insight = insight
-                                try? mainContext.save()
-                            }
-                        }
-                    } catch {
-                        print("Failed to generate AI insight for run \(newRun.id): \(error)")
-                    }
+                    await Task.detached {
+                        let analyzer = RunAnalyzerActor(modelContainer: container)
+                        await analyzer.generateAnalysis(for: runId)
+                    }.value
 
                     // Delay between generations to avoid overloading the model
                     runCount += 1
