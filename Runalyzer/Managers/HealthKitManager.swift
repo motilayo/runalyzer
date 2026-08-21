@@ -91,7 +91,18 @@ class HealthKitManager: ObservableObject {
                     return
                 }
 
-                continuation.resume(returning: workouts)
+                let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+                let minimumRunDistance = UserDefaults.standard.double(forKey: "minimumRunDistance")
+                let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+
+                let filteredWorkouts = workouts.filter { workout in
+                    let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
+                    // if minimumRunDistance is default 0 from UserDefaults (not saved), we will fallback to 1000
+                    let limit = minimumRunDistance == 0 ? 1000.0 : minDistanceInMeters
+                    return distance >= (limit - 0.01) // Small buffer
+                }
+
+                continuation.resume(returning: filteredWorkouts)
             }
             healthStore.execute(query)
         }

@@ -53,7 +53,8 @@ class CoachingEngine {
         let paceFormatted = runData.formattedPace
         let distanceConverted = useMetricSystem ? (runData.distance / 1000.0) : (runData.distance / 1609.344)
         let distanceFormatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), distanceConverted)
-        let distanceUnit = useMetricSystem ? "km" : "miles"
+        let distanceUnit = useMetricSystem ? "km" : "mi"
+        let paceUnit = useMetricSystem ? "min/km" : "min/mi"
 
         // Format the run date
         let dateFormatter = DateFormatter()
@@ -68,21 +69,33 @@ class CoachingEngine {
         if let baseline = runData.baseline {
             let baselineDistanceConverted = useMetricSystem ? (baseline.avgDistance / 1000.0) : (baseline.avgDistance / 1609.344)
             let baselineDistanceFormatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), baselineDistanceConverted)
+
+            // Format baseline pace string correctly based on metric/imperial (runData.avgPace is stored as min/km in DB)
+            let baselinePaceValue = useMetricSystem ? baseline.avgPace : (baseline.avgPace * 1.609344)
+            let baselinePaceMinutes = Int(baselinePaceValue)
+            let baselinePaceSeconds = Int((baselinePaceValue - Double(baselinePaceMinutes)) * 60.0)
+            let baselinePaceFormattedStr = String(format: "%d:%02d", baselinePaceMinutes, baselinePaceSeconds)
+
             let paceDelta = String(format: "%+.2f", locale: Locale(identifier: "en_US_POSIX"), (useMetricSystem ? runData.avgPace : runData.avgPace * 1.609344) - (useMetricSystem ? baseline.avgPace : baseline.avgPace * 1.609344))
             let hrDelta = runData.avgHeartRate - baseline.avgHeartRate
             let cadDelta = runData.avgCadence - baseline.avgCadence
 
-            runStatsPrompt += "The runner's 30-day baseline averages are: \(baselineDistanceFormatted)\(distanceUnit) distance, \(baseline.avgPace.formattedPaceString) pace, \(baseline.avgHeartRate) BPM heart rate, and \(baseline.avgCadence) SPM cadence.\n"
-            runStatsPrompt += "The mathematical deltas for the current run compared to the baseline are: Pace \(paceDelta) min/\(distanceUnit), Heart Rate \(hrDelta > 0 ? "+" : "")\(hrDelta) BPM, and Cadence \(cadDelta > 0 ? "+" : "")\(cadDelta) SPM.\n"
+            runStatsPrompt += "<BASELINE_30_DAYS>\n"
+            runStatsPrompt += "The runner's 30-day baseline averages are: \(baselineDistanceFormatted) \(distanceUnit) distance, \(baselinePaceFormattedStr) \(paceUnit) pace, \(baseline.avgHeartRate) BPM heart rate, and \(baseline.avgCadence) SPM cadence.\n"
+            runStatsPrompt += "</BASELINE_30_DAYS>\n"
+            runStatsPrompt += "The mathematical deltas for the current run compared to the baseline are: Pace \(paceDelta) \(paceUnit), Heart Rate \(hrDelta > 0 ? "+" : "")\(hrDelta) BPM, and Cadence \(cadDelta > 0 ? "+" : "")\(cadDelta) SPM.\n"
         } else {
-            runStatsPrompt += "The runner has no previous baseline history.\n"
+            runStatsPrompt += "<BASELINE_30_DAYS>\nThe runner has no previous baseline history.\n</BASELINE_30_DAYS>\n"
         }
 
-        runStatsPrompt += "The current run to analyze occurred on \(dateFormatted). The runner covered \(distanceFormatted)\(distanceUnit) at a pace of \(paceFormatted), with an average heart rate of \(runData.avgHeartRate) BPM and a cadence of \(runData.avgCadence) SPM."
+        runStatsPrompt += "<CURRENT_RUN>\n"
+        runStatsPrompt += "The current run to analyze occurred on \(dateFormatted). The runner covered \(distanceFormatted) \(distanceUnit) at a pace of \(paceFormatted) \(paceUnit), with an average heart rate of \(runData.avgHeartRate) BPM and a cadence of \(runData.avgCadence) SPM.\n"
+        runStatsPrompt += "</CURRENT_RUN>"
 
         let instructions = """
-        You are a run analyst. Compare CURRENT RUN to BASELINE. Write a 1-sentence title. Write a maximum 2-sentence summary of biomechanical differences. Provide 1 specific drill (maximum 3 steps) to improve their weakest metric. Do not use jargon. Be direct.
+        You are a run analyst. Compare CURRENT RUN to BASELINE_30_DAYS. Evaluate changes based exclusively on comparing the current run against the baseline. Write a 1-sentence, actionable headline. Do not use the run date or generic phrases like "Analyzing Run". Write a maximum 2-sentence summary of biomechanical differences, summarizing trends naturally without quoting exact decimal percentages. Provide 1 specific drill (maximum 3 steps) to improve their weakest metric. Do not use jargon. Be direct.
         Drill title MUST be exactly: "Cadence Pyramids", "Rhythm Intervals", "Tempo Surges", or "Strides".
+        Target cadence generation MUST be absolute (e.g. "120 SPM" or "142-146") and NEVER relative or single digit ranges.
         IMPORTANT: Respond entirely in \(Locale.current.language.languageCode?.identifier ?? "en").
         """
 
@@ -93,6 +106,7 @@ class CoachingEngine {
 
         let prompt = """
         Context Payload:
+        Note: Pace is in \(paceUnit) and Distance is in \(distanceUnit).
         \(runStatsPrompt)
         """
 

@@ -2,115 +2,82 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
-    @AppStorage("useMetricSystem") var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
-    @AppStorage("minimumRunDistance") var minimumRunDistance: Double = 1.0
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
+    @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
 
     @Environment(\.modelContext) private var modelContext
-    @Query private var allRuns: [RunRecord]
+    @Query private var runRecords: [RunRecord]
 
     var onForceSync: (() async -> Void)?
 
-    @State private var isClearingCache = false
-    @State private var isForceSyncing = false
-    @State private var showingClearCacheDialog = false
-    @State private var showingReSyncDialog = false
+    @State private var showSyncAlert = false
+    @State private var showClearCacheAlert = false
 
     var body: some View {
         Form {
             Section(header: Text("Preferences")) {
                 Toggle("Use Metric System", isOn: $useMetricSystem)
                     .onChange(of: useMetricSystem) { _, _ in
-                        clearAICache()
-
-                        // Adjust slider bounds if switching systems
-                        if useMetricSystem {
-                            if minimumRunDistance < 0.5 { minimumRunDistance = 0.5 }
-                            if minimumRunDistance > 10.0 { minimumRunDistance = 10.0 }
-                        } else {
-                            if minimumRunDistance < 0.3 { minimumRunDistance = 0.3 }
-                            if minimumRunDistance > 6.0 { minimumRunDistance = 6.0 }
+                        Task {
+                            for run in runRecords {
+                                run.insight = nil
+                            }
+                            try? modelContext.save()
                         }
                     }
 
                 VStack(alignment: .leading) {
                     Text("Minimum Workout Distance: \(String(format: "%.1f", minimumRunDistance)) \(useMetricSystem ? "km" : "mi")")
-                    if useMetricSystem {
-                        Slider(value: $minimumRunDistance, in: 0.5...10.0, step: 0.5)
-                    } else {
-                        Slider(value: $minimumRunDistance, in: 0.3...6.0, step: 0.1)
-                    }
+                    Slider(value: $minimumRunDistance, in: useMetricSystem ? 0.5...10.0 : 0.3...6.0, step: 0.1)
                 }
             }
 
             Section(header: Text("Data Management")) {
-                Button(action: {
-                    showingReSyncDialog = true
+                Button(role: .destructive, action: {
+                    showSyncAlert = true
                 }) {
-                    HStack {
-                        Text("Force Re-Sync Health Data")
-                        Spacer()
-                        if isForceSyncing {
-                            ProgressView()
+                    Text("Force Re-Sync Health Data")
+                }
+                .alert("Force Re-Sync", isPresented: $showSyncAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Re-Sync", role: .destructive) {
+                        Task {
+                            // Clear all runs
+                            for run in runRecords {
+                                modelContext.delete(run)
+                            }
+                            try? modelContext.save()
+
+                            // Trigger sync
+                            if let onForceSync = onForceSync {
+                                await onForceSync()
+                            }
                         }
                     }
-                }
-                .disabled(isForceSyncing || isClearingCache)
-                .confirmationDialog("Re-Sync Health Data?", isPresented: $showingReSyncDialog, titleVisibility: .visible) {
-                    Button("Re-Sync Data", role: .destructive) {
-                        forceReSync()
-                    }
-                    Button("Cancel", role: .cancel) { }
                 } message: {
-                    Text("This will clear local run records and re-fetch them from HealthKit.")
+                    Text("This will delete all locally saved run records and re-fetch them from Apple Health. This cannot be undone.")
                 }
 
-                Button(action: {
-                    showingClearCacheDialog = true
+                Button(role: .destructive, action: {
+                    showClearCacheAlert = true
                 }) {
-                    HStack {
-                        Text("Clear AI Insights Cache")
-                            .foregroundColor(.red)
-                        Spacer()
-                        if isClearingCache {
-                            ProgressView()
+                    Text("Clear AI Insights Cache")
+                }
+                .alert("Clear AI Cache", isPresented: $showClearCacheAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Clear", role: .destructive) {
+                        Task {
+                            for run in runRecords {
+                                run.insight = nil
+                            }
+                            try? modelContext.save()
                         }
                     }
-                }
-                .disabled(isForceSyncing || isClearingCache)
-                .confirmationDialog("Clear AI Cache?", isPresented: $showingClearCacheDialog, titleVisibility: .visible) {
-                    Button("Clear Cache", role: .destructive) {
-                        clearAICache()
-                    }
-                    Button("Cancel", role: .cancel) { }
                 } message: {
-                    Text("This will remove all generated insights. They will be regenerated the next time you view each workout.")
+                    Text("This will clear all generated AI insights for your saved runs. New insights will be generated upon next sync.")
                 }
             }
         }
         .navigationTitle("Settings")
-    }
-
-    private func forceReSync() {
-        Task {
-            isForceSyncing = true
-            for run in allRuns {
-                modelContext.delete(run)
-            }
-            try? modelContext.save()
-
-            if let sync = onForceSync {
-                await sync()
-            }
-            isForceSyncing = false
-        }
-    }
-
-    private func clearAICache() {
-        isClearingCache = true
-        for run in allRuns {
-            run.insight = nil
-        }
-        try? modelContext.save()
-        isClearingCache = false
     }
 }
