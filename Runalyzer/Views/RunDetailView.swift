@@ -28,7 +28,7 @@ struct RunDetailView: View {
                     StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "")
                     StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM")
                     StatBox(title: "Avg Cadence", value: "\(runRecord.avgCadence)", unit: "SPM")
-                    StatBox(title: "Calories", value: "\(runRecord.activeCalories)", unit: "kcal")
+                    StatBox(title: "Elevation", value: "\(runRecord.elevation)", unit: "m")
                 }
                 .padding(.horizontal)
 

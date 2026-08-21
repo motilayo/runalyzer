@@ -27,7 +27,7 @@ final class RunRecord {
     var avgCadence: Int
 
     /// Active calories burned during the run.
-    var activeCalories: Int = 0
+    var elevation: Int = 0
 
     /// A one-to-one relationship to the AI-generated coaching insight.
     /// If this run record is deleted, the insight is cascaded and deleted as well.
@@ -47,7 +47,7 @@ final class RunRecord {
         avgPace: Double,
         avgHeartRate: Int,
         avgCadence: Int,
-        activeCalories: Int = 0,
+        elevation: Int = 0,
         insight: CoachingInsight? = nil
     ) {
         self.id = id
@@ -57,7 +57,7 @@ final class RunRecord {
         self.avgPace = avgPace
         self.avgHeartRate = avgHeartRate
         self.avgCadence = avgCadence
-        self.activeCalories = activeCalories
+        self.elevation = elevation
         self.insight = insight
     }
 }
