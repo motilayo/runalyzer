@@ -27,7 +27,7 @@ final class RunRecord {
     var avgCadence: Int
 
     /// Active calories burned during the run.
-    var activeCalories: Int
+    var activeCalories: Int = 0
 
     /// A one-to-one relationship to the AI-generated coaching insight.
     /// If this run record is deleted, the insight is cascaded and deleted as well.
