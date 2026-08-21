@@ -30,7 +30,7 @@ struct RunDataForAI: Sendable {
 @Generable
 struct SuggestedDrill {
     var drillName: String
-    @Guide(maximumCount: 3, description: "Exactly three steps: reps, recovery, cues.")
+    @Guide(description: "Exactly three steps: reps, recovery, cues.")
     var drillSteps: [String]
 
     @Guide(description: "Must be a steady absolute band (e.g., '155-160') or a single number if appropriate. DO NOT output percentages. Always use absolute SPM numbers.")
