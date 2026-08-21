@@ -26,7 +26,7 @@ final class RunRecord {
     /// The average cadence during the run, stored in steps per minute (SPM).
     var avgCadence: Int
 
-    /// Active calories burned during the run.
+    /// Elevation gain during the run in meters.
     var elevation: Int = 0
 
     /// A one-to-one relationship to the AI-generated coaching insight.

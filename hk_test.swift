@@ -1,2 +1,0 @@
-import HealthKit
-print("OK")

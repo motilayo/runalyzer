@@ -133,13 +133,19 @@ class HealthKitManager: ObservableObject {
 
         let avgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
 
-        let flights = try await fetchSumQuantity(
-            for: workout,
-            quantityTypeIdentifier: .flightsClimbed,
-            unit: HKUnit.count()
-        )
-        // 1 flight is roughly 3 meters of elevation gain
-        let elevation = flights * 3.0
+        // Attempt to extract elevation from workout metadata first
+        var elevation = (workout.metadata?[HKMetadataKeyElevationAscended] as? HKQuantity)?.doubleValue(for: .meter()) ?? 0.0
+
+        // Fallback to flights climbed if metadata is unavailable
+        if elevation == 0 {
+            let flights = try await fetchSumQuantity(
+                for: workout,
+                quantityTypeIdentifier: .flightsClimbed,
+                unit: HKUnit.count()
+            )
+            // 1 flight is roughly 3 meters of elevation gain
+            elevation = flights * 3.0
+        }
 
         return RunRecord(
             id: workout.uuid,
