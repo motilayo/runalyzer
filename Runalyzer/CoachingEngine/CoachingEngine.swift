@@ -10,12 +10,14 @@ struct BaselineStats: Sendable {
     let avgPace: Double
     let avgHeartRate: Int
     let avgCadence: Int
+    let avgElevation: Int
 }
 
 struct RunDataForAI: Sendable {
     let cadenceContext: String
     let paceContext: String
     let hrContext: String
+    let elevationContext: String
 }
 
 @available(iOS 26.0, *)
@@ -79,11 +81,13 @@ class CoachingEngine {
           cadence_analysis: {{CADENCE_CONTEXT}}
           pace_analysis: {{PACE_CONTEXT}}
           heart_rate_analysis: {{HR_CONTEXT}}
+          elevation_analysis: {{ELEVATION_CONTEXT}}
         """
 
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{HR_CONTEXT}}", with: runData.hrContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{ELEVATION_CONTEXT}}", with: runData.elevationContext)
 
         let prompt = promptTemplate
 
@@ -138,13 +142,15 @@ actor RunAnalyzerActor {
             let avgPace = priorRuns.map(\.avgPace).reduce(0, +) / Double(priorRuns.count)
             let avgHR = priorRuns.map(\.avgHeartRate).reduce(0, +) / priorRuns.count
             let avgCadence = priorRuns.map(\.avgCadence).reduce(0, +) / priorRuns.count
-            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence)
+            let avgElevation = priorRuns.map(\.elevation).reduce(0, +) / priorRuns.count
+            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence, avgElevation: avgElevation)
         }
 
         // Precompute Context Strings for LLM
         let cadenceContext: String
         let paceContext: String
         let hrContext: String
+        let elevationContext: String
 
         if let base = baseline {
             // Cadence Logic
@@ -154,7 +160,6 @@ actor RunAnalyzerActor {
             let cadenceTrend = cadenceDelta >= 0 ? "+\(cadenceDelta) SPM higher than baseline" : "\(abs(cadenceDelta)) SPM lower than baseline"
             cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). \(cadenceTrend))."
 
-            // Pace Logic
             // Assuming average pace is stored in minutes per kilometer as a Double
             // We convert to total seconds for easier comparison
             let runPaceSeconds = Int(run.avgPace * 60)
@@ -167,12 +172,18 @@ actor RunAnalyzerActor {
             let hrDelta = run.avgHeartRate - base.avgHeartRate
             let hrTrend = hrDelta <= 0 ? "\(abs(hrDelta)) BPM LOWER than baseline" : "+\(hrDelta) BPM HIGHER than baseline"
             hrContext = "\(run.avgHeartRate) BPM (\(hrTrend))."
+
+            // Elevation Logic
+            let elevationDelta = run.elevation - base.avgElevation
+            let elevationTrend = elevationDelta >= 0 ? "+\(elevationDelta)m MORE than baseline" : "\(abs(elevationDelta))m LESS than baseline"
+            elevationContext = "\(run.elevation)m (\(elevationTrend))."
         } else {
             let cadenceFloor = 150
             let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
             cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). No baseline available)."
             paceContext = "\(run.formattedPace) (No baseline available)."
             hrContext = "\(run.avgHeartRate) BPM (No baseline available)."
+            elevationContext = "\(run.elevation)m (No baseline available)."
         }
 
         // 5. Run the LLM Prompt
@@ -180,7 +191,8 @@ actor RunAnalyzerActor {
             let runData = RunDataForAI(
                 cadenceContext: cadenceContext,
                 paceContext: paceContext,
-                hrContext: hrContext
+                hrContext: hrContext,
+                elevationContext: elevationContext
             )
 
             // Execute prompt asynchronously

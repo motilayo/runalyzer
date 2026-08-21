@@ -72,7 +72,6 @@ struct ContentView: View {
             // Sort new workouts ascending (oldest first) so we can insert them in order and calculate correct rolling baselines.
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
 
-            var runCount = 0
             for workout in sortedNewWorkouts {
                 // Extract stats
                 let newRun = try await healthKitManager.extractRunRecord(from: workout)
