@@ -1,7 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
+    @Environment(\.modelContext) private var modelContext
+    @Query private var existingRuns: [RunRecord]
 
     var body: some View {
         ScrollView {
@@ -9,7 +12,10 @@ struct RunDetailView: View {
 
                 // Top: 2x2 Grid of Raw Stats
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    StatBox(title: "Distance", value: String(format: "%.2f", runRecord.distance / 1000.0), unit: "km")
+                    let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+                    let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
+                    let distanceUnit = useMetricSystem ? "km" : "mi"
+                    StatBox(title: "Distance", value: String(format: "%.2f", distanceConverted), unit: distanceUnit)
 
                     let minutes = Int(runRecord.duration) / 60
                     let seconds = Int(runRecord.duration) % 60
@@ -109,15 +115,31 @@ struct RunDetailView: View {
                     }
 
                 } else {
-                    VStack(spacing: 16) {
-                        ProgressView()
-                        Text("Generating insights locally on your device...")
+                    VStack(spacing: 20) {
+                        Image(systemName: "figure.run")
+                            .font(.system(size: 60))
+                            .foregroundColor(.purple)
+                            .symbolEffect(.variableColor.iterative.reversing)
+                        Text("Generating Coaching Insight...")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                     }
                     .frame(minHeight: 1)
                     .padding(32)
+                    .task {
+                        if #available(iOS 26.0, *) {
+                            if runRecord.insight == nil {
+                                let container = modelContext.container
+                                let runId = runRecord.persistentModelID
+
+                                Task.detached {
+                                    let analyzer = RunAnalyzerActor(modelContainer: container)
+                                    await analyzer.generateAnalysis(for: runId)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .padding(.vertical)
