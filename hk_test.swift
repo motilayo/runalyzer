@@ -1,0 +1,2 @@
+import HealthKit
+print("OK")
