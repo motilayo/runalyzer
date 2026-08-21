@@ -28,7 +28,7 @@ struct CoachingInsightPayload {
     var title: String
     var summary: String
     var drillName: String
-    @Guide(maximumCount: 3)
+    @Guide(description: "Strictly max 3 steps")
     var drillSteps: [String]
     var cadence: String?
 }
