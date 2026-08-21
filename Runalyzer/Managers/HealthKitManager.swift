@@ -191,7 +191,8 @@ class HealthKitManager: ObservableObject {
                 options: .discreteAverage
             ) { _, result, error in
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    print("HKStatisticsQuery warning for \(quantityTypeIdentifier.rawValue): \(error.localizedDescription)")
+                    continuation.resume(returning: 0.0)
                     return
                 }
 
@@ -223,8 +224,11 @@ class HealthKitManager: ObservableObject {
                 quantitySamplePredicate: predicate,
                 options: .cumulativeSum
             ) { _, result, error in
+                // HealthKit throws "No data available for the specified predicate" if the sample type wasn't tracked for the workout.
+                // We shouldn't fail the entire workout sync; we should just return 0.0.
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    print("HKStatisticsQuery warning for \(quantityTypeIdentifier.rawValue): \(error.localizedDescription)")
+                    continuation.resume(returning: 0.0)
                     return
                 }
 
