@@ -82,26 +82,27 @@ struct ContentView: View {
 
                 // Save context so history is updated for subsequent runs
                 try modelContext.save()
+            }
 
-                // Generate AI insight locally for EACH run so baseline context is strictly temporal
-                if #available(iOS 26.0, *) {
-                    let runId = newRun.persistentModelID
+            // Lazy load AI analysis for ONLY the 4 most recent runs (Hero card + Top 3)
+            if #available(iOS 26.0, *) {
+                let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+                if let allRuns = try? modelContext.fetch(descriptor) {
+                    let topRuns = allRuns.prefix(4)
                     let container = modelContext.container
 
-                    await Task.detached {
-                        let analyzer = RunAnalyzerActor(modelContainer: container)
-                        await analyzer.generateAnalysis(for: runId)
-                    }.value
+                    for run in topRuns {
+                        if run.insight == nil {
+                            let runId = run.persistentModelID
+                            await Task.detached {
+                                let analyzer = RunAnalyzerActor(modelContainer: container)
+                                await analyzer.generateAnalysis(for: runId)
+                            }.value
 
-                    // Delay between generations to avoid overloading the model
-                    runCount += 1
-                    if runCount % 5 == 0 {
-                        try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds longer pause
-                    } else {
-                        try await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds default pause
+                            // Delay slightly to avoid overloading device resources
+                            try await Task.sleep(nanoseconds: 2_500_000_000)
+                        }
                     }
-                } else {
-                    print("AI insights require iOS 26.0+")
                 }
             }
 

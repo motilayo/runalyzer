@@ -204,19 +204,7 @@ struct HeroCardView: View {
                         .padding(.top, 4)
                 }
                 .frame(minHeight: 1)
-                .task(id: isSyncing) {
-                    if #available(iOS 26.0, *) {
-                        if runRecord.insight == nil && !isSyncing {
-                            let container = modelContext.container
-                            let runId = runRecord.persistentModelID
 
-                            Task.detached {
-                                let analyzer = RunAnalyzerActor(modelContainer: container)
-                                await analyzer.generateAnalysis(for: runId)
-                            }
-                        }
-                    }
-                }
             }
         }
         .frame(minHeight: 1)

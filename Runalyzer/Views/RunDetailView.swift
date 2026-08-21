@@ -115,9 +115,12 @@ struct RunDetailView: View {
                     }
 
                 } else {
-                    VStack(spacing: 16) {
-                        ProgressView()
-                        Text("Generating insights locally on your device...")
+                    VStack(spacing: 20) {
+                        Image(systemName: "figure.run")
+                            .font(.system(size: 60))
+                            .foregroundColor(.purple)
+                            .symbolEffect(.variableColor.iterative.reversing)
+                        Text("Generating Coaching Insight...")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
