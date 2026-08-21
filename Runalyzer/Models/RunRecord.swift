@@ -29,6 +29,15 @@ final class RunRecord {
     /// Vertical oscillation during the run in centimeters.
     var verticalOscillation: Double = 0.0
 
+    /// VO2 Max associated with the run, if available.
+    var vo2Max: Double = 0.0
+
+    /// Ground contact time during the run in milliseconds.
+    var groundContactTime: Double = 0.0
+
+    /// Stride length during the run in meters.
+    var strideLength: Double = 0.0
+
     /// A one-to-one relationship to the AI-generated coaching insight.
     /// If this run record is deleted, the insight is cascaded and deleted as well.
     @Relationship(deleteRule: .cascade, inverse: \CoachingInsight.runRecord)
@@ -48,6 +57,9 @@ final class RunRecord {
         avgHeartRate: Int,
         avgCadence: Int,
         verticalOscillation: Double = 0.0,
+        vo2Max: Double = 0.0,
+        groundContactTime: Double = 0.0,
+        strideLength: Double = 0.0,
         insight: CoachingInsight? = nil
     ) {
         self.id = id
@@ -58,6 +70,9 @@ final class RunRecord {
         self.avgHeartRate = avgHeartRate
         self.avgCadence = avgCadence
         self.verticalOscillation = verticalOscillation
+        self.vo2Max = vo2Max
+        self.groundContactTime = groundContactTime
+        self.strideLength = strideLength
         self.insight = insight
     }
 }

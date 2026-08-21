@@ -11,13 +11,19 @@ struct BaselineStats: Sendable {
     let avgHeartRate: Int
     let avgCadence: Int
     let avgVerticalOscillation: Double
+    let avgVo2Max: Double
+    let avgGroundContactTime: Double
+    let avgStrideLength: Double
 }
 
 struct RunDataForAI: Sendable {
+    let vo2Context: String
     let cadenceContext: String
     let paceContext: String
     let hrContext: String
     let vertOscContext: String
+    let gctContext: String
+    let strideContext: String
 }
 
 @available(iOS 26.0, *)
@@ -32,10 +38,10 @@ struct SuggestedDrill {
 @available(iOS 26.0, *)
 @Generable
 struct RunInsight {
-    @Guide(description: "A short, encouraging title (e.g., 'Solid Pace Improvement'). DO NOT use the drill name here.")
+    @Guide(description: "Encouraging title. DO NOT use the drill name here.")
     var headline: String
 
-    @Guide(description: "STRICTLY 2 or 3 sentences maximum. Synthesize the context strings. DO NOT include drill instructions or steps in this field.")
+    @Guide(description: "STRICTLY 2-3 sentences. Synthesize the provided context. DO NOT include drill instructions here.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -63,11 +69,12 @@ class CoachingEngine {
         rules:
           - speak_directly_to_user_using_second_person ("You", "Your")
           - observation_must_not_contain_drill_steps
+          - use_gait_metrics_to_diagnose_overstriding_or_bouncing
           - drill_target_cadence_must_be_between_150_and_180_spm
           - never_prescribe_cadence_below_150_spm
           - no_conversational_filler
           - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
-          - target_cadence_generation_must_be_absolute_e_g_120_spm_or_142_146
+          - target_cadence_generation_must_be_absolute_e_g_155_spm_or_160_165
           - respond_entirely_in_\(language)
         """
 
@@ -78,16 +85,22 @@ class CoachingEngine {
 
         var promptTemplate = """
         context:
+          global_fitness_vo2: {{VO2_CONTEXT}}
           cadence_analysis: {{CADENCE_CONTEXT}}
           pace_analysis: {{PACE_CONTEXT}}
           heart_rate_analysis: {{HR_CONTEXT}}
-          vertical_oscillation_analysis: {{VERT_OSC_CONTEXT}}
+          vertical_oscillation: {{OSCILLATION_CONTEXT}}
+          ground_contact_time: {{GCT_CONTEXT}}
+          stride_length: {{STRIDE_CONTEXT}}
         """
 
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{VO2_CONTEXT}}", with: runData.vo2Context)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{HR_CONTEXT}}", with: runData.hrContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{VERT_OSC_CONTEXT}}", with: runData.vertOscContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{OSCILLATION_CONTEXT}}", with: runData.vertOscContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{GCT_CONTEXT}}", with: runData.gctContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{STRIDE_CONTEXT}}", with: runData.strideContext)
 
         let prompt = promptTemplate
 
@@ -143,16 +156,37 @@ actor RunAnalyzerActor {
             let avgHR = priorRuns.map(\.avgHeartRate).reduce(0, +) / priorRuns.count
             let avgCadence = priorRuns.map(\.avgCadence).reduce(0, +) / priorRuns.count
             let avgVertOsc = priorRuns.map(\.verticalOscillation).reduce(0, +) / Double(priorRuns.count)
-            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence, avgVerticalOscillation: avgVertOsc)
+
+            let runsWithVo2 = priorRuns.filter { $0.vo2Max > 0 }
+            let avgVo2Max = runsWithVo2.isEmpty ? 0.0 : runsWithVo2.map(\.vo2Max).reduce(0, +) / Double(runsWithVo2.count)
+
+            let avgGct = priorRuns.map(\.groundContactTime).reduce(0, +) / Double(priorRuns.count)
+            let avgStride = priorRuns.map(\.strideLength).reduce(0, +) / Double(priorRuns.count)
+
+            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence, avgVerticalOscillation: avgVertOsc, avgVo2Max: avgVo2Max, avgGroundContactTime: avgGct, avgStrideLength: avgStride)
         }
 
         // Precompute Context Strings for LLM
+        let vo2Context: String
         let cadenceContext: String
         let paceContext: String
         let hrContext: String
         let vertOscContext: String
+        let gctContext: String
+        let strideContext: String
 
         if let base = baseline {
+            // VO2 Max Logic
+            if run.vo2Max > 0 && base.avgVo2Max > 0 {
+                let vo2Delta = run.vo2Max - base.avgVo2Max
+                let vo2Trend = vo2Delta == 0 ? "Steady compared to baseline" : (vo2Delta > 0 ? String(format: "+%.1f HIGHER than baseline", vo2Delta) : String(format: "%.1f LOWER than baseline", abs(vo2Delta)))
+                vo2Context = String(format: "%.1f (%@).", run.vo2Max, vo2Trend)
+            } else if run.vo2Max > 0 {
+                vo2Context = String(format: "%.1f (No baseline available).", run.vo2Max)
+            } else {
+                vo2Context = "No VO2 Max data recorded for this run."
+            }
+
             // Cadence Logic
             let cadenceFloor = 150
             let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
@@ -177,22 +211,39 @@ actor RunAnalyzerActor {
             let vertOscDelta = run.verticalOscillation - base.avgVerticalOscillation
             let vertOscTrend = vertOscDelta >= 0 ? String(format: "+%.1f cm MORE bounce than baseline", vertOscDelta) : String(format: "%.1f cm LESS bounce than baseline", abs(vertOscDelta))
             vertOscContext = String(format: "%.1f cm (%@).", run.verticalOscillation, vertOscTrend)
+
+            // Ground Contact Time Logic
+            let gctDelta = run.groundContactTime - base.avgGroundContactTime
+            let gctTrend = gctDelta >= 0 ? String(format: "+%.0f ms LONGER contact than baseline", gctDelta) : String(format: "%.0f ms SHORTER contact than baseline", abs(gctDelta))
+            gctContext = String(format: "%.0f ms (%@).", run.groundContactTime, gctTrend)
+
+            // Stride Length Logic
+            let strideDelta = run.strideLength - base.avgStrideLength
+            let strideTrend = strideDelta >= 0 ? String(format: "+%.2f m LONGER stride than baseline", strideDelta) : String(format: "%.2f m SHORTER stride than baseline", abs(strideDelta))
+            strideContext = String(format: "%.2f m (%@).", run.strideLength, strideTrend)
+
         } else {
+            vo2Context = run.vo2Max > 0 ? String(format: "%.1f (No baseline available).", run.vo2Max) : "No VO2 Max data recorded for this run."
             let cadenceFloor = 150
             let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
             cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). No baseline available)."
             paceContext = "\(run.formattedPace) (No baseline available)."
             hrContext = "\(run.avgHeartRate) BPM (No baseline available)."
             vertOscContext = String(format: "%.1f cm (No baseline available).", run.verticalOscillation)
+            gctContext = String(format: "%.0f ms (No baseline available).", run.groundContactTime)
+            strideContext = String(format: "%.2f m (No baseline available).", run.strideLength)
         }
 
         // 5. Run the LLM Prompt
         do {
             let runData = RunDataForAI(
+                vo2Context: vo2Context,
                 cadenceContext: cadenceContext,
                 paceContext: paceContext,
                 hrContext: hrContext,
-                vertOscContext: vertOscContext
+                vertOscContext: vertOscContext,
+                gctContext: gctContext,
+                strideContext: strideContext
             )
 
             // Execute prompt asynchronously

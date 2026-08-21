@@ -27,7 +27,10 @@ class HealthKitManager: ObservableObject {
             HKObjectType.quantityType(forIdentifier: .runningSpeed)!,
             HKObjectType.quantityType(forIdentifier: .stepCount)!, // Used for cadence calculation
             HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
-            HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!
+            HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!,
+            HKObjectType.quantityType(forIdentifier: .vo2Max)!,
+            HKObjectType.quantityType(forIdentifier: .runningGroundContactTime)!,
+            HKObjectType.quantityType(forIdentifier: .runningStrideLength)!
         ]
 
         try await healthStore.requestAuthorization(toShare: [], read: typesToRead)
@@ -140,6 +143,27 @@ class HealthKitManager: ObservableObject {
             unit: HKUnit.meterUnit(with: .centi)
         )
 
+        // Query average VO2 Max
+        let vo2Max = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .vo2Max,
+            unit: HKUnit(from: "ml/kg*min")
+        )
+
+        // Query average Ground Contact Time (in ms)
+        let groundContactTime = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .runningGroundContactTime,
+            unit: HKUnit.secondUnit(with: .milli)
+        )
+
+        // Query average Stride Length (in m)
+        let strideLength = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .runningStrideLength,
+            unit: HKUnit.meter()
+        )
+
         return RunRecord(
             id: workout.uuid,
             date: workout.startDate,
@@ -148,7 +172,10 @@ class HealthKitManager: ObservableObject {
             avgPace: avgPace,
             avgHeartRate: Int(avgHeartRate),
             avgCadence: avgCadence,
-            verticalOscillation: verticalOscillation
+            verticalOscillation: verticalOscillation,
+            vo2Max: vo2Max,
+            groundContactTime: groundContactTime,
+            strideLength: strideLength
         )
     }
 

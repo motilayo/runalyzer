@@ -20,6 +20,50 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 20) {
+                    // Global Fitness Pill (VO2 Max)
+                    if let latestVO2 = filteredRunRecords.first(where: { $0.vo2Max > 0 }), latestVO2.vo2Max > 0 {
+                        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+                        let oldRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo && $0.date < latestVO2.date && $0.vo2Max > 0 }
+                        let oldAvg = oldRuns.isEmpty ? latestVO2.vo2Max : (oldRuns.map(\.vo2Max).reduce(0, +) / Double(oldRuns.count))
+                        let delta = latestVO2.vo2Max - oldAvg
+                        let deltaStr = delta == 0 ? "Steady" : (delta > 0 ? String(format: "+%.1f", delta) : String(format: "%.1f", delta))
+                        let deltaColor = delta == 0 ? Color.secondary : (delta > 0 ? Color.green : Color.red)
+                        let deltaIcon = delta == 0 ? "arrow.right" : (delta > 0 ? "arrow.up.right" : "arrow.down.right")
+
+                        HStack {
+                            Image(systemName: "heart.text.square.fill")
+                                .foregroundColor(.red)
+                                .font(.title3)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("VO2 Max")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.1f", latestVO2.vo2Max))
+                                    .font(.headline)
+                            }
+
+                            Spacer()
+
+                            HStack(spacing: 4) {
+                                Image(systemName: deltaIcon)
+                                    .font(.caption2.bold())
+                                Text(deltaStr)
+                                    .font(.subheadline.bold())
+                            }
+                            .foregroundColor(deltaColor)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(deltaColor.opacity(0.15))
+                            .clipShape(Capsule())
+                        }
+                        .padding()
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    }
+
                     if filteredRunRecords.isEmpty {
                         if isSyncing && runRecords.isEmpty {
                             VStack(spacing: 16) {
