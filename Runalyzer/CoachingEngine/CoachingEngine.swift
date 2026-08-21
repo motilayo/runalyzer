@@ -111,8 +111,22 @@ class CoachingEngine {
             instructions: instructions
         )
 
-        var prompt = "context:\n"
-        prompt += "  user_units: \(distanceUnit) for distance, \(paceUnit) for pace\n"
+        var promptTemplate = """
+        context:
+          user_units: {{UNIT_PREFERENCE}}
+          baseline_30_days:
+            avg_pace: {{BASELINE_PACE}}
+            avg_hr: {{BASELINE_HR}}
+            avg_cadence: {{BASELINE_CADENCE}}
+          current_run:
+            distance: {{CURRENT_DISTANCE}}
+            avg_pace: {{CURRENT_PACE}}
+            avg_hr: {{CURRENT_HR}}
+            avg_cadence: {{CURRENT_CADENCE}}
+        """
+
+        let unitPref = distanceUnit == "km" ? "Metric" : "Imperial"
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{UNIT_PREFERENCE}}", with: unitPref)
 
         if let baseline = runData.baseline {
             let baselinePaceValue = useMetricSystem ? baseline.avgPace : (baseline.avgPace * 1.609344)
@@ -120,19 +134,19 @@ class CoachingEngine {
             let baselinePaceSeconds = Int((baselinePaceValue - Double(baselinePaceMinutes)) * 60.0)
             let baselinePaceFormattedStr = String(format: "%d:%02d", baselinePaceMinutes, baselinePaceSeconds)
 
-            prompt += "  baseline_30_days:\n"
-            prompt += "    avg_pace: \(baselinePaceFormattedStr)\n"
-            prompt += "    avg_hr: \(baseline.avgHeartRate)\n"
-            prompt += "    avg_cadence: \(baseline.avgCadence)\n"
+            promptTemplate = promptTemplate.replacingOccurrences(of: "{{BASELINE_PACE}}", with: baselinePaceFormattedStr)
+            promptTemplate = promptTemplate.replacingOccurrences(of: "{{BASELINE_HR}}", with: "\(baseline.avgHeartRate)")
+            promptTemplate = promptTemplate.replacingOccurrences(of: "{{BASELINE_CADENCE}}", with: "\(baseline.avgCadence)")
         } else {
-            prompt += "  baseline_30_days: none\n"
+            promptTemplate = promptTemplate.replacingOccurrences(of: "  baseline_30_days:\n    avg_pace: {{BASELINE_PACE}}\n    avg_hr: {{BASELINE_HR}}\n    avg_cadence: {{BASELINE_CADENCE}}", with: "  baseline_30_days: none")
         }
 
-        prompt += "  current_run:\n"
-        prompt += "    distance: \(distanceFormatted)\n"
-        prompt += "    avg_pace: \(paceFormatted)\n"
-        prompt += "    avg_hr: \(runData.avgHeartRate)\n"
-        prompt += "    avg_cadence: \(runData.avgCadence)\n"
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_DISTANCE}}", with: "\(distanceFormatted) \(distanceUnit)")
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_PACE}}", with: "\(paceFormatted) \(paceUnit)")
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_HR}}", with: "\(runData.avgHeartRate)")
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_CADENCE}}", with: "\(runData.avgCadence)")
+
+        let prompt = promptTemplate
 
         // Execute the prompt expecting the @Generable struct output
         do {
