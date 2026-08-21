@@ -10,8 +10,12 @@ struct RunDetailView: View {
         ScrollView {
             VStack(spacing: 24) {
 
-                // Top: 2x2 Grid of Raw Stats
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                // Top: Responsive 6-Card Grid of Raw Stats
+                let columns = [
+                    GridItem(.adaptive(minimum: 140), spacing: 16)
+                ]
+
+                LazyVGrid(columns: columns, spacing: 16) {
                     let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
                     let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
                     let distanceUnit = useMetricSystem ? "km" : "mi"
@@ -23,6 +27,8 @@ struct RunDetailView: View {
 
                     StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "")
                     StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM")
+                    StatBox(title: "Avg Cadence", value: "\(runRecord.avgCadence)", unit: "SPM")
+                    StatBox(title: "Calories", value: "\(runRecord.activeCalories)", unit: "kcal")
                 }
                 .padding(.horizontal)
 

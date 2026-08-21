@@ -13,24 +13,30 @@ struct BaselineStats: Sendable {
 }
 
 struct RunDataForAI: Sendable {
-    let date: Date
-    let distance: Double
-    let avgPace: Double
-    let avgHeartRate: Int
-    let avgCadence: Int
-    let formattedPace: String
-    let baseline: BaselineStats?
+    let cadenceContext: String
+    let paceContext: String
+    let hrContext: String
 }
 
 @available(iOS 26.0, *)
 @Generable
-struct CoachingInsightPayload {
-    var title: String
-    var summary: String
+struct SuggestedDrill {
     var drillName: String
     @Guide(description: "Strictly max 3 steps")
     var drillSteps: [String]
     var cadence: String?
+}
+
+@available(iOS 26.0, *)
+@Generable
+struct RunInsight {
+    @Guide(description: "A short, encouraging title (e.g., 'Solid Pace Improvement'). DO NOT use the drill name here.")
+    var headline: String
+
+    @Guide(description: "STRICTLY 2 or 3 sentences maximum. Synthesize the context strings. DO NOT include drill instructions or steps in this field.")
+    var observation: String
+
+    var drill: SuggestedDrill
 }
 
 @available(iOS 26.0, *)
@@ -41,66 +47,22 @@ class CoachingEngine {
     private init() {}
 
     /// Analyzes a run record and generates a CoachingInsight using on-device FoundationModels
-    func generateInsight(for runData: RunDataForAI) async throws -> CoachingInsightPayload {
+    func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
 
         // Ensure Foundation Models are available on device
         guard SystemLanguageModel.default.isAvailable else {
             throw NSError(domain: "CoachingEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foundation Models are not available on this device."])
         }
 
-        // Define the prompt string
-        let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-        let paceFormatted = runData.formattedPace
-        let distanceConverted = useMetricSystem ? (runData.distance / 1000.0) : (runData.distance / 1609.344)
-        let distanceFormatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), distanceConverted)
-        let distanceUnit = useMetricSystem ? "km" : "mi"
-        let paceUnit = useMetricSystem ? "min/km" : "min/mi"
-
-        // Format the run date
-        let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
-        let dateFormatted = dateFormatter.string(from: runData.date)
-
-        // Calculate 30-day baseline and deltas
-        var runStatsPrompt = ""
-
-        if let baseline = runData.baseline {
-            let baselineDistanceConverted = useMetricSystem ? (baseline.avgDistance / 1000.0) : (baseline.avgDistance / 1609.344)
-            let baselineDistanceFormatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), baselineDistanceConverted)
-
-            // Format baseline pace string correctly based on metric/imperial (runData.avgPace is stored as min/km in DB)
-            let baselinePaceValue = useMetricSystem ? baseline.avgPace : (baseline.avgPace * 1.609344)
-            let baselinePaceMinutes = Int(baselinePaceValue)
-            let baselinePaceSeconds = Int((baselinePaceValue - Double(baselinePaceMinutes)) * 60.0)
-            let baselinePaceFormattedStr = String(format: "%d:%02d", baselinePaceMinutes, baselinePaceSeconds)
-
-            let paceDelta = String(format: "%+.2f", locale: Locale(identifier: "en_US_POSIX"), (useMetricSystem ? runData.avgPace : runData.avgPace * 1.609344) - (useMetricSystem ? baseline.avgPace : baseline.avgPace * 1.609344))
-            let hrDelta = runData.avgHeartRate - baseline.avgHeartRate
-            let cadDelta = runData.avgCadence - baseline.avgCadence
-
-            runStatsPrompt += "<BASELINE_30_DAYS>\n"
-            runStatsPrompt += "The runner's 30-day baseline averages are: \(baselineDistanceFormatted) \(distanceUnit) distance, \(baselinePaceFormattedStr) \(paceUnit) pace, \(baseline.avgHeartRate) BPM heart rate, and \(baseline.avgCadence) SPM cadence.\n"
-            runStatsPrompt += "</BASELINE_30_DAYS>\n"
-            runStatsPrompt += "The mathematical deltas for the current run compared to the baseline are: Pace \(paceDelta) \(paceUnit), Heart Rate \(hrDelta > 0 ? "+" : "")\(hrDelta) BPM, and Cadence \(cadDelta > 0 ? "+" : "")\(cadDelta) SPM.\n"
-        } else {
-            runStatsPrompt += "<BASELINE_30_DAYS>\nThe runner has no previous baseline history.\n</BASELINE_30_DAYS>\n"
-        }
-
-        runStatsPrompt += "<CURRENT_RUN>\n"
-        runStatsPrompt += "The current run to analyze occurred on \(dateFormatted). The runner covered \(distanceFormatted) \(distanceUnit) at a pace of \(paceFormatted) \(paceUnit), with an average heart rate of \(runData.avgHeartRate) BPM and a cadence of \(runData.avgCadence) SPM.\n"
-        runStatsPrompt += "</CURRENT_RUN>"
-
         let language = Locale.current.language.languageCode?.identifier ?? "en"
         let instructions = """
         persona: elite_running_coach
-        task: analyze_workout_variance
+        task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
-          - speak_directly_to_user_using_second_person
-          - analyze_run_compared_to_baseline_30_days
-          - express_pace_changes_in_seconds_or_mmss
-          - realistic_running_cadence_floor_is_150_spm
+          - speak_directly_to_user_using_second_person ("You", "Your")
+          - observation_must_not_contain_drill_steps
+          - drill_target_cadence_must_be_between_150_and_180_spm
+          - never_prescribe_cadence_below_150_spm
           - no_conversational_filler
           - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
           - target_cadence_generation_must_be_absolute_e_g_120_spm_or_142_146
@@ -114,60 +76,38 @@ class CoachingEngine {
 
         var promptTemplate = """
         context:
-          user_units: {{UNIT_PREFERENCE}}
-          baseline_30_days:
-            avg_pace: {{BASELINE_PACE}}
-            avg_hr: {{BASELINE_HR}}
-            avg_cadence: {{BASELINE_CADENCE}}
-          current_run:
-            distance: {{CURRENT_DISTANCE}}
-            avg_pace: {{CURRENT_PACE}}
-            avg_hr: {{CURRENT_HR}}
-            avg_cadence: {{CURRENT_CADENCE}}
+          cadence_analysis: {{CADENCE_CONTEXT}}
+          pace_analysis: {{PACE_CONTEXT}}
+          heart_rate_analysis: {{HR_CONTEXT}}
         """
 
-        let unitPref = distanceUnit == "km" ? "Metric" : "Imperial"
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{UNIT_PREFERENCE}}", with: unitPref)
-
-        if let baseline = runData.baseline {
-            let baselinePaceValue = useMetricSystem ? baseline.avgPace : (baseline.avgPace * 1.609344)
-            let baselinePaceMinutes = Int(baselinePaceValue)
-            let baselinePaceSeconds = Int((baselinePaceValue - Double(baselinePaceMinutes)) * 60.0)
-            let baselinePaceFormattedStr = String(format: "%d:%02d", baselinePaceMinutes, baselinePaceSeconds)
-
-            promptTemplate = promptTemplate.replacingOccurrences(of: "{{BASELINE_PACE}}", with: baselinePaceFormattedStr)
-            promptTemplate = promptTemplate.replacingOccurrences(of: "{{BASELINE_HR}}", with: "\(baseline.avgHeartRate)")
-            promptTemplate = promptTemplate.replacingOccurrences(of: "{{BASELINE_CADENCE}}", with: "\(baseline.avgCadence)")
-        } else {
-            promptTemplate = promptTemplate.replacingOccurrences(of: "  baseline_30_days:\n    avg_pace: {{BASELINE_PACE}}\n    avg_hr: {{BASELINE_HR}}\n    avg_cadence: {{BASELINE_CADENCE}}", with: "  baseline_30_days: none")
-        }
-
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_DISTANCE}}", with: "\(distanceFormatted) \(distanceUnit)")
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_PACE}}", with: "\(paceFormatted) \(paceUnit)")
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_HR}}", with: "\(runData.avgHeartRate)")
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CURRENT_CADENCE}}", with: "\(runData.avgCadence)")
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{HR_CONTEXT}}", with: runData.hrContext)
 
         let prompt = promptTemplate
 
         // Execute the prompt expecting the @Generable struct output
         do {
-            let generatedInsight = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
+            let generatedInsight = try await session.respond(to: prompt, generating: RunInsight.self)
 
             return generatedInsight.content
         } catch {
             print("FoundationModels Generation Error: \(error.localizedDescription)")
 
             // Graceful fallback for unsupported languages/locales or generation failures
-            return CoachingInsightPayload(
-                title: String(localized: "Run Analyzed Successfully"),
-                summary: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
-                drillName: String(localized: "Strides"),
-                drillSteps: [
-                    String(localized: "4 × 20s"),
-                    String(localized: "60s easy walk"),
-                    String(localized: "Focus on relaxed shoulders and quick turnover.")
-                ],
-                cadence: nil
+            return RunInsight(
+                headline: String(localized: "Run Analyzed Successfully"),
+                observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
+                drill: SuggestedDrill(
+                    drillName: String(localized: "Strides"),
+                    drillSteps: [
+                        String(localized: "4 × 20s"),
+                        String(localized: "60s easy walk"),
+                        String(localized: "Focus on relaxed shoulders and quick turnover.")
+                    ],
+                    cadence: nil
+                )
             )
         }
     }
@@ -201,40 +141,70 @@ actor RunAnalyzerActor {
             baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence)
         }
 
+        // Precompute Context Strings for LLM
+        let cadenceContext: String
+        let paceContext: String
+        let hrContext: String
+
+        if let base = baseline {
+            // Cadence Logic
+            let cadenceFloor = 150
+            let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
+            let cadenceDelta = run.avgCadence - base.avgCadence
+            let cadenceTrend = cadenceDelta >= 0 ? "+\(cadenceDelta) SPM higher than baseline" : "\(abs(cadenceDelta)) SPM lower than baseline"
+            cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). \(cadenceTrend))."
+
+            // Pace Logic
+            // Assuming average pace is stored in minutes per kilometer as a Double
+            // We convert to total seconds for easier comparison
+            let runPaceSeconds = Int(run.avgPace * 60)
+            let basePaceSeconds = Int(base.avgPace * 60)
+            let paceDiff = basePaceSeconds - runPaceSeconds // Positive = faster
+            let paceTrend = paceDiff >= 0 ? "\(abs(paceDiff)) seconds FASTER than baseline" : "\(abs(paceDiff)) seconds SLOWER than baseline"
+            paceContext = "\(run.formattedPace) (\(paceTrend))."
+
+            // HR Logic
+            let hrDelta = run.avgHeartRate - base.avgHeartRate
+            let hrTrend = hrDelta <= 0 ? "\(abs(hrDelta)) BPM LOWER than baseline" : "+\(hrDelta) BPM HIGHER than baseline"
+            hrContext = "\(run.avgHeartRate) BPM (\(hrTrend))."
+        } else {
+            let cadenceFloor = 150
+            let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
+            cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). No baseline available)."
+            paceContext = "\(run.formattedPace) (No baseline available)."
+            hrContext = "\(run.avgHeartRate) BPM (No baseline available)."
+        }
+
         // 5. Run the LLM Prompt
         do {
             let runData = RunDataForAI(
-                date: run.date,
-                distance: run.distance,
-                avgPace: run.avgPace,
-                avgHeartRate: run.avgHeartRate,
-                avgCadence: run.avgCadence,
-                formattedPace: run.formattedPace,
-                baseline: baseline
+                cadenceContext: cadenceContext,
+                paceContext: paceContext,
+                hrContext: hrContext
             )
 
             // Execute prompt asynchronously
             let payload = try await CoachingEngine.shared.generateInsight(for: runData)
 
             // 6. Save directly to the background context (Main UI updates automatically)
-            let steps = payload.drillSteps
+            let steps = payload.drill.drillSteps
             let reps = steps.count > 0 ? steps[0] : ""
             let recovery = steps.count > 1 ? steps[1] : ""
             let cues = steps.count > 2 ? steps[2] : ""
 
             let drill = DrillRecommendation(
-                drillTitle: payload.drillName,
+                drillTitle: payload.drill.drillName,
                 drillReps: reps,
                 drillRecovery: recovery,
                 drillCues: cues,
-                targetCadence: payload.cadence,
+                targetCadence: payload.drill.cadence,
                 previousCadence: run.avgCadence,
                 isCompleted: false
             )
 
             let insight = CoachingInsight(
-                headline: payload.title,
-                longitudinalObservation: payload.summary,
+                headline: payload.headline,
+                longitudinalObservation: payload.observation,
                 drillRecommendation: drill
             )
 

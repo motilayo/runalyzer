@@ -26,6 +26,9 @@ final class RunRecord {
     /// The average cadence during the run, stored in steps per minute (SPM).
     var avgCadence: Int
 
+    /// Active calories burned during the run.
+    var activeCalories: Int
+
     /// A one-to-one relationship to the AI-generated coaching insight.
     /// If this run record is deleted, the insight is cascaded and deleted as well.
     @Relationship(deleteRule: .cascade, inverse: \CoachingInsight.runRecord)
@@ -44,6 +47,7 @@ final class RunRecord {
         avgPace: Double,
         avgHeartRate: Int,
         avgCadence: Int,
+        activeCalories: Int = 0,
         insight: CoachingInsight? = nil
     ) {
         self.id = id
@@ -53,6 +57,7 @@ final class RunRecord {
         self.avgPace = avgPace
         self.avgHeartRate = avgHeartRate
         self.avgCadence = avgCadence
+        self.activeCalories = activeCalories
         self.insight = insight
     }
 }

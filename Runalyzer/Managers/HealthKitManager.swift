@@ -132,6 +132,8 @@ class HealthKitManager: ObservableObject {
 
         let avgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
 
+        let activeCalories = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0.0
+
         return RunRecord(
             id: workout.uuid,
             date: workout.startDate,
@@ -139,7 +141,8 @@ class HealthKitManager: ObservableObject {
             duration: duration,
             avgPace: avgPace,
             avgHeartRate: Int(avgHeartRate),
-            avgCadence: avgCadence
+            avgCadence: avgCadence,
+            activeCalories: Int(activeCalories)
         )
     }
 

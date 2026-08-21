@@ -66,6 +66,9 @@ struct DashboardView: View {
                 }
                 .padding(.vertical)
             }
+            .safeAreaInset(edge: .bottom, spacing: 80) {
+                EmptyView()
+            }
             .navigationDestination(for: RunRecord.self) { runRecord in
                 RunDetailView(runRecord: runRecord)
             }
@@ -134,13 +137,20 @@ struct HeroCardView: View {
             }
 
             // Metrics Row
-            HStack(spacing: 20) {
+            let columns = [
+                GridItem(.adaptive(minimum: 90), spacing: 16)
+            ]
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
                 let distanceUnit = useMetricSystem ? "km" : "mi"
 
                 MetricView(title: "Distance", value: String(format: "%.2f %@", distanceConverted, distanceUnit))
                 MetricView(title: "Pace", value: runRecord.formattedPace)
                 MetricView(title: "Time", value: formattedDuration)
+                MetricView(title: "HR", value: "\(runRecord.avgHeartRate) BPM")
+                MetricView(title: "Cadence", value: "\(runRecord.avgCadence) SPM")
+                MetricView(title: "Calories", value: "\(runRecord.activeCalories) kcal")
             }
 
             Divider()
