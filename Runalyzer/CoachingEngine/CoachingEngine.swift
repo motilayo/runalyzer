@@ -72,12 +72,13 @@ class CoachingEngine {
             let hrDelta = runData.avgHeartRate - baseline.avgHeartRate
             let cadDelta = runData.avgCadence - baseline.avgCadence
 
-            runStatsPrompt += "BASELINE: \(baselineDistanceFormatted)\(distanceUnit), \(baseline.avgPace.formattedPaceString), \(baseline.avgHeartRate)BPM, \(baseline.avgCadence)SPM. DELTAS: Pace \(paceDelta)min/\(distanceUnit), HR \(hrDelta > 0 ? "+" : "")\(hrDelta), Cadence \(cadDelta > 0 ? "+" : "")\(cadDelta)\n"
+            runStatsPrompt += "The runner's 30-day baseline averages are: \(baselineDistanceFormatted)\(distanceUnit) distance, \(baseline.avgPace.formattedPaceString) pace, \(baseline.avgHeartRate) BPM heart rate, and \(baseline.avgCadence) SPM cadence.\n"
+            runStatsPrompt += "The mathematical deltas for the current run compared to the baseline are: Pace \(paceDelta) min/\(distanceUnit), Heart Rate \(hrDelta > 0 ? "+" : "")\(hrDelta) BPM, and Cadence \(cadDelta > 0 ? "+" : "")\(cadDelta) SPM.\n"
         } else {
-            runStatsPrompt += "BASELINE: None\n"
+            runStatsPrompt += "The runner has no previous baseline history.\n"
         }
 
-        runStatsPrompt += "CURRENT: \(dateFormatted), \(distanceFormatted)\(distanceUnit), \(paceFormatted), \(runData.avgHeartRate)BPM, \(runData.avgCadence)SPM"
+        runStatsPrompt += "The current run to analyze occurred on \(dateFormatted). The runner covered \(distanceFormatted)\(distanceUnit) at a pace of \(paceFormatted), with an average heart rate of \(runData.avgHeartRate) BPM and a cadence of \(runData.avgCadence) SPM."
 
         let instructions = """
         You are a run analyst. Compare CURRENT RUN to BASELINE. Write a 1-sentence title. Write a maximum 2-sentence summary of biomechanical differences. Provide 1 specific drill (maximum 3 steps) to improve their weakest metric. Do not use jargon. Be direct.
