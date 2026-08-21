@@ -150,7 +150,7 @@ struct HeroCardView: View {
                 MetricView(title: "Time", value: formattedDuration)
                 MetricView(title: "HR", value: "\(runRecord.avgHeartRate) BPM")
                 MetricView(title: "Cadence", value: "\(runRecord.avgCadence) SPM")
-                MetricView(title: "Elevation", value: "\(runRecord.elevation) m")
+                MetricView(title: "Vert. Osc.", value: String(format: "%.1f cm", runRecord.verticalOscillation))
             }
 
             Divider()

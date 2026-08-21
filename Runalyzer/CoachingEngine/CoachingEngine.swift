@@ -10,14 +10,14 @@ struct BaselineStats: Sendable {
     let avgPace: Double
     let avgHeartRate: Int
     let avgCadence: Int
-    let avgElevation: Int
+    let avgVerticalOscillation: Double
 }
 
 struct RunDataForAI: Sendable {
     let cadenceContext: String
     let paceContext: String
     let hrContext: String
-    let elevationContext: String
+    let vertOscContext: String
 }
 
 @available(iOS 26.0, *)
@@ -81,13 +81,13 @@ class CoachingEngine {
           cadence_analysis: {{CADENCE_CONTEXT}}
           pace_analysis: {{PACE_CONTEXT}}
           heart_rate_analysis: {{HR_CONTEXT}}
-          elevation_analysis: {{ELEVATION_CONTEXT}}
+          vertical_oscillation_analysis: {{VERT_OSC_CONTEXT}}
         """
 
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{HR_CONTEXT}}", with: runData.hrContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{ELEVATION_CONTEXT}}", with: runData.elevationContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{VERT_OSC_CONTEXT}}", with: runData.vertOscContext)
 
         let prompt = promptTemplate
 
@@ -142,15 +142,15 @@ actor RunAnalyzerActor {
             let avgPace = priorRuns.map(\.avgPace).reduce(0, +) / Double(priorRuns.count)
             let avgHR = priorRuns.map(\.avgHeartRate).reduce(0, +) / priorRuns.count
             let avgCadence = priorRuns.map(\.avgCadence).reduce(0, +) / priorRuns.count
-            let avgElevation = priorRuns.map(\.elevation).reduce(0, +) / priorRuns.count
-            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence, avgElevation: avgElevation)
+            let avgVertOsc = priorRuns.map(\.verticalOscillation).reduce(0, +) / Double(priorRuns.count)
+            baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence, avgVerticalOscillation: avgVertOsc)
         }
 
         // Precompute Context Strings for LLM
         let cadenceContext: String
         let paceContext: String
         let hrContext: String
-        let elevationContext: String
+        let vertOscContext: String
 
         if let base = baseline {
             // Cadence Logic
@@ -173,17 +173,17 @@ actor RunAnalyzerActor {
             let hrTrend = hrDelta <= 0 ? "\(abs(hrDelta)) BPM LOWER than baseline" : "+\(hrDelta) BPM HIGHER than baseline"
             hrContext = "\(run.avgHeartRate) BPM (\(hrTrend))."
 
-            // Elevation Logic
-            let elevationDelta = run.elevation - base.avgElevation
-            let elevationTrend = elevationDelta >= 0 ? "+\(elevationDelta)m MORE than baseline" : "\(abs(elevationDelta))m LESS than baseline"
-            elevationContext = "\(run.elevation)m (\(elevationTrend))."
+            // Vertical Oscillation Logic
+            let vertOscDelta = run.verticalOscillation - base.avgVerticalOscillation
+            let vertOscTrend = vertOscDelta >= 0 ? String(format: "+%.1f cm MORE bounce than baseline", vertOscDelta) : String(format: "%.1f cm LESS bounce than baseline", abs(vertOscDelta))
+            vertOscContext = String(format: "%.1f cm (%@).", run.verticalOscillation, vertOscTrend)
         } else {
             let cadenceFloor = 150
             let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
             cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). No baseline available)."
             paceContext = "\(run.formattedPace) (No baseline available)."
             hrContext = "\(run.avgHeartRate) BPM (No baseline available)."
-            elevationContext = "\(run.elevation)m (No baseline available)."
+            vertOscContext = String(format: "%.1f cm (No baseline available).", run.verticalOscillation)
         }
 
         // 5. Run the LLM Prompt
@@ -192,7 +192,7 @@ actor RunAnalyzerActor {
                 cadenceContext: cadenceContext,
                 paceContext: paceContext,
                 hrContext: hrContext,
-                elevationContext: elevationContext
+                vertOscContext: vertOscContext
             )
 
             // Execute prompt asynchronously

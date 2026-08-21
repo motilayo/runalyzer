@@ -27,7 +27,7 @@ class HealthKitManager: ObservableObject {
             HKObjectType.quantityType(forIdentifier: .runningSpeed)!,
             HKObjectType.quantityType(forIdentifier: .stepCount)!, // Used for cadence calculation
             HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
-            HKObjectType.quantityType(forIdentifier: .flightsClimbed)!
+            HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!
         ]
 
         try await healthStore.requestAuthorization(toShare: [], read: typesToRead)
@@ -133,19 +133,12 @@ class HealthKitManager: ObservableObject {
 
         let avgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
 
-        // Attempt to extract elevation from workout metadata first
-        var elevation = (workout.metadata?[HKMetadataKeyElevationAscended] as? HKQuantity)?.doubleValue(for: .meter()) ?? 0.0
-
-        // Fallback to flights climbed if metadata is unavailable
-        if elevation == 0 {
-            let flights = try await fetchSumQuantity(
-                for: workout,
-                quantityTypeIdentifier: .flightsClimbed,
-                unit: HKUnit.count()
-            )
-            // 1 flight is roughly 3 meters of elevation gain
-            elevation = flights * 3.0
-        }
+        // Query average vertical oscillation (in cm)
+        let verticalOscillation = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .runningVerticalOscillation,
+            unit: HKUnit.meterUnit(with: .centi)
+        )
 
         return RunRecord(
             id: workout.uuid,
@@ -155,7 +148,7 @@ class HealthKitManager: ObservableObject {
             avgPace: avgPace,
             avgHeartRate: Int(avgHeartRate),
             avgCadence: avgCadence,
-            elevation: Int(elevation)
+            verticalOscillation: verticalOscillation
         )
     }
 

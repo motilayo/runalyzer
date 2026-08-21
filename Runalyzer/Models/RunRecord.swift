@@ -26,8 +26,8 @@ final class RunRecord {
     /// The average cadence during the run, stored in steps per minute (SPM).
     var avgCadence: Int
 
-    /// Elevation gain during the run in meters.
-    var elevation: Int = 0
+    /// Vertical oscillation during the run in centimeters.
+    var verticalOscillation: Double = 0.0
 
     /// A one-to-one relationship to the AI-generated coaching insight.
     /// If this run record is deleted, the insight is cascaded and deleted as well.
@@ -47,7 +47,7 @@ final class RunRecord {
         avgPace: Double,
         avgHeartRate: Int,
         avgCadence: Int,
-        elevation: Int = 0,
+        verticalOscillation: Double = 0.0,
         insight: CoachingInsight? = nil
     ) {
         self.id = id
@@ -57,7 +57,7 @@ final class RunRecord {
         self.avgPace = avgPace
         self.avgHeartRate = avgHeartRate
         self.avgCadence = avgCadence
-        self.elevation = elevation
+        self.verticalOscillation = verticalOscillation
         self.insight = insight
     }
 }
