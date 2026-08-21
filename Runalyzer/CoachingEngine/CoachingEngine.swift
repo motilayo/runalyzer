@@ -92,11 +92,18 @@ class CoachingEngine {
         runStatsPrompt += "The current run to analyze occurred on \(dateFormatted). The runner covered \(distanceFormatted) \(distanceUnit) at a pace of \(paceFormatted) \(paceUnit), with an average heart rate of \(runData.avgHeartRate) BPM and a cadence of \(runData.avgCadence) SPM.\n"
         runStatsPrompt += "</CURRENT_RUN>"
 
+        let language = Locale.current.language.languageCode?.identifier ?? "en"
         let instructions = """
-        You are a run analyst. Compare CURRENT RUN to BASELINE_30_DAYS. Evaluate changes based exclusively on comparing the current run against the baseline. Write a 1-sentence, actionable headline. Do not use the run date or generic phrases like "Analyzing Run". Write a maximum 2-sentence summary of biomechanical differences, summarizing trends naturally without quoting exact decimal percentages. Provide 1 specific drill (maximum 3 steps) to improve their weakest metric. Do not use jargon. Be direct.
-        Drill title MUST be exactly: "Cadence Pyramids", "Rhythm Intervals", "Tempo Surges", or "Strides".
-        Target cadence generation MUST be absolute (e.g. "120 SPM" or "142-146") and NEVER relative or single digit ranges.
-        IMPORTANT: Respond entirely in \(Locale.current.language.languageCode?.identifier ?? "en").
+        persona: elite_running_coach
+        task: analyze_workout_variance
+        rules:
+          - speak_directly_to_user_using_second_person
+          - express_pace_changes_in_seconds_or_mmss
+          - realistic_running_cadence_floor_is_150_spm
+          - no_conversational_filler
+          - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
+          - target_cadence_generation_must_be_absolute_e_g_120_spm_or_142_146
+          - respond_entirely_in_\(language)
         """
 
         let session = LanguageModelSession(
@@ -104,11 +111,28 @@ class CoachingEngine {
             instructions: instructions
         )
 
-        let prompt = """
-        Context Payload:
-        Note: Pace is in \(paceUnit) and Distance is in \(distanceUnit).
-        \(runStatsPrompt)
-        """
+        var prompt = "context:\n"
+        prompt += "  user_units: \(distanceUnit) for distance, \(paceUnit) for pace\n"
+
+        if let baseline = runData.baseline {
+            let baselinePaceValue = useMetricSystem ? baseline.avgPace : (baseline.avgPace * 1.609344)
+            let baselinePaceMinutes = Int(baselinePaceValue)
+            let baselinePaceSeconds = Int((baselinePaceValue - Double(baselinePaceMinutes)) * 60.0)
+            let baselinePaceFormattedStr = String(format: "%d:%02d", baselinePaceMinutes, baselinePaceSeconds)
+
+            prompt += "  baseline_30_days:\n"
+            prompt += "    avg_pace: \(baselinePaceFormattedStr)\n"
+            prompt += "    avg_hr: \(baseline.avgHeartRate)\n"
+            prompt += "    avg_cadence: \(baseline.avgCadence)\n"
+        } else {
+            prompt += "  baseline_30_days: none\n"
+        }
+
+        prompt += "  current_run:\n"
+        prompt += "    distance: \(distanceFormatted)\n"
+        prompt += "    avg_pace: \(paceFormatted)\n"
+        prompt += "    avg_hr: \(runData.avgHeartRate)\n"
+        prompt += "    avg_cadence: \(runData.avgCadence)\n"
 
         // Execute the prompt expecting the @Generable struct output
         do {
