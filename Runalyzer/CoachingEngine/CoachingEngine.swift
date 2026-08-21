@@ -98,6 +98,7 @@ class CoachingEngine {
         task: analyze_workout_variance
         rules:
           - speak_directly_to_user_using_second_person
+          - analyze_run_compared_to_baseline_30_days
           - express_pace_changes_in_seconds_or_mmss
           - realistic_running_cadence_floor_is_150_spm
           - no_conversational_filler
