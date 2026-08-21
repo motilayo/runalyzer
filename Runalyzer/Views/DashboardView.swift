@@ -160,6 +160,7 @@ struct HeroCardView: View {
     var runRecord: RunRecord
     var isSyncing: Bool
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var formattedDuration: String {
@@ -187,9 +188,9 @@ struct HeroCardView: View {
             }
 
             // Metrics Row
-            let columns = [
-                GridItem(.adaptive(minimum: 90), spacing: 16)
-            ]
+            let columns = verticalSizeClass == .regular
+                ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
             LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)

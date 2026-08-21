@@ -4,6 +4,7 @@ import SwiftData
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
 
     var body: some View {
@@ -11,9 +12,9 @@ struct RunDetailView: View {
             VStack(spacing: 24) {
 
                 // Top: Responsive 6-Card Grid of Raw Stats
-                let columns = [
-                    GridItem(.adaptive(minimum: 140), spacing: 16)
-                ]
+                let columns = verticalSizeClass == .regular
+                    ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                    : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)

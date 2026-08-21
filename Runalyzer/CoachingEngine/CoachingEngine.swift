@@ -30,18 +30,20 @@ struct RunDataForAI: Sendable {
 @Generable
 struct SuggestedDrill {
     var drillName: String
-    @Guide(description: "Strictly max 3 steps")
+    @Guide(maximumCount: 3, description: "Exactly three steps: reps, recovery, cues.")
     var drillSteps: [String]
+
+    @Guide(description: "Must be a steady absolute band (e.g., '155-160') or a single number if appropriate. DO NOT output percentages. Always use absolute SPM numbers.")
     var cadence: String?
 }
 
 @available(iOS 26.0, *)
 @Generable
 struct RunInsight {
-    @Guide(description: "Encouraging title. DO NOT use the drill name here.")
+    @Guide(description: "A short, encouraging title (e.g., 'Solid Pace Improvement'). DO NOT use the drill name here.")
     var headline: String
 
-    @Guide(description: "STRICTLY 2-3 sentences. Synthesize the provided context. DO NOT include drill instructions here.")
+    @Guide(description: "STRICTLY 2 or 3 sentences maximum. Synthesize the context strings. DO NOT include drill instructions or steps in this field.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -74,7 +76,6 @@ class CoachingEngine {
           - never_prescribe_cadence_below_150_spm
           - no_conversational_filler
           - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
-          - target_cadence_generation_must_be_absolute_e_g_155_spm_or_160_165
           - respond_entirely_in_\(language)
         """
 
