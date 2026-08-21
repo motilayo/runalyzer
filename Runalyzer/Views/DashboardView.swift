@@ -117,6 +117,12 @@ struct DashboardView: View {
                 RunDetailView(runRecord: runRecord)
             }
             .task {
+                do {
+                    try await HealthKitManager.shared.requestAuthorization()
+                } catch {
+                    print("Error requesting HealthKit authorization on dashboard: \(error.localizedDescription)")
+                }
+
                 if let onSync {
                     await onSync()
                     isSyncing = false
