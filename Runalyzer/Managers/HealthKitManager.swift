@@ -112,6 +112,39 @@ class HealthKitManager: ObservableObject {
         }
     }
 
+    /// Fetches the single most recent global VO2 Max reading from HealthKit
+    func fetchLatestGlobalVO2Max() async throws -> Double? {
+        guard let quantityType = HKObjectType.quantityType(forIdentifier: .vo2Max) else {
+            return nil
+        }
+
+        // No predicate, just get the absolute latest globally
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: quantityType,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let sample = samples?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                let vo2 = sample.quantity.doubleValue(for: HKUnit(from: "ml/kg*min"))
+                continuation.resume(returning: vo2)
+            }
+            healthStore.execute(query)
+        }
+    }
+
     /// Extract data from a workout to create a RunRecord
     func extractRunRecord(from workout: HKWorkout) async throws -> RunRecord {
         let duration = workout.duration
