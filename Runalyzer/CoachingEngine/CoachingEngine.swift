@@ -85,6 +85,7 @@ class CoachingEngine {
           - speak_directly_to_user_using_second_person ("You", "Your")
           - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
           - observation_must_not_contain_drill_steps
+          - do_not_invent_or_calculate_math_in_the_observation_only_synthesize_the_strings
           - use_gait_metrics_to_diagnose_overstriding_or_bouncing
           - drill_target_cadence_must_be_between_150_and_180_spm
           - never_prescribe_cadence_below_150_spm
