@@ -30,9 +30,17 @@ struct RunDataForAI: Sendable {
 @available(iOS 26.0, *)
 @Generable
 struct SuggestedDrill {
-    var drillName: String
-    @Guide(description: "Exactly three steps: reps, recovery, cues.")
-    var drillSteps: [String]
+    @Guide(description: "A recognized drill name (e.g., 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', 'Strides').")
+    var drillTitle: String
+
+    @Guide(description: "The active work interval and total sets using absolute SPM (e.g., 'Run 4 x 30 sec at 155 SPM'). DO NOT put recovery or cues here.")
+    var drillReps: String
+
+    @Guide(description: "The recovery period between sets (e.g., 'Jog easily or walk for 60 seconds between reps to catch your breath').")
+    var drillRecovery: String
+
+    @Guide(description: "A specific biomechanical or mental form cue to execute during the drill (e.g., 'Keep torso tall, push forward rather than upward, and aim for light footfalls').")
+    var drillCues: String
 
     @Guide(description: "Must be a steady absolute band (e.g., '155-160') or a single number if appropriate. DO NOT output percentages. Always use absolute SPM numbers.")
     var cadence: String?
@@ -122,12 +130,10 @@ class CoachingEngine {
                 headline: String(localized: "Run Analyzed Successfully"),
                 observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
                 drill: SuggestedDrill(
-                    drillName: String(localized: "Strides"),
-                    drillSteps: [
-                        String(localized: "4 × 20s"),
-                        String(localized: "60s easy walk"),
-                        String(localized: "Focus on relaxed shoulders and quick turnover.")
-                    ],
+                    drillTitle: String(localized: "Strides"),
+                    drillReps: String(localized: "4 × 20s"),
+                    drillRecovery: String(localized: "60s easy walk"),
+                    drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                     cadence: nil
                 )
             )
@@ -269,16 +275,11 @@ actor RunAnalyzerActor {
             let payload = try await CoachingEngine.shared.generateInsight(for: runData)
 
             // 6. Save directly to the background context (Main UI updates automatically)
-            let steps = payload.drill.drillSteps
-            let reps = steps.count > 0 ? steps[0] : ""
-            let recovery = steps.count > 1 ? steps[1] : ""
-            let cues = steps.count > 2 ? steps[2] : ""
-
             let drill = DrillRecommendation(
-                drillTitle: payload.drill.drillName,
-                drillReps: reps,
-                drillRecovery: recovery,
-                drillCues: cues,
+                drillTitle: payload.drill.drillTitle,
+                drillReps: payload.drill.drillReps,
+                drillRecovery: payload.drill.drillRecovery,
+                drillCues: payload.drill.drillCues,
                 targetCadence: payload.drill.cadence,
                 previousCadence: run.avgCadence,
                 isCompleted: false
