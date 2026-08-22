@@ -17,6 +17,7 @@ struct BaselineStats: Sendable {
 }
 
 struct RunDataForAI: Sendable {
+    let directiveContext: String
     let vo2Context: String
     let cadenceContext: String
     let paceContext: String
@@ -70,6 +71,7 @@ class CoachingEngine {
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
           - speak_directly_to_user_using_second_person ("You", "Your")
+          - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
           - observation_must_not_contain_drill_steps
           - use_gait_metrics_to_diagnose_overstriding_or_bouncing
           - drill_target_cadence_must_be_between_150_and_180_spm
@@ -86,6 +88,7 @@ class CoachingEngine {
 
         var promptTemplate = """
         context:
+          swift_directive: {{DIRECTIVE_CONTEXT}}
           global_fitness_vo2: {{VO2_CONTEXT}}
           cadence_analysis: {{CADENCE_CONTEXT}}
           pace_analysis: {{PACE_CONTEXT}}
@@ -95,6 +98,7 @@ class CoachingEngine {
           stride_length: {{STRIDE_CONTEXT}}
         """
 
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{VO2_CONTEXT}}", with: runData.vo2Context)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
@@ -168,6 +172,7 @@ actor RunAnalyzerActor {
         }
 
         // Precompute Context Strings for LLM
+        let directiveContext: String
         let vo2Context: String
         let cadenceContext: String
         let paceContext: String
@@ -223,7 +228,19 @@ actor RunAnalyzerActor {
             let strideTrend = strideDelta >= 0 ? String(format: "+%.2f m LONGER stride than baseline", strideDelta) : String(format: "%.2f m SHORTER stride than baseline", abs(strideDelta))
             strideContext = String(format: "%.2f m (%@).", run.strideLength, strideTrend)
 
+            // Directive Logic (Swift Diagnoses the Issue)
+            if run.avgCadence < 150 || (run.verticalOscillation > 10.0 && run.verticalOscillation > base.avgVerticalOscillation) {
+                directiveContext = "The runner is either bounding too much (high vertical oscillation) or overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence and reducing vertical bounce."
+            } else if paceDiff < 0 && hrDelta > 0 {
+                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. Praise consistency but prescribe a drill focused on Easy Aerobic Recovery and HR control."
+            } else if paceDiff > 0 && hrDelta < 0 {
+                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill."
+            } else {
+                directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill."
+            }
+
         } else {
+            directiveContext = "Evaluate this isolated run and provide a basic introductory drill."
             vo2Context = run.vo2Max > 0 ? String(format: "%.1f (No baseline available).", run.vo2Max) : "No VO2 Max data recorded for this run."
             let cadenceFloor = 150
             let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
@@ -238,6 +255,7 @@ actor RunAnalyzerActor {
         // 5. Run the LLM Prompt
         do {
             let runData = RunDataForAI(
+                directiveContext: directiveContext,
                 vo2Context: vo2Context,
                 cadenceContext: cadenceContext,
                 paceContext: paceContext,
