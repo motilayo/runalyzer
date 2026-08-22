@@ -248,8 +248,8 @@ struct HeroCardView: View {
                             Text(drill.drillTitle)
                                 .font(.subheadline.bold())
                         }
-                        if !drill.drillWork.isEmpty {
-                            Text(drill.drillWork)
+                        if let work = drill.drillWork, !work.isEmpty {
+                            Text(work)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

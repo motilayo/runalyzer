@@ -80,10 +80,10 @@ struct RunDetailView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 12) {
-                                DrillRow(icon: "repeat", text: drill.drillWork)
+                                DrillRow(icon: "repeat", text: drill.drillWork ?? "")
                                 DrillRow(icon: "brain.head.profile", text: drill.drillCues)
-                                DrillRow(icon: "bolt", text: drill.drillEffort)
-                                DrillRow(icon: "target", text: drill.drillPurpose)
+                                DrillRow(icon: "bolt", text: drill.drillEffort ?? "")
+                                DrillRow(icon: "target", text: drill.drillPurpose ?? "")
                             }
 
                             if let target = drill.targetCadence, let prev = drill.previousCadence, !target.isEmpty {
