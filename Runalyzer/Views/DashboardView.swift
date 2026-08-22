@@ -16,12 +16,12 @@ struct DashboardView: View {
 
     // 1. Get the most recent valid VO2 Max score
     var latestVO2Max: Double? {
-        filteredRunRecords.first(where: { $0.vo2Max > 0 })?.vo2Max
+        runRecords.first(where: { $0.vo2Max > 0 })?.vo2Max
     }
 
     // 2. Calculate the trend against the 30 days prior to that recent score
     var vo2MaxTrend: Double? {
-        let validRuns = filteredRunRecords.filter { $0.vo2Max > 0 }
+        let validRuns = runRecords.filter { $0.vo2Max > 0 }
 
         // We need at least 2 valid readings to establish a trend
         guard validRuns.count >= 2 else { return nil }
