@@ -40,46 +40,105 @@ struct DashboardView: View {
         return currentVO2 - baselineAvg
     }
 
+    // 1. The actual 30-Day VO2 Max Average
+    var vo2MaxBaseline: Double? {
+        let validRuns = runRecords.filter { $0.vo2Max > 0 }
+        guard validRuns.count >= 2 else { return nil }
+
+        let currentRun = validRuns[0]
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: currentRun.date) else { return nil }
+
+        let baselineRuns = validRuns.dropFirst().filter { $0.date >= thirtyDaysAgo }
+        guard !baselineRuns.isEmpty else { return nil }
+
+        return baselineRuns.map(\.vo2Max).reduce(0, +) / Double(baselineRuns.count)
+    }
+
+    // 2. The 30-Day Average Pace (Optional, but great for a baseline card)
+    var baselinePace: Double? {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
+        let recentRuns = runRecords.filter { $0.date >= thirtyDaysAgo }
+        guard !recentRuns.isEmpty else { return nil }
+
+        return recentRuns.map(\.avgPace).reduce(0, +) / Double(recentRuns.count)
+    }
+
     var onSync: (() async -> Void)? = nil
 
     @ViewBuilder
-    private var vo2MaxHeroCard: some View {
+    private var fitnessBaselineCard: some View {
         if let currentVO2 = latestVO2Max {
-            HStack {
-                // Icon and Title
-                HStack(spacing: 8) {
-                    Image(systemName: "heart.text.square.fill")
-                        .foregroundColor(.red)
-                        .font(.title2)
-
-                    VStack(alignment: .leading) {
-                        Text("VO2 Max")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(String(format: "%.1f", currentVO2))
+            VStack(spacing: 12) {
+                // TOP ROW: Current VO2 Max & Trend
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "heart.text.square.fill")
+                            .foregroundColor(.red)
                             .font(.title2)
-                            .bold()
+
+                        Text("VO2 Max")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                    }
+
+                    Spacer()
+
+                    Text(String(format: "%.1f", currentVO2))
+                        .font(.title2)
+                        .bold()
+
+                    if let trend = vo2MaxTrend {
+                        let isPositive = trend >= 0
+                        HStack(spacing: 2) {
+                            Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption2)
+                                .bold()
+                            Text(String(format: "%.1f", abs(trend)))
+                                .font(.subheadline)
+                                .bold()
+                        }
+                        .foregroundColor(isPositive ? .green : .red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(isPositive ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
+                        .clipShape(Capsule())
                     }
                 }
 
-                Spacer()
+                // BOTTOM ROW: The 30-Day Baseline Stats
+                if let vo2Base = vo2MaxBaseline {
+                    Divider()
 
-                // Trend Badge (Only shows if there is enough historical data)
-                if let trend = vo2MaxTrend {
-                    let isPositive = trend >= 0
-                    HStack(spacing: 4) {
-                        Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                            .font(.caption2)
-                            .bold()
-                        Text(String(format: "%.1f", abs(trend)))
-                            .font(.subheadline)
-                            .bold()
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("30-DAY BASELINE VO2")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .fontWeight(.semibold)
+                            Text(String(format: "%.1f", vo2Base))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+
+                        Spacer()
+
+                        if let avgPace = baselinePace {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("30-DAY AVG PACE")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .fontWeight(.semibold)
+
+                                // Format the Double (minutes) into a M:SS string
+                                let minutes = Int(avgPace)
+                                let seconds = Int((avgPace - Double(minutes)) * 60)
+                                Text(String(format: "%d:%02d/km", minutes, seconds))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                        }
                     }
-                    .foregroundColor(isPositive ? .green : .red)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(isPositive ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
-                    .clipShape(Capsule())
                 }
             }
             .padding()
@@ -95,7 +154,7 @@ struct DashboardView: View {
             ScrollView {
                 LazyVStack(spacing: 20) {
                     // Global Fitness Pill (VO2 Max)
-                    vo2MaxHeroCard
+                    fitnessBaselineCard
 
                     if filteredRunRecords.isEmpty {
                         if isSyncing && runRecords.isEmpty {
