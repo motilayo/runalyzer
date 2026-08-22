@@ -5,7 +5,7 @@ import SwiftData
 final class DrillRecommendation {
     var drillTitle: String
     var drillWork: String?
-    var drillCues: String
+    var drillCues: String?
     var drillEffort: String?
     var drillPurpose: String?
 
@@ -18,10 +18,10 @@ final class DrillRecommendation {
 
     init(
         drillTitle: String,
-        drillWork: String? = nil,
-        drillCues: String,
-        drillEffort: String? = nil,
         drillPurpose: String? = nil,
+        drillWork: String? = nil,
+        drillCues: String? = nil,
+        drillEffort: String? = nil,
         targetCadence: String? = nil,
         previousCadence: Int? = nil,
         isCompleted: Bool = false

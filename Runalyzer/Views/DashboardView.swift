@@ -253,8 +253,8 @@ struct HeroCardView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        if !drill.drillCues.isEmpty {
-                            Text(drill.drillCues)
+                        if let cues = drill.drillCues, !cues.isEmpty {
+                            Text(cues)
                                 .font(.caption)
                                 .italic()
                         }

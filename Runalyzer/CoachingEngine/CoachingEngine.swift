@@ -34,6 +34,9 @@ struct SuggestedDrill {
     @Guide(description: "A recognized drill name (e.g., 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', 'Strides').")
     var drillTitle: String
 
+    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive (e.g., 'To reduce vertical oscillation by quickening turnover').")
+    var drillPurpose: String
+
     @Guide(description: "Combine sets, reps, active target cadence, AND recovery instructions into a single cohesive field (e.g., 'Run 4 x 30 sec at 155 SPM, walking for 60 seconds between reps').")
     var drillWork: String
 
@@ -43,11 +46,6 @@ struct SuggestedDrill {
     @Guide(description: "The intended intensity level or Rate of Perceived Exertion (RPE) for the drill (e.g., 'Moderate aerobic effort', 'RPE 7/10', 'Hard but controlled').")
     var drillEffort: String
 
-    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive (e.g., 'To reduce vertical oscillation by quickening turnover').")
-    var drillPurpose: String
-
-    @Guide(description: "YOU MUST use the EXACT number provided in the TARGET CADENCE context variable. DO NOT calculate your own number.")
-    var cadence: String?
 }
 
 @available(iOS 26.0, *)
@@ -139,11 +137,10 @@ class CoachingEngine {
                 observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
                 drill: SuggestedDrill(
                     drillTitle: String(localized: "Strides"),
+                    drillPurpose: String(localized: "Builds turnover and neural recruitment."),
                     drillWork: String(localized: "4 × 20s with 60s easy walk recovery"),
                     drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                     drillEffort: String(localized: "Comfortably hard"),
-                    drillPurpose: String(localized: "Builds turnover and neural recruitment."),
-                    cadence: nil
                 )
             )
         }
@@ -290,11 +287,10 @@ actor RunAnalyzerActor {
             // 6. Save directly to the background context (Main UI updates automatically)
             let drill = DrillRecommendation(
                 drillTitle: payload.drill.drillTitle,
+                drillPurpose: payload.drill.drillPurpose,
                 drillWork: payload.drill.drillWork,
                 drillCues: payload.drill.drillCues,
                 drillEffort: payload.drill.drillEffort,
-                drillPurpose: payload.drill.drillPurpose,
-                targetCadence: payload.drill.cadence,
                 previousCadence: run.avgCadence,
                 isCompleted: false
             )
