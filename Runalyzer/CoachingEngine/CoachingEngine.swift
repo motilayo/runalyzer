@@ -37,13 +37,13 @@ struct SuggestedDrill {
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "Combine sets, reps, active target cadence, AND recovery instructions into a single cohesive field.")
+    @Guide(description: "Combine sets, reps, and recovery. You MUST use the exact TARGET CADENCE provided in the context. Do NOT use Heart Rate (BPM) values here.")
     var drillWork: String
 
-    @Guide(description: "A specific biomechanical or mental form cue to execute during the drill. Keep it short and actionable.")
+    @Guide(description: "A specific biomechanical form cue. Keep it short and actionable.")
     var drillCues: String
 
-    @Guide(description: "The intended intensity level or Rate of Perceived Exertion (RPE) for the drill (e.g., 'Moderate aerobic effort', 'RPE 7/10', 'Hard but controlled').")
+    @Guide(description: "The intended intensity level (e.g., 'Moderate aerobic effort').")
     var drillEffort: String
 
 }
@@ -51,10 +51,10 @@ struct SuggestedDrill {
 @available(iOS 26.0, *)
 @Generable
 struct RunInsight {
-    @Guide(description: "A short, encouraging title. YOU MUST NOT use the drill name here.")
+    @Guide(description: "A short, encouraging title. DO NOT use the drill name here.")
     var headline: String
 
-    @Guide(description: "Synthesize the context strings and provide feedback driven by the run context. DO NOT include drill steps or give instructions. Keep it short and meaningful, 3 sentences or less.")
+    @Guide(description: "Synthesize the context strings. STRICT RULES: Do NOT perform any math. Do NOT calculate differences. Do NOT mix up BPM and SPM. Only highlight the 2 or 3 most significant or impactful metric changes; do not list every single metric.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -80,17 +80,17 @@ class CoachingEngine {
         persona: elite_running_coach
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
-          - speak_directly_to_user_using_second_person ("You", "Your")
-          - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
-          - observation_must_not_contain_drill_steps
-          - do_not_invent_or_calculate_math_in_the_observation_only_synthesize_the_strings
-          - use_gait_metrics_to_diagnose_overstriding_or_bouncing
-          - drill_target_cadence_must_be_between_150_and_180_spm
-          - never_prescribe_cadence_below_150_spm
-          - no_conversational_filler
-          - use_a_conversational_and_motivational_tone_do_not_sound_like_a_textbook
-          - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
-          - respond_entirely_in_\(language)
+        - speak_directly_to_user_using_second_person ("You", "Your")
+        - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
+        - STRICT_RULE: Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
+        - STRICT_RULE: Never perform math. Use ONLY the exact pre-computed numbers provided.
+        - STRICT_RULE: For drills, you MUST use the provided target_cadence value.
+        - STRICT_RULE: Do not invent causal relationships. Never say one metric "contributed to" or "caused" another.
+        - STRICT_RULE: Never compare a distance metric (like stride length) to a frequency metric (like cadence).
+        - use_gait_metrics_to_diagnose_overstriding_or_bouncing
+        - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
+        - respond_entirely_in_\(language)
+
         """
 
         let session = LanguageModelSession(
@@ -99,16 +99,19 @@ class CoachingEngine {
         )
 
         var promptTemplate = """
-        context:
-          swift_directive: {{DIRECTIVE_CONTEXT}}
-          target_cadence: {{TARGET_CADENCE_CONTEXT}}
-          global_fitness_vo2: {{VO2_CONTEXT}}
-          cadence_analysis: {{CADENCE_CONTEXT}}
-          pace_analysis: {{PACE_CONTEXT}}
-          heart_rate_analysis: {{HR_CONTEXT}}
-          vertical_oscillation: {{OSCILLATION_CONTEXT}}
-          ground_contact_time: {{GCT_CONTEXT}}
-          stride_length: {{STRIDE_CONTEXT}}
+        [RUN_DATA_START]
+        DIRECTIVE: {{DIRECTIVE_CONTEXT}}
+        TARGET_DRILL_CADENCE: {{TARGET_CADENCE_CONTEXT}}
+        
+        --- METRICS ---
+        HEART_RATE_BPM: {{HR_CONTEXT}}
+        CADENCE_SPM: {{CADENCE_CONTEXT}}
+        PACE: {{PACE_CONTEXT}}
+        VERTICAL_OSCILLATION: {{OSCILLATION_CONTEXT}}
+        GROUND_CONTACT_TIME: {{GCT_CONTEXT}}
+        STRIDE_LENGTH: {{STRIDE_CONTEXT}}
+        VO2_MAX: {{VO2_CONTEXT}}
+        [RUN_DATA_END]
         """
 
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{TARGET_CADENCE_CONTEXT}}", with: runData.targetCadenceContext)
