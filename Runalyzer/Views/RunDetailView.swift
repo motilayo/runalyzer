@@ -162,6 +162,27 @@ struct StatBox: View {
     var value: String
     var unit: String
 
+    @State private var showingInfo = false
+
+    private var definition: String {
+        switch title.lowercased() {
+        case "distance":
+            return "The total distance covered during your run."
+        case "total time":
+            return "The total elapsed time of your run."
+        case "avg pace":
+            return "Your average speed, measured in minutes per distance unit (mile or kilometer)."
+        case "avg hr":
+            return "Your average heart rate during the run in Beats Per Minute (BPM)."
+        case "avg cadence":
+            return "Your average step rate, measured in Steps Per Minute (SPM). A higher cadence can reduce impact forces."
+        case "vert. osc.":
+            return "Vertical Oscillation measures how much your torso bounces up and down with each step. Lower values often indicate better efficiency and less energy wasted fighting gravity."
+        default:
+            return "A running metric tracked by HealthKit."
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -181,8 +202,17 @@ struct StatBox: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(16)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingInfo = true
+        }
+        .alert(title, isPresented: $showingInfo) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(definition)
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(value) \(unit)")
+        .accessibilityLabel("\(title), \(value) \(unit). Double tap for definition.")
     }
 }
 
