@@ -83,6 +83,14 @@ struct ContentView: View {
                 try modelContext.save()
             }
 
+            // 4. Update the most recent run with the global VO2 max
+            if let latestRun = try? modelContext.fetch(FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])).first {
+                if let globalVO2 = try? await healthKitManager.fetchLatestGlobalVO2Max() {
+                    latestRun.vo2Max = globalVO2
+                    try modelContext.save()
+                }
+            }
+
             // Lazy load AI analysis for ONLY the 4 most recent runs (Hero card + Top 3)
             if #available(iOS 26.0, *) {
                 let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])

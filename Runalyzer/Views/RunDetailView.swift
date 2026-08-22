@@ -7,6 +7,26 @@ struct RunDetailView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
 
+    @ViewBuilder
+    private var aiDisclaimerFooter: some View {
+        VStack(spacing: 6) {
+            Divider()
+                .padding(.vertical, 4)
+
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.8))
+
+                Text("AI-generated insights are for informational purposes only and do not replace professional medical or coaching advice. Always listen to your body.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .padding(.top, 4)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -55,6 +75,8 @@ struct RunDetailView: View {
                                 .font(.body)
                                 .foregroundColor(.secondary)
                         }
+
+                        aiDisclaimerFooter
                     }
                     .frame(minHeight: 1)
                     .frame(maxWidth: .infinity, alignment: .leading)
