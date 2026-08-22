@@ -34,14 +34,17 @@ struct SuggestedDrill {
     @Guide(description: "A recognized drill name (e.g., 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', 'Strides').")
     var drillTitle: String
 
-    @Guide(description: "The active work interval and total sets. YOU MUST only include the work part, DO NOT put recovery or cues here.")
-    var drillReps: String
-
-    @Guide(description: "The recovery period between sets. YOU MUST explicitly specify the rest time or walk time.")
-    var drillRecovery: String
+    @Guide(description: "Combine sets, reps, active target cadence, AND recovery instructions into a single cohesive field (e.g., 'Run 4 x 30 sec at 155 SPM, walking for 60 seconds between reps').")
+    var drillWork: String
 
     @Guide(description: "A specific biomechanical or mental form cue to execute during the drill. Keep it short and actionable.")
     var drillCues: String
+
+    @Guide(description: "The intended intensity level or Rate of Perceived Exertion (RPE) for the drill (e.g., 'Moderate aerobic effort', 'RPE 7/10', 'Hard but controlled').")
+    var drillEffort: String
+
+    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive (e.g., 'To reduce vertical oscillation by quickening turnover').")
+    var drillPurpose: String
 
     @Guide(description: "YOU MUST use the EXACT number provided in the TARGET CADENCE context variable. DO NOT calculate your own number.")
     var cadence: String?
@@ -53,7 +56,7 @@ struct RunInsight {
     @Guide(description: "A short, encouraging title. YOU MUST NOT use the drill name here.")
     var headline: String
 
-    @Guide(description: "MAXIMUM 2 SENTENCES. Synthesize the context strings. YOU MUST STOP before you mention the drill or give instructions. DO NOT include drill steps.")
+    @Guide(description: "Synthesize the context strings and provide feedback driven by the run context. DO NOT include drill steps or give instructions. Keep it short and meaningful, 3 sentences or less.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -86,6 +89,7 @@ class CoachingEngine {
           - drill_target_cadence_must_be_between_150_and_180_spm
           - never_prescribe_cadence_below_150_spm
           - no_conversational_filler
+          - use_a_conversational_and_motivational_tone_do_not_sound_like_a_textbook
           - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
           - respond_entirely_in_\(language)
         """
@@ -134,9 +138,10 @@ class CoachingEngine {
                 observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
                 drill: SuggestedDrill(
                     drillTitle: String(localized: "Strides"),
-                    drillReps: String(localized: "4 × 20s"),
-                    drillRecovery: String(localized: "60s easy walk"),
+                    drillWork: String(localized: "4 × 20s with 60s easy walk recovery"),
                     drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
+                    drillEffort: String(localized: "Comfortably hard"),
+                    drillPurpose: String(localized: "Builds turnover and neural recruitment."),
                     cadence: nil
                 )
             )
@@ -284,9 +289,10 @@ actor RunAnalyzerActor {
             // 6. Save directly to the background context (Main UI updates automatically)
             let drill = DrillRecommendation(
                 drillTitle: payload.drill.drillTitle,
-                drillReps: payload.drill.drillReps,
-                drillRecovery: payload.drill.drillRecovery,
+                drillWork: payload.drill.drillWork,
                 drillCues: payload.drill.drillCues,
+                drillEffort: payload.drill.drillEffort,
+                drillPurpose: payload.drill.drillPurpose,
                 targetCadence: payload.drill.cadence,
                 previousCadence: run.avgCadence,
                 isCompleted: false

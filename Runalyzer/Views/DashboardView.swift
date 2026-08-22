@@ -248,8 +248,8 @@ struct HeroCardView: View {
                             Text(drill.drillTitle)
                                 .font(.subheadline.bold())
                         }
-                        if !drill.drillReps.isEmpty || !drill.drillRecovery.isEmpty {
-                            Text("\(drill.drillReps) • \(drill.drillRecovery)")
+                        if !drill.drillWork.isEmpty {
+                            Text(drill.drillWork)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

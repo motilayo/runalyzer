@@ -4,9 +4,10 @@ import SwiftData
 @Model
 final class DrillRecommendation {
     var drillTitle: String
-    var drillReps: String
-    var drillRecovery: String
+    var drillWork: String
     var drillCues: String
+    var drillEffort: String
+    var drillPurpose: String
 
     var targetCadence: String?
     var previousCadence: Int?
@@ -17,17 +18,19 @@ final class DrillRecommendation {
 
     init(
         drillTitle: String,
-        drillReps: String,
-        drillRecovery: String,
+        drillWork: String,
         drillCues: String,
+        drillEffort: String,
+        drillPurpose: String,
         targetCadence: String? = nil,
         previousCadence: Int? = nil,
         isCompleted: Bool = false
     ) {
         self.drillTitle = drillTitle
-        self.drillReps = drillReps
-        self.drillRecovery = drillRecovery
+        self.drillWork = drillWork
         self.drillCues = drillCues
+        self.drillEffort = drillEffort
+        self.drillPurpose = drillPurpose
         self.targetCadence = targetCadence
         self.previousCadence = previousCadence
         self.isCompleted = isCompleted
