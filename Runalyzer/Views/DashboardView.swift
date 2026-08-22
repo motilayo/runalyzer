@@ -40,18 +40,17 @@ struct DashboardView: View {
         return currentVO2 - baselineAvg
     }
 
-    // 1. The actual 30-Day VO2 Max Average
-    var vo2MaxBaseline: Double? {
-        let validRuns = runRecords.filter { $0.vo2Max > 0 }
-        guard validRuns.count >= 2 else { return nil }
+    // 1. The 30-Day Average Cadence (SPM)
+    var baselineCadence: Int? {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
 
-        let currentRun = validRuns[0]
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: currentRun.date) else { return nil }
+        // Filter for runs in the last 30 days that have a valid cadence
+        let recentRuns = runRecords.filter { $0.date >= thirtyDaysAgo && $0.avgCadence > 0 }
+        guard !recentRuns.isEmpty else { return nil }
 
-        let baselineRuns = validRuns.dropFirst().filter { $0.date >= thirtyDaysAgo }
-        guard !baselineRuns.isEmpty else { return nil }
-
-        return baselineRuns.map(\.vo2Max).reduce(0, +) / Double(baselineRuns.count)
+        // Calculate the average
+        let totalCadence = recentRuns.map(\.avgCadence).reduce(0, +)
+        return totalCadence / recentRuns.count
     }
 
     // 2. The 30-Day Average Pace (Optional, but great for a baseline card)
@@ -107,36 +106,38 @@ struct DashboardView: View {
                 }
 
                 // BOTTOM ROW: The 30-Day Baseline Stats
-                if let vo2Base = vo2MaxBaseline {
-                    Divider()
+                Divider()
 
-                    HStack {
+                HStack {
+                    // LEFT SIDE: 30-Day Avg Cadence
+                    if let avgCadence = baselineCadence {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("30-DAY BASELINE VO2")
+                            Text("30-DAY AVG CADENCE")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .fontWeight(.semibold)
-                            Text(String(format: "%.1f", vo2Base))
+                            Text("\(avgCadence) SPM")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                         }
+                    }
 
-                        Spacer()
+                    Spacer()
 
-                        if let avgPace = baselinePace {
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("30-DAY AVG PACE")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .fontWeight(.semibold)
+                    // RIGHT SIDE: 30-Day Avg Pace
+                    if let avgPace = baselinePace {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("30-DAY AVG PACE")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .fontWeight(.semibold)
 
-                                // Format the Double (minutes) into a M:SS string
-                                let minutes = Int(avgPace)
-                                let seconds = Int((avgPace - Double(minutes)) * 60)
-                                Text(String(format: "%d:%02d/km", minutes, seconds))
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            }
+                            // Format the Double (minutes) into a M:SS string
+                            let minutes = Int(avgPace)
+                            let seconds = Int((avgPace - Double(minutes)) * 60)
+                            Text(String(format: "%d:%02d/km", minutes, seconds))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
                         }
                     }
                 }
