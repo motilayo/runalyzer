@@ -4,14 +4,19 @@ import SwiftData
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
 
-                // Top: 2x2 Grid of Raw Stats
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                // Top: Responsive 6-Card Grid of Raw Stats
+                let columns = verticalSizeClass == .regular
+                    ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                    : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+
+                LazyVGrid(columns: columns, spacing: 16) {
                     let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
                     let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
                     let distanceUnit = useMetricSystem ? "km" : "mi"
@@ -23,6 +28,8 @@ struct RunDetailView: View {
 
                     StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "")
                     StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM")
+                    StatBox(title: "Avg Cadence", value: "\(runRecord.avgCadence)", unit: "SPM")
+                    StatBox(title: "Vert. Osc.", value: String(format: "%.1f", runRecord.verticalOscillation), unit: "cm")
                 }
                 .padding(.horizontal)
 
@@ -73,9 +80,10 @@ struct RunDetailView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 12) {
-                                DrillRow(icon: "repeat", text: drill.drillReps)
-                                DrillRow(icon: "lungs", text: drill.drillRecovery)
-                                DrillRow(icon: "brain.head.profile", text: drill.drillCues)
+                                DrillRow(icon: "target", text: drill.drillPurpose ?? "")
+                                DrillRow(icon: "repeat", text: drill.drillWork ?? "")
+                                DrillRow(icon: "brain.head.profile", text: drill.drillCues ?? "")
+                                DrillRow(icon: "bolt", text: drill.drillEffort ?? "")
                             }
 
                             if let target = drill.targetCadence, let prev = drill.previousCadence, !target.isEmpty {
@@ -144,6 +152,9 @@ struct RunDetailView: View {
             }
             .padding(.vertical)
         }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80)
+        }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(runRecord.date.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.inline)
@@ -154,6 +165,27 @@ struct StatBox: View {
     var title: String
     var value: String
     var unit: String
+
+    @State private var showingInfo = false
+
+    private var definition: String {
+        switch title.lowercased() {
+        case "distance":
+            return "The total distance covered during your run."
+        case "total time":
+            return "The total elapsed time of your run."
+        case "avg pace":
+            return "Your average speed, measured in minutes per distance unit (mile or kilometer)."
+        case "avg hr":
+            return "Your average heart rate during the run in Beats Per Minute (BPM)."
+        case "avg cadence":
+            return "Your average step rate, measured in Steps Per Minute (SPM). A higher cadence can reduce impact forces."
+        case "vert. osc.":
+            return "Vertical Oscillation measures how much your torso bounces up and down with each step. Lower values often indicate better efficiency and less energy wasted fighting gravity."
+        default:
+            return "A running metric tracked by HealthKit."
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -174,8 +206,17 @@ struct StatBox: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(16)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingInfo = true
+        }
+        .alert(title, isPresented: $showingInfo) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(definition)
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(value) \(unit)")
+        .accessibilityLabel("\(title), \(value) \(unit). Double tap for definition.")
     }
 }
 

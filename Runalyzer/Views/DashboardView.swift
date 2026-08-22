@@ -20,6 +20,50 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 20) {
+                    // Global Fitness Pill (VO2 Max)
+                    if let latestVO2 = filteredRunRecords.first(where: { $0.vo2Max > 0 }), latestVO2.vo2Max > 0 {
+                        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+                        let oldRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo && $0.date < latestVO2.date && $0.vo2Max > 0 }
+                        let oldAvg = oldRuns.isEmpty ? latestVO2.vo2Max : (oldRuns.map(\.vo2Max).reduce(0, +) / Double(oldRuns.count))
+                        let delta = latestVO2.vo2Max - oldAvg
+                        let deltaStr = delta == 0 ? "Steady" : (delta > 0 ? String(format: "+%.1f", delta) : String(format: "%.1f", delta))
+                        let deltaColor = delta == 0 ? Color.secondary : (delta > 0 ? Color.green : Color.red)
+                        let deltaIcon = delta == 0 ? "arrow.right" : (delta > 0 ? "arrow.up.right" : "arrow.down.right")
+
+                        HStack {
+                            Image(systemName: "heart.text.square.fill")
+                                .foregroundColor(.red)
+                                .font(.title3)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("VO2 Max")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.1f", latestVO2.vo2Max))
+                                    .font(.headline)
+                            }
+
+                            Spacer()
+
+                            HStack(spacing: 4) {
+                                Image(systemName: deltaIcon)
+                                    .font(.caption2.bold())
+                                Text(deltaStr)
+                                    .font(.subheadline.bold())
+                            }
+                            .foregroundColor(deltaColor)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(deltaColor.opacity(0.15))
+                            .clipShape(Capsule())
+                        }
+                        .padding()
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    }
+
                     if filteredRunRecords.isEmpty {
                         if isSyncing && runRecords.isEmpty {
                             VStack(spacing: 16) {
@@ -66,10 +110,19 @@ struct DashboardView: View {
                 }
                 .padding(.vertical)
             }
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 100)
+            }
             .navigationDestination(for: RunRecord.self) { runRecord in
                 RunDetailView(runRecord: runRecord)
             }
             .task {
+                do {
+                    try await HealthKitManager.shared.requestAuthorization()
+                } catch {
+                    print("Error requesting HealthKit authorization on dashboard: \(error.localizedDescription)")
+                }
+
                 if let onSync {
                     await onSync()
                     isSyncing = false
@@ -89,14 +142,23 @@ struct DashboardView: View {
                 }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Dashboard")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack {
+                        Text("Dashboard")
+                            .font(.headline)
+                        Spacer()
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SettingsView(onForceSync: onSync)) {
                         Image(systemName: "gearshape")
                     }
                 }
             }
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.regularMaterial, for: .navigationBar)
         }
     }
 }
@@ -107,6 +169,7 @@ struct HeroCardView: View {
     var runRecord: RunRecord
     var isSyncing: Bool
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var formattedDuration: String {
@@ -134,13 +197,20 @@ struct HeroCardView: View {
             }
 
             // Metrics Row
-            HStack(spacing: 20) {
+            let columns = verticalSizeClass == .regular
+                ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
                 let distanceUnit = useMetricSystem ? "km" : "mi"
 
                 MetricView(title: "Distance", value: String(format: "%.2f %@", distanceConverted, distanceUnit))
                 MetricView(title: "Pace", value: runRecord.formattedPace)
                 MetricView(title: "Time", value: formattedDuration)
+                MetricView(title: "HR", value: "\(runRecord.avgHeartRate) BPM")
+                MetricView(title: "Cadence", value: "\(runRecord.avgCadence) SPM")
+                MetricView(title: "Vert. Osc.", value: String(format: "%.1f cm", runRecord.verticalOscillation))
             }
 
             Divider()
@@ -178,13 +248,13 @@ struct HeroCardView: View {
                             Text(drill.drillTitle)
                                 .font(.subheadline.bold())
                         }
-                        if !drill.drillReps.isEmpty || !drill.drillRecovery.isEmpty {
-                            Text("\(drill.drillReps) • \(drill.drillRecovery)")
+                        if let work = drill.drillWork, !work.isEmpty {
+                            Text(work)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        if !drill.drillCues.isEmpty {
-                            Text(drill.drillCues)
+                        if let cues = drill.drillCues, !cues.isEmpty {
+                            Text(cues)
                                 .font(.caption)
                                 .italic()
                         }
@@ -222,6 +292,27 @@ struct MetricView: View {
     let title: String
     let value: String
 
+    @State private var showingInfo = false
+
+    private var definition: String {
+        switch title.lowercased() {
+        case "distance":
+            return "The total distance covered during your run."
+        case "time":
+            return "The total elapsed time of your run."
+        case "pace":
+            return "Your average speed, measured in minutes per distance unit (mile or kilometer)."
+        case "hr":
+            return "Your average heart rate during the run in Beats Per Minute (BPM)."
+        case "cadence":
+            return "Your average step rate, measured in Steps Per Minute (SPM). A higher cadence can reduce impact forces."
+        case "vert. osc.":
+            return "Vertical Oscillation measures how much your torso bounces up and down with each step. Lower values often indicate better efficiency and less energy wasted fighting gravity."
+        default:
+            return "A running metric tracked by HealthKit."
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -230,6 +321,15 @@ struct MetricView: View {
             Text(value)
                 .font(.headline)
                 .foregroundColor(.primary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingInfo = true
+        }
+        .alert(title, isPresented: $showingInfo) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(definition)
         }
     }
 }

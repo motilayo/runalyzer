@@ -26,7 +26,11 @@ class HealthKitManager: ObservableObject {
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
             HKObjectType.quantityType(forIdentifier: .runningSpeed)!,
             HKObjectType.quantityType(forIdentifier: .stepCount)!, // Used for cadence calculation
-            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!
+            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+            HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!,
+            HKObjectType.quantityType(forIdentifier: .vo2Max)!,
+            HKObjectType.quantityType(forIdentifier: .runningGroundContactTime)!,
+            HKObjectType.quantityType(forIdentifier: .runningStrideLength)!
         ]
 
         try await healthStore.requestAuthorization(toShare: [], read: typesToRead)
@@ -132,6 +136,34 @@ class HealthKitManager: ObservableObject {
 
         let avgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
 
+        // Query average vertical oscillation (in cm)
+        let verticalOscillation = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .runningVerticalOscillation,
+            unit: HKUnit.meterUnit(with: .centi)
+        )
+
+        // Query average VO2 Max
+        let vo2Max = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .vo2Max,
+            unit: HKUnit(from: "ml/kg*min")
+        )
+
+        // Query average Ground Contact Time (in ms)
+        let groundContactTime = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .runningGroundContactTime,
+            unit: HKUnit.secondUnit(with: .milli)
+        )
+
+        // Query average Stride Length (in m)
+        let strideLength = try await fetchAverageQuantity(
+            for: workout,
+            quantityTypeIdentifier: .runningStrideLength,
+            unit: HKUnit.meter()
+        )
+
         return RunRecord(
             id: workout.uuid,
             date: workout.startDate,
@@ -139,7 +171,11 @@ class HealthKitManager: ObservableObject {
             duration: duration,
             avgPace: avgPace,
             avgHeartRate: Int(avgHeartRate),
-            avgCadence: avgCadence
+            avgCadence: avgCadence,
+            verticalOscillation: verticalOscillation,
+            vo2Max: vo2Max,
+            groundContactTime: groundContactTime,
+            strideLength: strideLength
         )
     }
 
@@ -181,7 +217,8 @@ class HealthKitManager: ObservableObject {
                 options: .discreteAverage
             ) { _, result, error in
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    print("HKStatisticsQuery warning for \(quantityTypeIdentifier.rawValue): \(error.localizedDescription)")
+                    continuation.resume(returning: 0.0)
                     return
                 }
 
@@ -213,8 +250,11 @@ class HealthKitManager: ObservableObject {
                 quantitySamplePredicate: predicate,
                 options: .cumulativeSum
             ) { _, result, error in
+                // HealthKit throws "No data available for the specified predicate" if the sample type wasn't tracked for the workout.
+                // We shouldn't fail the entire workout sync; we should just return 0.0.
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    print("HKStatisticsQuery warning for \(quantityTypeIdentifier.rawValue): \(error.localizedDescription)")
+                    continuation.resume(returning: 0.0)
                     return
                 }
 
