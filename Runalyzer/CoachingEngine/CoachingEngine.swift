@@ -34,10 +34,10 @@ struct SuggestedDrill {
     @Guide(description: "A recognized drill name (e.g., 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', 'Strides').")
     var drillTitle: String
 
-    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive (e.g., 'To reduce vertical oscillation by quickening turnover').")
+    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "Combine sets, reps, active target cadence, AND recovery instructions into a single cohesive field (e.g., 'Run 4 x 30 sec at 155 SPM, walking for 60 seconds between reps').")
+    @Guide(description: "Combine sets, reps, active target cadence, AND recovery instructions into a single cohesive field.")
     var drillWork: String
 
     @Guide(description: "A specific biomechanical or mental form cue to execute during the drill. Keep it short and actionable.")
