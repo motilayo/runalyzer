@@ -25,6 +25,7 @@ struct RunDataForAI: Sendable {
     let vertOscContext: String
     let gctContext: String
     let strideContext: String
+    let targetCadenceContext: String
 }
 
 @available(iOS 26.0, *)
@@ -33,26 +34,26 @@ struct SuggestedDrill {
     @Guide(description: "A recognized drill name (e.g., 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', 'Strides').")
     var drillTitle: String
 
-    @Guide(description: "The active work interval and total sets using absolute SPM (e.g., 'Run 4 x 30 sec at 155 SPM'). DO NOT put recovery or cues here.")
+    @Guide(description: "The active work interval and total sets. YOU MUST only include the work part, DO NOT put recovery or cues here.")
     var drillReps: String
 
-    @Guide(description: "The recovery period between sets (e.g., 'Jog easily or walk for 60 seconds between reps to catch your breath').")
+    @Guide(description: "The recovery period between sets. YOU MUST explicitly specify the rest time or walk time.")
     var drillRecovery: String
 
-    @Guide(description: "A specific biomechanical or mental form cue to execute during the drill (e.g., 'Keep torso tall, push forward rather than upward, and aim for light footfalls').")
+    @Guide(description: "A specific biomechanical or mental form cue to execute during the drill. Keep it short and actionable.")
     var drillCues: String
 
-    @Guide(description: "Must be a steady absolute band (e.g., '155-160') or a single number if appropriate. DO NOT output percentages. Always use absolute SPM numbers.")
+    @Guide(description: "YOU MUST use the EXACT number provided in the TARGET CADENCE context variable. DO NOT calculate your own number.")
     var cadence: String?
 }
 
 @available(iOS 26.0, *)
 @Generable
 struct RunInsight {
-    @Guide(description: "A short, encouraging title (e.g., 'Solid Pace Improvement'). DO NOT use the drill name here.")
+    @Guide(description: "A short, encouraging title. YOU MUST NOT use the drill name here.")
     var headline: String
 
-    @Guide(description: "STRICTLY 2 or 3 sentences maximum. Synthesize the context strings. DO NOT include drill instructions or steps in this field.")
+    @Guide(description: "MAXIMUM 2 SENTENCES. Synthesize the context strings. YOU MUST STOP before you mention the drill or give instructions. DO NOT include drill steps.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -97,6 +98,7 @@ class CoachingEngine {
         var promptTemplate = """
         context:
           swift_directive: {{DIRECTIVE_CONTEXT}}
+          target_cadence: {{TARGET_CADENCE_CONTEXT}}
           global_fitness_vo2: {{VO2_CONTEXT}}
           cadence_analysis: {{CADENCE_CONTEXT}}
           pace_analysis: {{PACE_CONTEXT}}
@@ -106,6 +108,7 @@ class CoachingEngine {
           stride_length: {{STRIDE_CONTEXT}}
         """
 
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{TARGET_CADENCE_CONTEXT}}", with: runData.targetCadenceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{VO2_CONTEXT}}", with: runData.vo2Context)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
@@ -258,6 +261,9 @@ actor RunAnalyzerActor {
             strideContext = String(format: "%.2f m (No baseline available).", run.strideLength)
         }
 
+        let targetCadence = min(180, max(150, Int(Double(run.avgCadence) * 1.05)))
+        let targetCadenceContext = "\(targetCadence) SPM"
+
         // 5. Run the LLM Prompt
         do {
             let runData = RunDataForAI(
@@ -268,7 +274,8 @@ actor RunAnalyzerActor {
                 hrContext: hrContext,
                 vertOscContext: vertOscContext,
                 gctContext: gctContext,
-                strideContext: strideContext
+                strideContext: strideContext,
+                targetCadenceContext: targetCadenceContext
             )
 
             // Execute prompt asynchronously

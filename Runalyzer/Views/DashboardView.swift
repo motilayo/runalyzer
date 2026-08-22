@@ -110,8 +110,8 @@ struct DashboardView: View {
                 }
                 .padding(.vertical)
             }
-            .safeAreaInset(edge: .bottom, spacing: 80) {
-                EmptyView()
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 100)
             }
             .navigationDestination(for: RunRecord.self) { runRecord in
                 RunDetailView(runRecord: runRecord)
@@ -142,14 +142,23 @@ struct DashboardView: View {
                 }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Dashboard")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack {
+                        Text("Dashboard")
+                            .font(.headline)
+                        Spacer()
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SettingsView(onForceSync: onSync)) {
                         Image(systemName: "gearshape")
                     }
                 }
             }
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.regularMaterial, for: .navigationBar)
         }
     }
 }

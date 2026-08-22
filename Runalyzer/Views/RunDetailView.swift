@@ -151,6 +151,9 @@ struct RunDetailView: View {
             }
             .padding(.vertical)
         }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80)
+        }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(runRecord.date.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.inline)
