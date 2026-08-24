@@ -20,12 +20,12 @@ struct DashboardView: View {
 
     // 1. Get the most recent valid VO2 Max score
     var latestVO2Max: Double? {
-        runRecords.first(where: { $0.vo2Max > 0 })?.vo2Max
+        filteredRunRecords.first(where: { $0.vo2Max > 0 })?.vo2Max
     }
 
     // 2. Calculate the trend against the 30 days prior to that recent score
     var vo2MaxTrend: Double? {
-        let validRuns = runRecords.filter { $0.vo2Max > 0 }
+        let validRuns = filteredRunRecords.filter { $0.vo2Max > 0 }
 
         // We need at least 2 valid readings to establish a trend
         guard validRuns.count >= 2 else { return nil }
@@ -49,7 +49,7 @@ struct DashboardView: View {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
 
         // Filter for runs in the last 30 days that have a valid cadence
-        let recentRuns = runRecords.filter { $0.date >= thirtyDaysAgo && $0.avgCadence > 0 }
+        let recentRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo && $0.avgCadence > 0 }
         guard !recentRuns.isEmpty else { return nil }
 
         // Calculate the average
@@ -60,7 +60,7 @@ struct DashboardView: View {
     // 2. The 30-Day Average Pace (Optional, but great for a baseline card)
     var baselinePace: Double? {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
-        let recentRuns = runRecords.filter { $0.date >= thirtyDaysAgo }
+        let recentRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo }
         guard !recentRuns.isEmpty else { return nil }
 
         return recentRuns.map(\.avgPace).reduce(0, +) / Double(recentRuns.count)
@@ -137,9 +137,7 @@ struct DashboardView: View {
                                 .fontWeight(.semibold)
 
                             // Format the Double (minutes) into a M:SS string
-                            let minutes = Int(avgPace)
-                            let seconds = Int((avgPace - Double(minutes)) * 60)
-                            Text(String(format: "%d:%02d/km", minutes, seconds))
+                            Text(avgPace.formattedPaceString)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                         }
