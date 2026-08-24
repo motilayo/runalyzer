@@ -36,10 +36,10 @@ Runalyzer is a minimal, native iOS application acting as an "analytical mirror" 
 
 ## Project Structure
 
-- `Runalyzer/Models/`: Contains the `SwiftData` schemas (`RunRecord`, `CoachingInsight`).
+- `Runalyzer/Models/`: Contains the `SwiftData` schemas (`RunRecord`, `CoachingInsight`, `DrillRecommendation`).
 - `Runalyzer/Managers/`: Contains singletons and actors like `HealthKitManager` for data ingestion.
-- *(Upcoming)* `Runalyzer/CoachingEngine/`: The Intelligence layer interfacing with FoundationModels.
-- *(Upcoming)* `Runalyzer/Views/`: Minimalist SwiftUI components (Dashboard, Onboarding, RunDetail).
+- `Runalyzer/CoachingEngine/`: The Intelligence layer interfacing with FoundationModels (`CoachingEngine.swift`).
+- `Runalyzer/Views/`: Minimalist SwiftUI components (Dashboard, Onboarding, RunDetail, Settings).
 
 ## Note on Privacy & Scope
 
