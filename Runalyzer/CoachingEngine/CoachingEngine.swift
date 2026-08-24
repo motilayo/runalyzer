@@ -104,7 +104,12 @@ class CoachingEngine {
             instructions: instructions
         )
 
+        let useMetric = UserDefaults.standard.bool(forKey: "useMetricSystem")
+        let unitContext = useMetric ? "Pace is in min/km, Distance is in kilometers." : "Pace is in min/mi, Distance is in miles."
+
         var promptTemplate = """
+        You are a running coach.
+        \(unitContext)
         [RUN_DATA_START]
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
         TARGET_DRILL_CADENCE: {{TARGET_CADENCE_CONTEXT}}
