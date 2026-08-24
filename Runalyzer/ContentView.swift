@@ -2,6 +2,10 @@ import SwiftUI
 import SwiftData
 import HealthKit
 
+/// The root view of the application that manages the onboarding state and primary HealthKit synchronization loop.
+///
+/// `ContentView` determines whether to show `OnboardingView` or `DashboardView`. It also handles fetching new
+/// running workouts from HealthKit, persisting them to SwiftData, and lazily invoking the background AI analysis.
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @StateObject private var healthKitManager = HealthKitManager.shared

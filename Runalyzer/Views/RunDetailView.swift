@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+/// A detailed view for a single `RunRecord`, displaying in-depth metrics and the full AI Coaching Insight.
+///
+/// This view includes a grid of physiological and biomechanical stats, followed by the AI-generated
+/// observation and the specific actionable technique drill prescribed by the Foundation Model.
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
     @Environment(\.modelContext) private var modelContext
@@ -183,6 +187,8 @@ struct RunDetailView: View {
     }
 }
 
+/// A tappable statistic box displaying a specific metric for a run.
+/// Tapping it presents an alert with a detailed definition of the metric.
 struct StatBox: View {
     var title: String
     var value: String
@@ -242,6 +248,7 @@ struct StatBox: View {
     }
 }
 
+/// A styled row within a drill recommendation card, combining a system icon with a descriptive text.
 struct DrillRow: View {
     var icon: String
     var text: String

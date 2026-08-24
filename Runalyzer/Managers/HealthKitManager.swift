@@ -1,6 +1,11 @@
 import Foundation
 import HealthKit
 
+/// A singleton manager responsible for all interactions with Apple HealthKit.
+///
+/// `HealthKitManager` requests permissions, configures background delivery, and fetches recent running workouts.
+/// It also queries discrete and cumulative statistics (like VO2 Max, Cadence, and Vertical Oscillation) and maps them
+/// into the app's native `RunRecord` model for processing and AI analysis.
 @MainActor
 class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
