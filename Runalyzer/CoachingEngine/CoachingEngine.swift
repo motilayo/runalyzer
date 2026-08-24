@@ -54,7 +54,7 @@ struct SuggestedDrill {
 @available(iOS 26.0, *)
 @Generable
 struct RunInsight {
-    @Guide(description: "A short, encouraging title. DO NOT use the drill name here.")
+    @Guide(description: "A short, punchy 2-5 word phrase capturing the essence of the run. Do NOT write a full sentence. Do NOT use punctuation like periods or exclamation marks. Example: 'Strong Cadence' or 'Aerobic Base Building'.")
     var headline: String
 
     @Guide(description: "Synthesize the context strings. STRICT RULES: Do NOT perform any math. Do NOT calculate differences. Do NOT mix up BPM and SPM. Only highlight the 2 or 3 most significant or impactful metric changes; do not list every single metric.")

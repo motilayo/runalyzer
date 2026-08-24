@@ -372,7 +372,19 @@ struct HeroCardView: View {
                         .padding(.top, 4)
                 }
                 .frame(minHeight: 1)
+                .task(id: runRecord.persistentModelID) {
+                    if #available(iOS 26.0, *) {
+                        if !isSyncing && runRecord.insight == nil {
+                            let container = modelContext.container
+                            let runId = runRecord.persistentModelID
 
+                            Task.detached {
+                                let analyzer = RunAnalyzerActor(modelContainer: container)
+                                await analyzer.generateAnalysis(for: runId)
+                            }
+                        }
+                    }
+                }
             }
         }
         .frame(minHeight: 1)
@@ -446,10 +458,17 @@ struct MetricView: View {
         .onTapGesture {
             showingInfo = true
         }
-        .alert(title, isPresented: $showingInfo) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(definition)
+        .sheet(isPresented: $showingInfo) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                Text(definition)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.visible)
         }
     }
 }

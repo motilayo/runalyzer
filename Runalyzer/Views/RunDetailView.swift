@@ -161,7 +161,7 @@ struct RunDetailView: View {
                     }
                     .frame(minHeight: 1)
                     .padding(32)
-                    .task {
+                    .task(id: runRecord.persistentModelID) {
                         if #available(iOS 26.0, *) {
                             if runRecord.insight == nil {
                                 let container = modelContext.container
@@ -238,10 +238,17 @@ struct StatBox: View {
         .onTapGesture {
             showingInfo = true
         }
-        .alert(title, isPresented: $showingInfo) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(definition)
+        .sheet(isPresented: $showingInfo) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                Text(definition)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.visible)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), \(value) \(unit). Double tap for definition.")
