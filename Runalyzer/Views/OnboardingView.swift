@@ -1,6 +1,10 @@
 import SwiftUI
 import HealthKit
 
+/// The initial launch screen introducing the app's features and requesting HealthKit permissions.
+///
+/// `OnboardingView` explains the core value proposition (passive sync, private AI) and triggers
+/// the HealthKit authorization flow. Once granted, it updates `AppStorage` to transition to the main app.
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @StateObject private var healthKitManager = HealthKitManager.shared
@@ -96,6 +100,7 @@ struct OnboardingView: View {
     }
 }
 
+/// A reusable view component for displaying a feature with an icon, title, and description during onboarding.
 struct FeatureRow: View {
     var iconName: String
     var title: String

@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+/// The primary view of the Runalyzer application displaying the user's running metrics, AI insights, and run history.
+///
+/// `DashboardView` presents a summary of the most recent run, a grid of aggregate metrics over the last 30 days,
+/// and a list of historical runs. It triggers data synchronization and handles the UI states for AI generation.
 struct DashboardView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
@@ -258,6 +262,7 @@ struct DashboardView: View {
 
 // MARK: - Subviews
 
+/// A prominent card view displaying the most recent run's metrics and its associated AI Coaching Insight.
 struct HeroCardView: View {
     var runRecord: RunRecord
     var isSyncing: Bool
@@ -403,6 +408,8 @@ struct HeroCardView: View {
     }
 }
 
+/// A small, tappable view displaying a single metric title and its corresponding value.
+/// Tapping the view displays an alert with a detailed definition of the metric.
 struct MetricView: View {
     let title: String
     let value: String
@@ -449,6 +456,7 @@ struct MetricView: View {
     }
 }
 
+/// A list row representing a single historical run, displaying its date, distance, pace, and an AI insight tag.
 struct RunListRowView: View {
     var runRecord: RunRecord
 
@@ -501,6 +509,7 @@ struct RunListRowView: View {
     }
 }
 
+/// A small, pill-shaped tag used to categorize runs based on their AI drill recommendations.
 struct PillTagView: View {
     var text: String
     var color: Color

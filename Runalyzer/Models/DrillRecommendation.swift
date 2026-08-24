@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+/// Represents an actionable technique or form drill recommended by the AI Coaching Engine.
+/// Persisted locally via SwiftData.
 @Model
 final class DrillRecommendation {
     var drillTitle: String

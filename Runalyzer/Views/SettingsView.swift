@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+/// The settings and configuration view for the Runalyzer application.
+///
+/// `SettingsView` allows users to toggle metric/imperial units, adjust the minimum run distance filter,
+/// force re-synchronization with HealthKit, and clear the AI insights cache.
 struct SettingsView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
