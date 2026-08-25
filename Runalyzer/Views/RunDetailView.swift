@@ -265,11 +265,12 @@ struct DrillRow: View {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: icon)
                     .foregroundColor(.secondary)
-                    .frame(width: 24)
+                    .frame(width: 24, alignment: .top)
                 Text(text)
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }

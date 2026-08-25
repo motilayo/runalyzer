@@ -36,7 +36,7 @@ struct ContentView: View {
                 } message: {
                     Text(syncError ?? "An unknown error occurred while syncing.")
                 }
-                .safeAreaInset(edge: .bottom) {
+                .safeAreaInset(edge: .bottom, spacing: 80) {
                     if isSyncing {
                         HStack {
                             ProgressView()
@@ -47,8 +47,9 @@ struct ContentView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
-                        .background(Capsule().fill(Color(.systemBackground)))
-                        .shadow(radius: 5)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                         .padding(.bottom, 20)
                     }
                 }
