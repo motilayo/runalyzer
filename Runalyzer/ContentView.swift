@@ -20,8 +20,8 @@ struct ContentView: View {
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                DashboardView(onSync: {
-                    await syncData()
+                DashboardView(onSync: { force in
+                    await syncData(force: force)
                 })
                 .task {
                     await syncData()
@@ -59,41 +59,63 @@ struct ContentView: View {
         }
     }
 
-    private func syncData() async {
+    private func syncData(force: Bool = false) async {
         guard !isSyncing else { return }
         isSyncing = true
         defer { isSyncing = false }
 
         do {
+            if force {
+                // Clear the local workout table completely
+                let allRuns = try modelContext.fetch(FetchDescriptor<RunRecord>())
+                for run in allRuns {
+                    modelContext.delete(run)
+                }
+                try modelContext.save()
+            }
+
             // 1. Fetch recent workouts from HealthKit
             let workouts = try await healthKitManager.fetchRecentRunningWorkouts()
 
             // 2. Cross-reference with SwiftData to find new workouts
+            // Re-fetch existing runs from DB to ensure we have the latest state (especially after force delete)
+            let currentExistingRuns = try modelContext.fetch(FetchDescriptor<RunRecord>())
             let newWorkouts = workouts.filter { workout in
-                !existingRuns.contains(where: { $0.id == workout.uuid })
+                !currentExistingRuns.contains(where: { $0.id == workout.uuid })
             }
 
             // 3. Extract and insert new runs
             // Sort new workouts ascending (oldest first) so we can insert them in order and calculate correct rolling baselines.
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
 
+            // Extract all records first before saving
+            var extractedRuns: [RunRecord] = []
             for workout in sortedNewWorkouts {
-                // Extract stats
                 let newRun = try await healthKitManager.extractRunRecord(from: workout)
-
-                // Insert into SwiftData context immediately so it appears on Dashboard
-                modelContext.insert(newRun)
-
-                // Save context so history is updated for subsequent runs
-                try modelContext.save()
+                extractedRuns.append(newRun)
             }
 
-            // 4. Update the most recent run with the global VO2 max
-            if let latestRun = try? modelContext.fetch(FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])).first {
-                if let globalVO2 = try? await healthKitManager.fetchLatestGlobalVO2Max() {
-                    latestRun.vo2Max = globalVO2
+            // 4. Query the global standalone VO2 Max sample independently
+            let globalVO2 = try? await healthKitManager.fetchLatestGlobalVO2Max()
+
+            // Assign to the latest workout before saving to persistent storage
+            if let mostRecentRun = extractedRuns.last {
+                if let globalVO2 = globalVO2 {
+                    mostRecentRun.vo2Max = globalVO2
+                }
+            } else if let latestDbRun = currentExistingRuns.sorted(by: { $0.date > $1.date }).first {
+                // If there are no new workouts, update the latest existing one
+                if let globalVO2 = globalVO2 {
+                    latestDbRun.vo2Max = globalVO2
                     try modelContext.save()
                 }
+            }
+
+            for newRun in extractedRuns {
+                // Insert into SwiftData context
+                modelContext.insert(newRun)
+                // Save context so history is updated for subsequent runs
+                try modelContext.save()
             }
 
             // Lazy load AI analysis for ONLY the 4 most recent runs (Hero card + Top 3)
