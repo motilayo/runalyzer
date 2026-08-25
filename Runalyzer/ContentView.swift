@@ -38,13 +38,15 @@ struct ContentView: View {
                 }
                 .safeAreaInset(edge: .bottom, spacing: 80) {
                     if isSyncing {
-                        HStack {
-                            ProgressView()
-                            Text("Syncing Health Data & AI...")
-                                .font(.caption)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
+                        AnimatedLoadingView(
+                            text: "Syncing Health Data & AI...",
+                            isHorizontal: true,
+                            imageSize: 16,
+                            textFont: .caption,
+                            spacing: 8
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
                         .background(.regularMaterial)
