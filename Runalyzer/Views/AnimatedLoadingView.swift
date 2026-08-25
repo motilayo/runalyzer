@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct AnimatedLoadingView: View {
-    @State private var isBouncing = false
     @State private var isPulsing = false
 
     var text: String = "Analyzing your run..."
@@ -28,19 +27,16 @@ struct AnimatedLoadingView: View {
 
     @ViewBuilder
     private var content: some View {
-        Image(systemName: "figure.run")
-            .font(.system(size: imageSize))
-            .foregroundColor(iconColor)
-            .offset(y: isBouncing ? -10 : 0)
-            .rotationEffect(.degrees(isBouncing ? 15 : -5))
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 0.3)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    isBouncing = true
-                }
-            }
+        if #available(iOS 17.0, *) {
+            Image(systemName: "figure.run")
+                .font(.system(size: imageSize))
+                .foregroundColor(iconColor)
+                .symbolEffect(.bounce.up, options: .repeating)
+        } else {
+            Image(systemName: "figure.run")
+                .font(.system(size: imageSize))
+                .foregroundColor(iconColor)
+        }
 
         Text(text)
             .font(textFont)
