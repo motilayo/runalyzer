@@ -57,7 +57,7 @@ struct RunInsight {
     @Guide(description: "Constrain strictly to a 2–4 word title. Forbid full sentences, punctuation-heavy titles, numbers, and digits.")
     var headline: String
 
-    @Guide(description: "Limit to a maximum of 2 qualitative sentences synthesizing form and efficiency trends. STRICT RULES: Do NOT use any numbers, digits, percentages, or units. Use qualitative biomechanical phrasing instead.")
+    @Guide(description: "Limit to a maximum of 3 qualitative sentences synthesizing form and efficiency trends. STRICT RULES: Do NOT use any numbers, digits, percentages, or units. Use qualitative biomechanical phrasing instead.")
     var observation: String
 
     var drill: SuggestedDrill
