@@ -395,7 +395,7 @@ struct HeroCardView: View {
                         .padding(.top, 4)
                 }
                 .frame(minHeight: 1)
-                .task(id: runRecord.persistentModelID) {
+                .task(id: runRecord.id) {
                     if #available(iOS 26.0, *) {
                         if !isSyncing && runRecord.insight == nil {
                             let container = modelContext.container
