@@ -161,7 +161,7 @@ struct RunDetailView: View {
                     }
                     .frame(minHeight: 1)
                     .padding(32)
-                    .task(id: runRecord.persistentModelID) {
+                    .task(id: runRecord.id) {
                         if #available(iOS 26.0, *) {
                             if runRecord.insight == nil {
                                 let container = modelContext.container
