@@ -22,12 +22,7 @@ struct SettingsView: View {
             Section(header: Text("Preferences")) {
                 Toggle("Use Metric System", isOn: $useMetricSystem)
                     .onChange(of: useMetricSystem) { _, _ in
-                        Task {
-                            for run in runRecords {
-                                run.insight = nil
-                            }
-                            try? modelContext.save()
-                        }
+                        // Removed the AI cache clear on toggle
                     }
 
                 VStack(alignment: .leading) {
@@ -45,15 +40,15 @@ struct SettingsView: View {
                 .alert("Force Re-Sync", isPresented: $showSyncAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Re-Sync", role: .destructive) {
-                        Task {
-                            // Clear all runs
-                            for run in runRecords {
-                                modelContext.delete(run)
-                            }
-                            try? modelContext.save()
+                        // Clear all runs
+                        for run in runRecords {
+                            modelContext.delete(run)
+                        }
+                        try? modelContext.save()
 
-                            // Trigger sync
-                            if let onForceSync = onForceSync {
+                        // Trigger sync
+                        if let onForceSync = onForceSync {
+                            Task {
                                 await onForceSync()
                             }
                         }
@@ -70,12 +65,10 @@ struct SettingsView: View {
                 .alert("Clear AI Cache", isPresented: $showClearCacheAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Clear", role: .destructive) {
-                        Task {
-                            for run in runRecords {
-                                run.insight = nil
-                            }
-                            try? modelContext.save()
+                        for run in runRecords {
+                            run.insight = nil
                         }
+                        try? modelContext.save()
                     }
                 } message: {
                     Text("This will clear all generated AI insights for your saved runs. New insights will be generated upon next sync.")
