@@ -70,8 +70,8 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var fitnessBaselineCard: some View {
-        if let currentVO2 = latestVO2Max {
-            VStack(spacing: 12) {
+        VStack(spacing: 12) {
+            if let currentVO2 = latestVO2Max {
                 // TOP ROW: Current VO2 Max & Trend
                 HStack {
                     HStack(spacing: 8) {
@@ -111,7 +111,9 @@ struct DashboardView: View {
 
                 // BOTTOM ROW: The 30-Day Baseline Stats
                 Divider()
+            }
 
+            if baselineCadence != nil || baselinePace != nil {
                 HStack {
                     // LEFT SIDE: 30-Day Avg Cadence
                     if let avgCadence = baselineCadence {
@@ -144,12 +146,12 @@ struct DashboardView: View {
                     }
                 }
             }
-            .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .cornerRadius(16)
-            .padding(.horizontal)
-            .padding(.top, 8)
         }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .padding(.horizontal)
+        .padding(.top, 8)
     }
 
     var body: some View {
@@ -181,7 +183,7 @@ struct DashboardView: View {
                         // Hero Card for the latest run insight
                         if let latestRun = filteredRunRecords.first {
                             NavigationLink(value: latestRun) {
-                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing)
+                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
                             }
                             .buttonStyle(.plain)
                         }
@@ -264,6 +266,7 @@ struct DashboardView: View {
 struct HeroCardView: View {
     var runRecord: RunRecord
     var isSyncing: Bool
+    var allRuns: [RunRecord]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
@@ -273,6 +276,36 @@ struct HeroCardView: View {
         formatter.allowedUnits = [.hour, .minute, .second]
         formatter.unitsStyle = .abbreviated
         return formatter.string(from: runRecord.duration) ?? ""
+    }
+
+    // Baseline calculations
+    private var baselineRuns: [RunRecord] {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
+        return allRuns.filter { $0.date < runRecord.date && $0.date >= thirtyDaysAgo }
+    }
+
+    private var baselinePace: Double? {
+        let runs = baselineRuns
+        guard !runs.isEmpty else { return nil }
+        return runs.map(\.avgPace).reduce(0, +) / Double(runs.count)
+    }
+
+    private var baselineHR: Double? {
+        let runs = baselineRuns.filter { $0.avgHeartRate > 0 }
+        guard !runs.isEmpty else { return nil }
+        return Double(runs.map(\.avgHeartRate).reduce(0, +)) / Double(runs.count)
+    }
+
+    private var baselineCadence: Double? {
+        let runs = baselineRuns.filter { $0.avgCadence > 0 }
+        guard !runs.isEmpty else { return nil }
+        return Double(runs.map(\.avgCadence).reduce(0, +)) / Double(runs.count)
+    }
+
+    private var baselineVertOsc: Double? {
+        let runs = baselineRuns.filter { $0.verticalOscillation > 0 }
+        guard !runs.isEmpty else { return nil }
+        return runs.map(\.verticalOscillation).reduce(0, +) / Double(runs.count)
     }
 
     var body: some View {
@@ -302,11 +335,11 @@ struct HeroCardView: View {
                 let distanceUnit = useMetricSystem ? "km" : "mi"
 
                 MetricView(title: "Distance", value: String(format: "%.2f %@", distanceConverted, distanceUnit))
-                MetricView(title: "Pace", value: runRecord.formattedPace)
+                MetricView(title: "Pace", value: runRecord.formattedPace, currentValue: runRecord.avgPace, baselineValue: baselinePace, polarity: .lowerIsBetter)
                 MetricView(title: "Time", value: formattedDuration)
-                MetricView(title: "HR", value: "\(runRecord.avgHeartRate) BPM")
-                MetricView(title: "Cadence", value: "\(runRecord.avgCadence) SPM")
-                MetricView(title: "Vert. Osc.", value: String(format: "%.1f cm", runRecord.verticalOscillation))
+                MetricView(title: "HR", value: "\(runRecord.avgHeartRate) BPM", currentValue: Double(runRecord.avgHeartRate), baselineValue: baselineHR, polarity: .lowerIsBetter)
+                MetricView(title: "Cadence", value: "\(runRecord.avgCadence) SPM", currentValue: Double(runRecord.avgCadence), baselineValue: baselineCadence, polarity: .higherIsBetter)
+                MetricView(title: "Vert. Osc.", value: String(format: "%.1f cm", runRecord.verticalOscillation), currentValue: runRecord.verticalOscillation, baselineValue: baselineVertOsc, polarity: .lowerIsBetter)
             }
 
             Divider()
@@ -331,29 +364,19 @@ struct HeroCardView: View {
 
                 // Drill Recommendation
                 if let drill = insight.drillRecommendation {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "figure.run")
-                                .foregroundColor(.purple)
-                            Text("Recommended Drill")
-                                .font(.headline)
-                                .foregroundColor(.purple)
-                        }
+                    HStack {
+                        Image(systemName: "figure.run")
+                            .foregroundColor(.purple)
 
-                        if !drill.drillTitle.isEmpty {
-                            Text(drill.drillTitle)
-                                .font(.subheadline.bold())
-                        }
-                        if let work = drill.drillWork, !work.isEmpty {
-                            Text(work)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        if let cues = drill.drillCues, !cues.isEmpty {
-                            Text(cues)
-                                .font(.caption)
-                                .italic()
-                        }
+                        Text(drill.drillTitle.isEmpty ? "Recommended Drill" : drill.drillTitle)
+                            .font(.headline)
+                            .foregroundColor(.purple)
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.purple)
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -418,11 +441,19 @@ struct HeroCardView: View {
     }
 }
 
+enum MetricPolarity {
+    case higherIsBetter
+    case lowerIsBetter
+}
+
 /// A small, tappable view displaying a single metric title and its corresponding value.
 /// Tapping the view displays an alert with a detailed definition of the metric.
 struct MetricView: View {
     let title: String
     let value: String
+    var currentValue: Double? = nil
+    var baselineValue: Double? = nil
+    var polarity: MetricPolarity? = nil
 
     @State private var showingInfo = false
 
@@ -450,9 +481,26 @@ struct MetricView: View {
             Text(title)
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Text(value)
-                .font(.headline)
-                .foregroundColor(.primary)
+
+            HStack(spacing: 4) {
+                Text(value)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                if let current = currentValue, let baseline = baselineValue, let polarity = polarity {
+                    let diff = current - baseline
+                    // Add a small epsilon to avoid floating point precision issues showing 0 trend
+                    if abs(diff) > 0.01 {
+                        let isPositiveTrend = diff > 0
+                        let isGood = (polarity == .higherIsBetter) ? isPositiveTrend : !isPositiveTrend
+
+                        Image(systemName: isPositiveTrend ? "arrow.up.right" : "arrow.down.right")
+                            .font(.caption2)
+                            .bold()
+                            .foregroundColor(isGood ? .green : .red)
+                    }
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
