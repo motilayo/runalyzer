@@ -492,13 +492,7 @@ struct MetricView: View {
                     // Add a small epsilon to avoid floating point precision issues showing 0 trend
                     if abs(diff) > 0.01 {
                         let isPositiveTrend = diff > 0
-                        let isGood: Bool
-                        switch polarity {
-                        case .higherIsBetter:
-                            isGood = isPositiveTrend
-                        case .lowerIsBetter:
-                            isGood = !isPositiveTrend
-                        }
+                        let isGood = (polarity == .higherIsBetter) ? isPositiveTrend : !isPositiveTrend
 
                         Image(systemName: isPositiveTrend ? "arrow.up.right" : "arrow.down.right")
                             .font(.caption2)
