@@ -12,7 +12,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var runRecords: [RunRecord]
 
-    var onForceSync: (() async -> Void)?
+    var onForceSync: ((Bool) async -> Void)?
 
     @State private var showSyncAlert = false
     @State private var showClearCacheAlert = false
@@ -40,16 +40,10 @@ struct SettingsView: View {
                 .alert("Force Re-Sync", isPresented: $showSyncAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Re-Sync", role: .destructive) {
-                        // Clear all runs
-                        for run in runRecords {
-                            modelContext.delete(run)
-                        }
-                        try? modelContext.save()
-
                         // Trigger sync
                         if let onForceSync = onForceSync {
                             Task {
-                                await onForceSync()
+                                await onForceSync(true)
                             }
                         }
                     }

@@ -66,7 +66,7 @@ struct DashboardView: View {
         return recentRuns.map(\.avgPace).reduce(0, +) / Double(recentRuns.count)
     }
 
-    var onSync: (() async -> Void)? = nil
+    var onSync: ((Bool) async -> Void)? = nil
 
     @ViewBuilder
     private var fitnessBaselineCard: some View {
@@ -219,7 +219,7 @@ struct DashboardView: View {
                 }
 
                 if let onSync {
-                    await onSync()
+                    await onSync(false)
                     isSyncing = false
                 }
             }
@@ -229,7 +229,7 @@ struct DashboardView: View {
                     // Detach the sync operation from the refreshable task's strict lifecycle
                     // so it doesn't get cancelled when the view re-renders upon saving the first run.
                     let task = Task {
-                        await onSync()
+                        await onSync(false)
                     }
                     // Await its completion so the refresh indicator stays active
                     _ = await task.result
