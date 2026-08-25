@@ -54,10 +54,10 @@ struct SuggestedDrill {
 @available(iOS 26.0, *)
 @Generable
 struct RunInsight {
-    @Guide(description: "A short, punchy 2-5 word phrase capturing the essence of the run. Do NOT write a full sentence. Do NOT use punctuation like periods or exclamation marks. Example: 'Strong Cadence' or 'Aerobic Base Building'.")
+    @Guide(description: "Constrain strictly to a 2–4 word title. Forbid full sentences, punctuation-heavy titles, numbers, and digits.")
     var headline: String
 
-    @Guide(description: "Synthesize the context strings. STRICT RULES: Do NOT perform any math. Do NOT calculate differences. Do NOT mix up BPM and SPM. Only highlight the 2 or 3 most significant or impactful metric changes; do not list every single metric.")
+    @Guide(description: "Limit to a maximum of 2 qualitative sentences synthesizing form and efficiency trends. STRICT RULES: Do NOT use any numbers, digits, percentages, or units. Use qualitative biomechanical phrasing instead.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -88,8 +88,11 @@ class CoachingEngine {
         rules:
         - speak_directly_to_user_using_second_person ("You", "Your")
         - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
+        - STRICT_RULE: Forbid all numbers, digits, percentages, measurements, and unit names from the `headline` and `observation` fields.
+        - STRICT_RULE: Allow numbers ONLY inside the `SuggestedDrill` structure for workout intervals, repetitions, and targets (SPM/BPM).
+        - STRICT_RULE: Require qualitative biomechanical phrasing instead (e.g., "quicker turnover", "reduced bounce", "lower cardiovascular exertion").
+        - STRICT_RULE: Never attempt mental math, subtraction, or delta calculations.
         - STRICT_RULE: Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
-        - STRICT_RULE: Never perform math. Use ONLY the exact pre-computed numbers provided.
         - STRICT_RULE: For drills, you MUST use the provided target_cadence value.
         - STRICT_RULE: Do not invent causal relationships. Never say one metric "contributed to" or "caused" another.
         - STRICT_RULE: Never compare a distance metric (like stride length) to a frequency metric (like cadence).
