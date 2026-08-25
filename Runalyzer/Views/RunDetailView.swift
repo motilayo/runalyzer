@@ -149,16 +149,16 @@ struct RunDetailView: View {
                     }
 
                 } else {
-                    VStack(spacing: 20) {
-                        Image(systemName: "figure.run")
-                            .font(.system(size: 60))
-                            .foregroundColor(.purple)
-                            .symbolEffect(.variableColor.iterative.reversing)
-                        Text("Generating Coaching Insight...")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+                    AnimatedLoadingView(
+                        text: "Generating Coaching Insight...",
+                        isHorizontal: false,
+                        imageSize: 60,
+                        textFont: .subheadline,
+                        textColor: .secondary,
+                        iconColor: .purple,
+                        spacing: 20
+                    )
+                    .multilineTextAlignment(.center)
                     .frame(minHeight: 1)
                     .padding(32)
                     .task(id: runRecord.id) {
