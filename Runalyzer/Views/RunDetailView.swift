@@ -11,6 +11,37 @@ struct RunDetailView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
 
+
+    // Baseline calculations
+    private var baselineRuns: [RunRecord] {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
+        return existingRuns.filter { $0.date < runRecord.date && $0.date >= thirtyDaysAgo }
+    }
+
+    private var baselinePace: Double? {
+        let runs = baselineRuns
+        guard !runs.isEmpty else { return nil }
+        return runs.map(\.avgPace).reduce(0, +) / Double(runs.count)
+    }
+
+    private var baselineHR: Double? {
+        let runs = baselineRuns.filter { $0.avgHeartRate > 0 }
+        guard !runs.isEmpty else { return nil }
+        return Double(runs.map(\.avgHeartRate).reduce(0, +)) / Double(runs.count)
+    }
+
+    private var baselineCadence: Double? {
+        let runs = baselineRuns.filter { $0.avgCadence > 0 }
+        guard !runs.isEmpty else { return nil }
+        return Double(runs.map(\.avgCadence).reduce(0, +)) / Double(runs.count)
+    }
+
+    private var baselineVertOsc: Double? {
+        let runs = baselineRuns.filter { $0.verticalOscillation > 0 }
+        guard !runs.isEmpty else { return nil }
+        return runs.map(\.verticalOscillation).reduce(0, +) / Double(runs.count)
+    }
+
     @ViewBuilder
     private var aiDisclaimerFooter: some View {
         VStack(spacing: 6) {
@@ -50,10 +81,10 @@ struct RunDetailView: View {
                     let seconds = Int(runRecord.duration) % 60
                     StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
 
-                    StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "")
-                    StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM")
-                    StatBox(title: "Avg Cadence", value: "\(runRecord.avgCadence)", unit: "SPM")
-                    StatBox(title: "Vert. Osc.", value: String(format: "%.1f", runRecord.verticalOscillation), unit: "cm")
+                    StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "", currentValue: runRecord.avgPace, baselineValue: baselinePace, polarity: .lowerIsBetter)
+                    StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM", currentValue: Double(runRecord.avgHeartRate), baselineValue: baselineHR, polarity: .lowerIsBetter)
+                    StatBox(title: "Avg Cadence", value: "\(runRecord.avgCadence)", unit: "SPM", currentValue: Double(runRecord.avgCadence), baselineValue: baselineCadence, polarity: .higherIsBetter)
+                    StatBox(title: "Vert. Osc.", value: String(format: "%.1f", runRecord.verticalOscillation), unit: "cm", currentValue: runRecord.verticalOscillation, baselineValue: baselineVertOsc, polarity: .lowerIsBetter)
                 }
                 .padding(.horizontal)
 
@@ -189,10 +220,14 @@ struct RunDetailView: View {
 
 /// A tappable statistic box displaying a specific metric for a run.
 /// Tapping it presents an alert with a detailed definition of the metric.
+
 struct StatBox: View {
     var title: String
     var value: String
     var unit: String
+    var currentValue: Double? = nil
+    var baselineValue: Double? = nil
+    var polarity: MetricPolarity? = nil
 
     @State private var showingInfo = false
 
@@ -228,6 +263,20 @@ struct StatBox: View {
                 Text(unit)
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                if let current = currentValue, let baseline = baselineValue, let polarity = polarity {
+                    let diff = current - baseline
+                    if abs(diff) > 0.01 {
+                        let isPositiveTrend = diff > 0
+                        let isGood = (polarity == .higherIsBetter) ? isPositiveTrend : !isPositiveTrend
+
+                        Image(systemName: isPositiveTrend ? "arrow.up.right" : "arrow.down.right")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(isGood ? .green : .red)
+                            .padding(.leading, 2)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
