@@ -286,7 +286,7 @@ struct DrillDeckView: View {
             ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
                 let relativeIndex = index - activeCardIndex
 
-                if relativeIndex >= 0 && relativeIndex < 3 {
+                if relativeIndex >= 0 && relativeIndex < 4 {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "figure.run")
@@ -353,9 +353,9 @@ struct DrillDeckView: View {
                     .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(20)
                     .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: CGFloat(relativeIndex) * 20)
-                    .scaleEffect(1 - CGFloat(relativeIndex) * 0.08, anchor: .top)
-                    .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 50))) : (1 - Double(relativeIndex) * 0.3))
+                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: CGFloat(relativeIndex) * 16)
+                    .scaleEffect(1 - CGFloat(relativeIndex) * 0.06, anchor: .top)
+                    .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 50))) : (1 - Double(relativeIndex) * 0.15))
                     .zIndex(Double(sortedDrills.count - index))
                     .padding(.horizontal)
                     .gesture(

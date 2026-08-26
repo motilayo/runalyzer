@@ -363,14 +363,12 @@ struct HeroCardView: View {
                 }
 
                 // Drill Recommendation
-                if let firstDrill = insight.drillRecommendations?.first ?? insight.drillRecommendation {
+                if (insight.drillRecommendations?.first ?? insight.drillRecommendation) != nil {
                     HStack {
                         Image(systemName: "figure.run")
                             .foregroundColor(.purple)
 
-                        let drillCount = insight.drillRecommendations?.count ?? 1
-                        let titleSuffix = drillCount > 1 ? " (\(drillCount) Drills)" : ""
-                        Text(firstDrill.drillTitle.isEmpty ? "Recommended Drill" : firstDrill.drillTitle + titleSuffix)
+                        Text("View Suggested Drills")
                             .font(.headline)
                             .foregroundColor(.purple)
 
