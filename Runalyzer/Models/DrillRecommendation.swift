@@ -15,7 +15,9 @@ final class DrillRecommendation {
     var previousCadence: Int?
     var isCompleted: Bool
 
-    @Relationship(deleteRule: .nullify, inverse: \CoachingInsight.drillRecommendation)
+    var orderIndex: Int?
+
+    @Relationship(deleteRule: .nullify, inverse: \CoachingInsight.drillRecommendations)
     var insight: CoachingInsight?
 
     init(
@@ -26,7 +28,8 @@ final class DrillRecommendation {
         drillEffort: String? = nil,
         targetCadence: String? = nil,
         previousCadence: Int? = nil,
-        isCompleted: Bool = false
+        isCompleted: Bool = false,
+        orderIndex: Int? = nil
     ) {
         self.drillTitle = drillTitle
         self.drillWork = drillWork
@@ -36,5 +39,6 @@ final class DrillRecommendation {
         self.targetCadence = targetCadence
         self.previousCadence = previousCadence
         self.isCompleted = isCompleted
+        self.orderIndex = orderIndex
     }
 }
