@@ -57,7 +57,7 @@ struct RunInsight {
     @Guide(description: "Constrain strictly to a 2–4 word title. Forbid full sentences, punctuation-heavy titles, numbers, and digits.")
     var headline: String
 
-    @Guide(description: "Limit to a maximum of 3 qualitative sentences synthesizing form and efficiency trends. STRICT RULES: Do NOT use any numbers, digits, percentages, or units. Use qualitative biomechanical phrasing instead.")
+    @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach.")
     var observation: String
 
     var drill: SuggestedDrill
@@ -73,33 +73,26 @@ class CoachingEngine {
 
     private init() {}
 
-    /// Analyzes a run record and generates a CoachingInsight using on-device FoundationModels
     func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
-
-        // Ensure Foundation Models are available on device
         guard SystemLanguageModel.default.isAvailable else {
             throw NSError(domain: "CoachingEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foundation Models are not available on this device."])
         }
 
         let language = Locale.current.language.languageCode?.identifier ?? "en"
+        
+        // Gutted the negative rules and replaced with positive, structured guidance
         let instructions = """
         persona: elite_running_coach
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
-        - speak_directly_to_user_using_second_person ("You", "Your")
-        - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
-        - STRICT_RULE: Forbid all numbers, digits, percentages, measurements, and unit names from the `headline` and `observation` fields.
-        - STRICT_RULE: Allow numbers ONLY inside the `SuggestedDrill` structure for workout intervals, repetitions, and targets (SPM/BPM).
-        - STRICT_RULE: Require qualitative biomechanical phrasing instead (e.g., "quicker turnover", "reduced bounce", "lower cardiovascular exertion").
-        - STRICT_RULE: Never attempt mental math, subtraction, or delta calculations.
-        - STRICT_RULE: Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
-        - STRICT_RULE: For drills, you MUST use the provided target_cadence value.
-        - STRICT_RULE: Do not invent causal relationships. Never say one metric "contributed to" or "caused" another.
-        - STRICT_RULE: Never compare a distance metric (like stride length) to a frequency metric (like cadence).
-        - use_gait_metrics_to_diagnose_overstriding_or_bouncing
+        - speak directly to user using second person ("You", "Your")
+        - you must strictly follow the swift directive for the overall tone and drill focus
+        - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided. 
+        - explain what the grouped trends indicate about their form and efficiency.
+        - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
+        - For drills, you MUST use the provided target_cadence value.
         - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
         - respond_entirely_in_\(language)
-
         """
 
         let session = LanguageModelSession(
@@ -110,6 +103,7 @@ class CoachingEngine {
         let useMetric = UserDefaults.standard.bool(forKey: "useMetricSystem")
         let unitContext = useMetric ? "Pace is in min/km, Distance is in kilometers." : "Pace is in min/mi, Distance is in miles."
 
+        // Metrics are now logically grouped for the AI
         var promptTemplate = """
         You are a running coach.
         \(unitContext)
@@ -117,14 +111,18 @@ class CoachingEngine {
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
         TARGET_DRILL_CADENCE: {{TARGET_CADENCE_CONTEXT}}
         
-        --- METRICS ---
+        --- METRIC GROUP A: CARDIOVASCULAR EFFICIENCY ---
         HEART_RATE_BPM: {{HR_CONTEXT}}
+        VO2_MAX: {{VO2_CONTEXT}}
+        
+        --- METRIC GROUP B: RUNNING ECONOMY & FORM ---
         CADENCE_SPM: {{CADENCE_CONTEXT}}
         PACE: {{PACE_CONTEXT}}
         VERTICAL_OSCILLATION: {{OSCILLATION_CONTEXT}}
+        
+        --- METRIC GROUP C: BIOMECHANICS ---
         GROUND_CONTACT_TIME: {{GCT_CONTEXT}}
         STRIDE_LENGTH: {{STRIDE_CONTEXT}}
-        VO2_MAX: {{VO2_CONTEXT}}
         [RUN_DATA_END]
         """
 
@@ -138,16 +136,11 @@ class CoachingEngine {
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{GCT_CONTEXT}}", with: runData.gctContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{STRIDE_CONTEXT}}", with: runData.strideContext)
 
-        let prompt = promptTemplate
-
-        // Execute the prompt expecting the @Generable struct output
         do {
-            let generatedInsight = try await session.respond(to: prompt, generating: RunInsight.self)
-
+            let generatedInsight = try await session.respond(to: promptTemplate, generating: RunInsight.self)
             return generatedInsight.content
         } catch {
             print("FoundationModels Generation Error: \(error.localizedDescription)")
-
             // Graceful fallback for unsupported languages/locales or generation failures
             return RunInsight(
                 headline: String(localized: "Run Analyzed Successfully"),
@@ -203,7 +196,6 @@ actor RunAnalyzerActor {
             baseline = BaselineStats(avgDistance: avgDistance, avgPace: avgPace, avgHeartRate: avgHR, avgCadence: avgCadence, avgVerticalOscillation: avgVertOsc, avgVo2Max: avgVo2Max, avgGroundContactTime: avgGct, avgStrideLength: avgStride)
         }
 
-        // Precompute Context Strings for LLM
         let directiveContext: String
         let vo2Context: String
         let cadenceContext: String
@@ -214,51 +206,47 @@ actor RunAnalyzerActor {
         let strideContext: String
 
         if let base = baseline {
-            // VO2 Max Logic
+            
+            // VO2 Max Logic (Higher is better)
             if run.vo2Max > 0 && base.avgVo2Max > 0 {
                 let vo2Delta = run.vo2Max - base.avgVo2Max
-                let vo2Trend = vo2Delta == 0 ? "Steady compared to baseline" : (vo2Delta > 0 ? String(format: "+%.1f HIGHER than baseline", vo2Delta) : String(format: "%.1f LOWER than baseline", abs(vo2Delta)))
-                vo2Context = String(format: "%.1f (%@).", run.vo2Max, vo2Trend)
-            } else if run.vo2Max > 0 {
-                vo2Context = String(format: "%.1f (No baseline available).", run.vo2Max)
+                let impact = vo2Delta > 0 ? "This is a positive indicator of fitness." : "This is a negative indicator."
+                vo2Context = String(format: "%.1f (%.1f vs baseline). %@", run.vo2Max, vo2Delta, impact)
             } else {
                 vo2Context = "No VO2 Max data recorded for this run."
             }
 
-            // Cadence Logic
-            let cadenceFloor = 150
-            let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
+            // Cadence Logic (Higher/closer to 170+ is better)
             let cadenceDelta = run.avgCadence - base.avgCadence
-            let cadenceTrend = cadenceDelta >= 0 ? "+\(cadenceDelta) SPM higher than baseline" : "\(abs(cadenceDelta)) SPM lower than baseline"
-            cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). \(cadenceTrend))."
+            let isCadenceImproved = cadenceDelta >= 0 || run.avgCadence >= 170
+            let cadenceImpact = isCadenceImproved ? "This is a GOOD trend for reducing impact." : "This is a BAD trend, increasing injury risk."
+            cadenceContext = "\(run.avgCadence) SPM (Delta: \(cadenceDelta)). \(cadenceImpact)"
 
-            // Assuming average pace is stored in minutes per kilometer as a Double
-            // We convert to total seconds for easier comparison
+            // Pace Logic (Faster/Positive difference is better)
             let runPaceSeconds = Int(run.avgPace * 60)
             let basePaceSeconds = Int(base.avgPace * 60)
-            let paceDiff = basePaceSeconds - runPaceSeconds // Positive = faster
-            let paceTrend = paceDiff >= 0 ? "\(abs(paceDiff)) seconds FASTER than baseline" : "\(abs(paceDiff)) seconds SLOWER than baseline"
-            paceContext = "\(run.formattedPace) (\(paceTrend))."
+            let paceDiff = basePaceSeconds - runPaceSeconds
+            let paceImpact = paceDiff >= 0 ? "A POSITIVE trend in speed." : "A NEGATIVE trend indicating slower turnover."
+            paceContext = "\(run.formattedPace) (\(abs(paceDiff)) sec diff). \(paceImpact)"
 
-            // HR Logic
+            // HR Logic (Lower is better)
             let hrDelta = run.avgHeartRate - base.avgHeartRate
-            let hrTrend = hrDelta <= 0 ? "\(abs(hrDelta)) BPM LOWER than baseline" : "+\(hrDelta) BPM HIGHER than baseline"
-            hrContext = "\(run.avgHeartRate) BPM (\(hrTrend))."
+            let hrImpact = hrDelta <= 0 ? "A GOOD trend indicating aerobic efficiency." : "A BAD trend indicating higher cardiovascular strain."
+            hrContext = "\(run.avgHeartRate) BPM (Delta: \(hrDelta)). \(hrImpact)"
 
-            // Vertical Oscillation Logic
+            // Vertical Oscillation Logic (Lower is better)
             let vertOscDelta = run.verticalOscillation - base.avgVerticalOscillation
-            let vertOscTrend = vertOscDelta >= 0 ? String(format: "+%.1f cm MORE bounce than baseline", vertOscDelta) : String(format: "%.1f cm LESS bounce than baseline", abs(vertOscDelta))
-            vertOscContext = String(format: "%.1f cm (%@).", run.verticalOscillation, vertOscTrend)
+            let oscImpact = vertOscDelta <= 0 ? "A GOOD trend showing less wasted vertical energy." : "A BAD trend showing too much vertical bounce."
+            vertOscContext = String(format: "%.1f cm (Delta: %.1f). %@", run.verticalOscillation, vertOscDelta, oscImpact)
 
-            // Ground Contact Time Logic
+            // Ground Contact Time Logic (Lower is better)
             let gctDelta = run.groundContactTime - base.avgGroundContactTime
-            let gctTrend = gctDelta >= 0 ? String(format: "+%.0f ms LONGER contact than baseline", gctDelta) : String(format: "%.0f ms SHORTER contact than baseline", abs(gctDelta))
-            gctContext = String(format: "%.0f ms (%@).", run.groundContactTime, gctTrend)
+            let gctImpact = gctDelta <= 0 ? "A GOOD trend showing quicker, lighter steps." : "A BAD trend showing heavy, prolonged impact."
+            gctContext = String(format: "%.0f ms (Delta: %.0f). %@", run.groundContactTime, gctDelta, gctImpact)
 
-            // Stride Length Logic
+            // Stride Length (Neutral context depending on cadence)
             let strideDelta = run.strideLength - base.avgStrideLength
-            let strideTrend = strideDelta >= 0 ? String(format: "+%.2f m LONGER stride than baseline", strideDelta) : String(format: "%.2f m SHORTER stride than baseline", abs(strideDelta))
-            strideContext = String(format: "%.2f m (%@).", run.strideLength, strideTrend)
+            strideContext = String(format: "%.2f m (Delta: %.2f). Evaluate this in relation to their cadence.", run.strideLength, strideDelta)
 
             // Directive Logic (Swift Diagnoses the Issue)
             if run.avgCadence < 150 || (run.verticalOscillation > 10.0 && run.verticalOscillation > base.avgVerticalOscillation) {
