@@ -282,7 +282,7 @@ struct DrillDeckView: View {
     var body: some View {
         let sortedDrills = drills.sorted { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }
 
-        ZStack {
+        ZStack(alignment: .top) {
             ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
                 let relativeIndex = index - activeCardIndex
 
@@ -348,15 +348,16 @@ struct DrillDeckView: View {
                             }
                         }
                     }
-                    .frame(minHeight: 1)
+                    .frame(maxWidth: .infinity, minHeight: 1)
                     .padding()
                     .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(20)
-                    .padding(.horizontal)
-                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: CGFloat(relativeIndex) * 12)
-                    .scaleEffect(1 - CGFloat(relativeIndex) * 0.05)
+                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: CGFloat(relativeIndex) * 20)
+                    .scaleEffect(1 - CGFloat(relativeIndex) * 0.08, anchor: .top)
                     .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 50))) : (1 - Double(relativeIndex) * 0.3))
                     .zIndex(Double(sortedDrills.count - index))
+                    .padding(.horizontal)
                     .gesture(
                         relativeIndex == 0 ?
                         DragGesture()
@@ -378,6 +379,7 @@ struct DrillDeckView: View {
                 }
             }
         }
+        .padding(.bottom, 40) // Give space for the vertical offsets
         .animation(.spring(), value: offset)
         .animation(.spring(), value: activeCardIndex)
     }
