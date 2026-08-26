@@ -282,97 +282,103 @@ struct DrillDeckView: View {
     var body: some View {
         let sortedDrills = drills.sorted { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }
 
-        VStack {
-            if activeCardIndex < sortedDrills.count {
-                let currentDrill = sortedDrills[activeCardIndex]
+        ZStack {
+            ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
+                let relativeIndex = index - activeCardIndex
 
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Image(systemName: "figure.run")
-                            .foregroundColor(.blue)
-                        Text("Suggested Drill \(activeCardIndex + 1) of \(sortedDrills.count)")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.blue)
-                        Spacer()
-                        if sortedDrills.count > 1 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                    .opacity(activeCardIndex > 0 ? 1 : 0.3)
-                                Image(systemName: "chevron.right")
-                                    .opacity(activeCardIndex < sortedDrills.count - 1 ? 1 : 0.3)
-                            }
-                            .foregroundColor(.secondary)
-                            .font(.caption.bold())
-                        }
-                    }
-
-                    if !currentDrill.drillTitle.isEmpty {
-                        Text(currentDrill.drillTitle)
-                            .font(.headline)
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        DrillRow(icon: "target", text: currentDrill.drillPurpose ?? "")
-                        DrillRow(icon: "repeat", text: currentDrill.drillWork ?? "")
-                        DrillRow(icon: "brain.head.profile", text: currentDrill.drillCues ?? "")
-                        DrillRow(icon: "bolt", text: currentDrill.drillEffort ?? "")
-                    }
-
-                    if let target = currentDrill.targetCadence, let prev = currentDrill.previousCadence, !target.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Cadence Goal")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("Current: \(prev) SPM → Target: \(target)")
+                if relativeIndex >= 0 && relativeIndex < 3 {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Image(systemName: "figure.run")
+                                .foregroundColor(.blue)
+                            Text("Suggested Drill \(index + 1) of \(sortedDrills.count)")
                                 .font(.subheadline.bold())
-                                .foregroundColor(.primary)
-                        }
-                        .padding(.top, 4)
-                    }
-
-                    VStack(spacing: 0) {
-                        Divider()
-                    }
-                    .padding(.vertical, 4)
-
-                    Toggle(isOn: Bindable(currentDrill).isCompleted) {
-                        Text("Mark as Completed")
-                            .font(.subheadline.bold())
-                    }
-                    .tint(.blue)
-                    .onChange(of: currentDrill.isCompleted) { _, newValue in
-                        if newValue {
-                            let generator = UIImpactFeedbackGenerator(style: .medium)
-                            generator.impactOccurred()
-                        }
-                    }
-                }
-                .frame(minHeight: 1)
-                .padding()
-                .background(Color(.secondarySystemGroupedBackground))
-                .cornerRadius(20)
-                .padding(.horizontal)
-                .offset(x: offset.width, y: 0)
-                .opacity(2 - Double(abs(offset.width / 50)))
-                .gesture(
-                    DragGesture()
-                        .onChanged { gesture in
-                            offset = gesture.translation
-                        }
-                        .onEnded { _ in
-                            if offset.width < -100 && activeCardIndex < sortedDrills.count - 1 {
-                                // Swipe left (next)
-                                activeCardIndex += 1
-                            } else if offset.width > 100 && activeCardIndex > 0 {
-                                // Swipe right (previous)
-                                activeCardIndex -= 1
+                                .foregroundColor(.blue)
+                            Spacer()
+                            if sortedDrills.count > 1 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                        .opacity(index > 0 ? 1 : 0.3)
+                                    Image(systemName: "chevron.right")
+                                        .opacity(index < sortedDrills.count - 1 ? 1 : 0.3)
+                                }
+                                .foregroundColor(.secondary)
+                                .font(.caption.bold())
                             }
-                            offset = .zero
                         }
-                )
-                .animation(.spring(), value: offset)
-                .animation(.spring(), value: activeCardIndex)
+
+                        if !currentDrill.drillTitle.isEmpty {
+                            Text(currentDrill.drillTitle)
+                                .font(.headline)
+                        }
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            DrillRow(icon: "target", text: currentDrill.drillPurpose ?? "")
+                            DrillRow(icon: "repeat", text: currentDrill.drillWork ?? "")
+                            DrillRow(icon: "brain.head.profile", text: currentDrill.drillCues ?? "")
+                            DrillRow(icon: "bolt", text: currentDrill.drillEffort ?? "")
+                        }
+
+                        if let target = currentDrill.targetCadence, let prev = currentDrill.previousCadence, !target.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Cadence Goal")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("Current: \(prev) SPM → Target: \(target)")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.primary)
+                            }
+                            .padding(.top, 4)
+                        }
+
+                        VStack(spacing: 0) {
+                            Divider()
+                        }
+                        .padding(.vertical, 4)
+
+                        Toggle(isOn: Bindable(currentDrill).isCompleted) {
+                            Text("Mark as Completed")
+                                .font(.subheadline.bold())
+                        }
+                        .tint(.blue)
+                        .onChange(of: currentDrill.isCompleted) { _, newValue in
+                            if newValue {
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                            }
+                        }
+                    }
+                    .frame(minHeight: 1)
+                    .padding()
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .cornerRadius(20)
+                    .padding(.horizontal)
+                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: CGFloat(relativeIndex) * 12)
+                    .scaleEffect(1 - CGFloat(relativeIndex) * 0.05)
+                    .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 50))) : (1 - Double(relativeIndex) * 0.3))
+                    .zIndex(Double(sortedDrills.count - index))
+                    .gesture(
+                        relativeIndex == 0 ?
+                        DragGesture()
+                            .onChanged { gesture in
+                                offset = gesture.translation
+                            }
+                            .onEnded { _ in
+                                if offset.width < -100 && activeCardIndex < sortedDrills.count - 1 {
+                                    // Swipe left (next)
+                                    activeCardIndex += 1
+                                } else if offset.width > 100 && activeCardIndex > 0 {
+                                    // Swipe right (previous)
+                                    activeCardIndex -= 1
+                                }
+                                offset = .zero
+                            }
+                        : nil
+                    )
+                }
             }
         }
+        .animation(.spring(), value: offset)
+        .animation(.spring(), value: activeCardIndex)
     }
 }
