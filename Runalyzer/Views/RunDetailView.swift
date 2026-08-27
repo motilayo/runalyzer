@@ -123,9 +123,11 @@ struct RunDetailView: View {
                     // Bottom: Drill Card Deck
                     if let drills = insight.drillRecommendations, !drills.isEmpty {
                         DrillDeckView(drills: drills)
+                            .padding(.top, 24)
                     } else if let drill = insight.drillRecommendation {
                         // Fallback for legacy single drill migrations
                         DrillDeckView(drills: [drill])
+                            .padding(.top, 24)
                     }
 
                 } else {
