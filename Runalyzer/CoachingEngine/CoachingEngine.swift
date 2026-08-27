@@ -24,7 +24,8 @@ struct RunDataForAI: Sendable {
     let vertOscContext: String
     let gctContext: String
     let strideContext: String
-    let targetCadenceContext: String
+    let intervalCadence: String
+    let recoveryCadence: String
 }
 
 /// A structured response definition representing a suggested form drill.
@@ -47,6 +48,8 @@ struct SuggestedDrill {
     @Guide(description: "The intended intensity level (e.g., 'Moderate aerobic effort').")
     var drillEffort: String
 
+    @Guide(description: "The targeted cadence for this drill. E.g. '160-165 SPM'. DO NOT use if no cadence is provided.")
+    var targetCadence: String?
 }
 
 /// A structured response definition representing the complete AI analysis of a run.
@@ -60,7 +63,8 @@ struct RunInsight {
     @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach.")
     var observation: String
 
-    var drill: SuggestedDrill
+    @Guide(description: "A comprehensive routine of 1 to 4 complementary drills, such as a warm-up, interval block, and strides. Keep it focused on form and technique, not a full running plan.")
+    var drills: [SuggestedDrill]
 }
 
 /// The primary intelligence layer responsible for interfacing with Apple's on-device FoundationModels.
@@ -90,8 +94,9 @@ class CoachingEngine {
         - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided. 
         - explain what the grouped trends indicate about their form and efficiency.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
-        - For drills, you MUST use the provided target_cadence value.
+        - populate_the_workout_steps_and_target_badge_using_only_the_exact_cadence_integers_provided
         - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
+        - you can generate a comprehensive routine (e.g., 1 to 4 complementary drills, such as a warm-up, interval block, and strides) rather than being restricted to one.
         - respond_entirely_in_\(language)
         """
 
@@ -109,7 +114,9 @@ class CoachingEngine {
         \(unitContext)
         [RUN_DATA_START]
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
-        TARGET_DRILL_CADENCE: {{TARGET_CADENCE_CONTEXT}}
+        TARGET_DRILL_CADENCES:
+        - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
+        - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
         
         --- METRIC GROUP A: CARDIOVASCULAR EFFICIENCY ---
         HEART_RATE_BPM: {{HR_CONTEXT}}
@@ -126,7 +133,8 @@ class CoachingEngine {
         [RUN_DATA_END]
         """
 
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{TARGET_CADENCE_CONTEXT}}", with: runData.targetCadenceContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{RECOVERY_CADENCE}}", with: runData.recoveryCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{VO2_CONTEXT}}", with: runData.vo2Context)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
@@ -145,13 +153,14 @@ class CoachingEngine {
             return RunInsight(
                 headline: String(localized: "Run Analyzed Successfully"),
                 observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
-                drill: SuggestedDrill(
+                drills: [SuggestedDrill(
                     drillTitle: String(localized: "Strides"),
                     drillPurpose: String(localized: "Builds turnover and neural recruitment."),
                     drillWork: String(localized: "4 × 20s with 60s easy walk recovery"),
                     drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                     drillEffort: String(localized: "Comfortably hard"),
-                )
+                    targetCadence: nil
+                )]
             )
         }
     }
@@ -272,8 +281,8 @@ actor RunAnalyzerActor {
             strideContext = String(format: "%.2f m (No baseline available).", run.strideLength)
         }
 
-        let targetCadence = min(180, max(150, Int(Double(run.avgCadence) * 1.05)))
-        let targetCadenceContext = "\(targetCadence) SPM"
+        let intervalTarget = min(180, max(150, Int(Double(run.avgCadence) * 1.05)))
+        let recoveryTarget = max(140, run.avgCadence) // At least 140, or their current cadence
 
         // 5. Run the LLM Prompt
         do {
@@ -286,28 +295,35 @@ actor RunAnalyzerActor {
                 vertOscContext: vertOscContext,
                 gctContext: gctContext,
                 strideContext: strideContext,
-                targetCadenceContext: targetCadenceContext
+                intervalCadence: "\(intervalTarget)",
+                recoveryCadence: "\(recoveryTarget)"
             )
 
             // Execute prompt asynchronously
             let payload = try await CoachingEngine.shared.generateInsight(for: runData)
 
             // 6. Save directly to the background context (Main UI updates automatically)
-            let drill = DrillRecommendation(
-                drillTitle: payload.drill.drillTitle,
-                drillPurpose: payload.drill.drillPurpose,
-                drillWork: payload.drill.drillWork,
-                drillCues: payload.drill.drillCues,
-                drillEffort: payload.drill.drillEffort,
-                previousCadence: run.avgCadence,
-                isCompleted: false
-            )
-
             let insight = CoachingInsight(
                 headline: payload.headline,
-                longitudinalObservation: payload.observation,
-                drillRecommendation: drill
+                longitudinalObservation: payload.observation
             )
+
+            var drillRecs: [DrillRecommendation] = []
+            for (index, suggestedDrill) in payload.drills.enumerated() {
+                let drill = DrillRecommendation(
+                    drillTitle: suggestedDrill.drillTitle,
+                    drillPurpose: suggestedDrill.drillPurpose,
+                    drillWork: suggestedDrill.drillWork,
+                    drillCues: suggestedDrill.drillCues,
+                    drillEffort: suggestedDrill.drillEffort,
+                    targetCadence: suggestedDrill.targetCadence,
+                    previousCadence: run.avgCadence,
+                    isCompleted: false,
+                    orderIndex: index
+                )
+                drillRecs.append(drill)
+            }
+            insight.drillRecommendations = drillRecs
 
             run.insight = insight
             try modelContext.save()

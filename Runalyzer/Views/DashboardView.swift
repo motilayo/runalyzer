@@ -363,12 +363,12 @@ struct HeroCardView: View {
                 }
 
                 // Drill Recommendation
-                if let drill = insight.drillRecommendation {
+                if (insight.drillRecommendations?.first ?? insight.drillRecommendation) != nil {
                     HStack {
                         Image(systemName: "figure.run")
                             .foregroundColor(.purple)
 
-                        Text(drill.drillTitle.isEmpty ? "Recommended Drill" : drill.drillTitle)
+                        Text("View Suggested Drills")
                             .font(.headline)
                             .foregroundColor(.purple)
 
@@ -544,7 +544,8 @@ struct RunListRowView: View {
             Spacer()
 
             if let insight = runRecord.insight {
-                if let drillTitle = insight.drillRecommendation?.drillTitle.lowercased() {
+                let firstDrill = insight.drillRecommendations?.first ?? insight.drillRecommendation
+                if let drillTitle = firstDrill?.drillTitle.lowercased() {
                     if drillTitle.contains("cadence") {
                         PillTagView(text: "Cadence", color: .red)
                     } else if drillTitle.contains("tempo") {

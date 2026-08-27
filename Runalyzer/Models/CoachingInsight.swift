@@ -11,8 +11,11 @@ final class CoachingInsight {
     /// Compare today's Pace/HR/Cadence relationship to the rolling average.
     var longitudinalObservation: String
 
-    /// The structured drill recommendation.
+    /// The structured drill recommendation. (Legacy, keep for migrations but generally unused now)
     var drillRecommendation: DrillRecommendation?
+
+    /// The structured drill recommendations.
+    var drillRecommendations: [DrillRecommendation]?
 
     /// The inverse one-to-one relationship back to the `RunRecord` that generated this insight.
     var runRecord: RunRecord?
@@ -20,10 +23,12 @@ final class CoachingInsight {
     init(
         headline: String,
         longitudinalObservation: String,
-        drillRecommendation: DrillRecommendation? = nil
+        drillRecommendation: DrillRecommendation? = nil,
+        drillRecommendations: [DrillRecommendation]? = nil
     ) {
         self.headline = headline
         self.longitudinalObservation = longitudinalObservation
         self.drillRecommendation = drillRecommendation
+        self.drillRecommendations = drillRecommendations
     }
 }
