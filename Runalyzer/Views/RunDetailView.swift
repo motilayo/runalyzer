@@ -123,9 +123,11 @@ struct RunDetailView: View {
                     // Bottom: Drill Card Deck
                     if let drills = insight.drillRecommendations, !drills.isEmpty {
                         DrillDeckView(drills: drills)
+                            .padding(.top, 24)
                     } else if let drill = insight.drillRecommendation {
                         // Fallback for legacy single drill migrations
                         DrillDeckView(drills: [drill])
+                            .padding(.top, 24)
                     }
 
                 } else {
@@ -278,6 +280,7 @@ struct DrillDeckView: View {
     var drills: [DrillRecommendation]
     @State private var activeCardIndex: Int = 0
     @State private var offset: CGSize = .zero
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let sortedDrills = drills.sorted { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }
@@ -286,35 +289,58 @@ struct DrillDeckView: View {
             ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
                 let relativeIndex = index - activeCardIndex
 
-                if relativeIndex >= 0 && relativeIndex < 4 {
+                if relativeIndex >= 0 && relativeIndex < 3 {
+                    // Calculate rotational offset for background cards
+                    let rotationDegree: Double = {
+                        if relativeIndex == 0 { return 0 }
+                        return relativeIndex % 2 == 1 ? -3.0 : 3.0
+                    }()
+
                     VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "figure.run")
-                                .foregroundColor(.blue)
-                            Text("Suggested Drill \(index + 1) of \(sortedDrills.count)")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.blue)
-                            Spacer()
-                            if sortedDrills.count > 1 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "chevron.left")
-                                        .opacity(index > 0 ? 1 : 0.3)
-                                    Image(systemName: "chevron.right")
-                                        .opacity(index < sortedDrills.count - 1 ? 1 : 0.3)
+                        // Header (Progress & Dismiss)
+                        HStack(alignment: .center) {
+                            // Segmented progress bar
+                            HStack(spacing: 4) {
+                                ForEach(0..<sortedDrills.count, id: \.self) { barIndex in
+                                    Capsule()
+                                        .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
+                                        .frame(width: 16, height: 4)
                                 }
-                                .foregroundColor(.secondary)
-                                .font(.caption.bold())
+                            }
+
+                            Spacer()
+
+                            // Close button
+                            Button(action: {
+                                // Since we are in the RunDetailView, dismissing here will go back to Dashboard
+                                dismiss()
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
                             }
                         }
 
+                        // Typography & Content Hierarchy
+                        Text("DRILL \(String(format: "%02d", index + 1))")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .textCase(.uppercase)
+                            .foregroundColor(.secondary)
+
                         if !currentDrill.drillTitle.isEmpty {
                             Text(currentDrill.drillTitle)
-                                .font(.headline)
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
                         }
 
                         VStack(alignment: .leading, spacing: 12) {
                             DrillRow(icon: "target", text: currentDrill.drillPurpose ?? "")
                             DrillRow(icon: "repeat", text: currentDrill.drillWork ?? "")
+                            if let recovery = currentDrill.drillRecovery, !recovery.isEmpty {
+                                DrillRow(icon: "moon.zzz", text: recovery)
+                            }
                             DrillRow(icon: "brain.head.profile", text: currentDrill.drillCues ?? "")
                             DrillRow(icon: "bolt", text: currentDrill.drillEffort ?? "")
                         }
@@ -331,33 +357,74 @@ struct DrillDeckView: View {
                             .padding(.top, 4)
                         }
 
-                        VStack(spacing: 0) {
-                            Divider()
-                        }
-                        .padding(.vertical, 4)
+                        Spacer(minLength: 16)
 
-                        Toggle(isOn: Bindable(currentDrill).isCompleted) {
-                            Text("Mark as Completed")
+                        // Footer Navigation
+                        HStack {
+                            if activeCardIndex > 0 {
+                                Button("Back") {
+                                    withAnimation(.spring()) {
+                                        activeCardIndex -= 1
+                                    }
+                                }
                                 .font(.subheadline.bold())
-                        }
-                        .tint(.blue)
-                        .onChange(of: currentDrill.isCompleted) { _, newValue in
-                            if newValue {
-                                let generator = UIImpactFeedbackGenerator(style: .medium)
-                                generator.impactOccurred()
+                                .foregroundColor(.secondary)
+                            } else {
+                                Button("Skip") {
+                                    withAnimation(.spring()) {
+                                        if activeCardIndex < sortedDrills.count - 1 {
+                                            activeCardIndex += 1
+                                        }
+                                    }
+                                }
+                                .font(.subheadline.bold())
+                                .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            if activeCardIndex < sortedDrills.count - 1 {
+                                Button(action: {
+                                    withAnimation(.spring()) {
+                                        activeCardIndex += 1
+                                    }
+                                }) {
+                                    Text("Next")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(Color.accentColor)
+                                        .clipShape(Capsule())
+                                }
+                            } else {
+                                Button(action: {
+                                    currentDrill.isCompleted = true
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                }) {
+                                    Text(currentDrill.isCompleted ? "Completed" : "Mark Completed")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(Color.white)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(currentDrill.isCompleted ? Color.green : Color.accentColor)
+                                        .clipShape(Capsule())
+                                }
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 1)
                     .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
+                    .background(Color(.systemBackground))
                     .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: CGFloat(relativeIndex) * 16)
-                    .scaleEffect(1 - CGFloat(relativeIndex) * 0.06, anchor: .top)
-                    .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 50))) : (1 - Double(relativeIndex) * 0.15))
+                    .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
+                    .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : rotationDegree))
+                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: relativeIndex == 0 ? offset.height : 0)
+                    .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 150))) : 1.0)
                     .zIndex(Double(sortedDrills.count - index))
                     .padding(.horizontal)
+                    .padding(.bottom, 20)
                     .gesture(
                         relativeIndex == 0 ?
                         DragGesture()
@@ -379,8 +446,8 @@ struct DrillDeckView: View {
                 }
             }
         }
-        .padding(.bottom, 40) // Give space for the vertical offsets
-        .animation(.spring(), value: offset)
-        .animation(.spring(), value: activeCardIndex)
+        .padding(.bottom, 40)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: offset)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: activeCardIndex)
     }
 }
