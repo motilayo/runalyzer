@@ -39,11 +39,8 @@ struct SuggestedDrill {
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "The active sets and reps (e.g., '4 x 30s'). Do NOT include recovery here.")
+    @Guide(description: "A short pre-run drill prescription including sets, reps, intervals, and recovery. Keep it concise; this drill should take about 1 to 5 minutes (e.g., '4 x 30s, 60s easy walk recovery').")
     var drillWork: String
-
-    @Guide(description: "The rest or recovery instructions (e.g., '60s easy walk').")
-    var drillRecovery: String?
 
     @Guide(description: "A specific biomechanical form cue. Keep it short and actionable.")
     var drillCues: String
@@ -66,7 +63,7 @@ struct RunInsight {
     @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach.")
     var observation: String
 
-    @Guide(description: "A comprehensive routine of 1 to 4 complementary drills, such as a warm-up, interval block, and strides. Keep it focused on form and technique, not a full running plan.")
+    @Guide(description: "One to four short pre-run technique drills performed after the user's normal stretches and warm-up. The drills together must take about 5 to 10 minutes. Do not prescribe stretches, warm-ups, or a full running workout.")
     var drills: [SuggestedDrill]
 }
 
@@ -99,7 +96,10 @@ class CoachingEngine {
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
         - populate_the_workout_steps_and_target_badge_using_only_the_exact_cadence_integers_provided
         - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
-        - you can generate a comprehensive routine (e.g., 1 to 4 complementary drills, such as a warm-up, interval block, and strides) rather than being restricted to one.
+        - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
+        - generate 1 to 4 drills that take about 5 to 10 minutes total
+        - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
+        - keep `drillWork` concise and include all sets, reps, intervals, and recovery in that field
         - respond_entirely_in_\(language)
         """
 
@@ -159,7 +159,7 @@ class CoachingEngine {
                 drills: [SuggestedDrill(
                     drillTitle: String(localized: "Strides"),
                     drillPurpose: String(localized: "Builds turnover and neural recruitment."),
-                    drillWork: String(localized: "4 × 20s"), drillRecovery: String(localized: "60s easy walk recovery"),
+                    drillWork: String(localized: "4 × 20s, 60s easy walk recovery"),
                     drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                     drillEffort: String(localized: "Comfortably hard"),
                     targetCadence: nil
@@ -334,7 +334,6 @@ actor RunAnalyzerActor {
                     isCompleted: false,
                     orderIndex: index
                 )
-                drill.drillRecovery = suggestedDrill.drillRecovery
                 drillRecs.append(drill)
             }
             insight.drillRecommendations = drillRecs

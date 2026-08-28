@@ -282,6 +282,64 @@ struct DrillDeckView: View {
     @State private var offset: CGSize = .zero
     @Environment(\.dismiss) private var dismiss
 
+    private func updateDragOffset(_ translation: CGSize, isActive: Bool) {
+        guard isActive else { return }
+        offset = translation
+    }
+
+    private func finishDrag(isActive: Bool, totalDrills: Int) {
+        guard isActive else { return }
+        if offset.width < -100 && activeCardIndex < totalDrills - 1 {
+            activeCardIndex += 1
+        } else if offset.width > 100 && activeCardIndex > 0 {
+            activeCardIndex -= 1
+        }
+        offset = CGSize.zero
+    }
+
+    private func deckCard(_ drill: DrillRecommendation, index: Int, totalDrills: Int) -> some View {
+        let relativeIndex = index - activeCardIndex
+        let rotationDegree = relativeIndex == 0 ? 0 : (relativeIndex % 2 == 1 ? -3.0 : 3.0)
+
+        return DrillCardView(
+            drill: drill,
+            drillIndex: index,
+            totalDrills: totalDrills,
+            activeCardIndex: $activeCardIndex,
+            dismiss: dismiss
+        )
+        .frame(maxWidth: .infinity, minHeight: 1)
+        .padding()
+        .background {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.secondarySystemGroupedBackground))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(relativeIndex == 0 ? 0 : 0.3))
+        }
+        .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
+        .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : rotationDegree))
+        .offset(x: relativeIndex == 0 ? offset.width : 0, y: relativeIndex == 0 ? offset.height : 0)
+        .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 150))) : 1.0)
+        .zIndex(Double(totalDrills - index))
+        .padding(.horizontal)
+        .padding(.bottom, 20)
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    updateDragOffset(gesture.translation, isActive: relativeIndex == 0)
+                }
+                .onEnded { _ in
+                    finishDrag(isActive: relativeIndex == 0, totalDrills: totalDrills)
+                }
+        )
+    }
+
     var body: some View {
         let sortedDrills = drills.sorted { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }
 
@@ -290,164 +348,136 @@ struct DrillDeckView: View {
                 let relativeIndex = index - activeCardIndex
 
                 if relativeIndex >= 0 && relativeIndex < 3 {
-                    // Calculate rotational offset for background cards
-                    let rotationDegree: Double = {
-                        if relativeIndex == 0 { return 0 }
-                        return relativeIndex % 2 == 1 ? -3.0 : 3.0
-                    }()
-
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Header (Progress & Dismiss)
-                        HStack(alignment: .center) {
-                            // Segmented progress bar
-                            HStack(spacing: 4) {
-                                ForEach(0..<sortedDrills.count, id: \.self) { barIndex in
-                                    Capsule()
-                                        .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
-                                        .frame(width: 16, height: 4)
-                                }
-                            }
-
-                            Spacer()
-
-                            // Close button
-                            Button(action: {
-                                // Since we are in the RunDetailView, dismissing here will go back to Dashboard
-                                dismiss()
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        // Typography & Content Hierarchy
-                        Text("DRILL \(String(format: "%02d", index + 1))")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .textCase(.uppercase)
-                            .foregroundColor(.secondary)
-
-                        if !currentDrill.drillTitle.isEmpty {
-                            Text(currentDrill.drillTitle)
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                        }
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            DrillRow(icon: "target", text: currentDrill.drillPurpose ?? "")
-                            DrillRow(icon: "repeat", text: currentDrill.drillWork ?? "")
-                            if let recovery = currentDrill.drillRecovery, !recovery.isEmpty {
-                                DrillRow(icon: "moon.zzz", text: recovery)
-                            }
-                            DrillRow(icon: "brain.head.profile", text: currentDrill.drillCues ?? "")
-                            DrillRow(icon: "bolt", text: currentDrill.drillEffort ?? "")
-                        }
-
-                        if let target = currentDrill.targetCadence, let prev = currentDrill.previousCadence, !target.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Cadence Goal")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("Current: \(prev) SPM → Target: \(target)")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.primary)
-                            }
-                            .padding(.top, 4)
-                        }
-
-                        Spacer(minLength: 16)
-
-                        // Footer Navigation
-                        HStack {
-                            if activeCardIndex > 0 {
-                                Button("Back") {
-                                    withAnimation(.spring()) {
-                                        activeCardIndex -= 1
-                                    }
-                                }
-                                .font(.subheadline.bold())
-                                .foregroundColor(.secondary)
-                            } else {
-                                Button("Skip") {
-                                    withAnimation(.spring()) {
-                                        if activeCardIndex < sortedDrills.count - 1 {
-                                            activeCardIndex += 1
-                                        }
-                                    }
-                                }
-                                .font(.subheadline.bold())
-                                .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-
-                            if activeCardIndex < sortedDrills.count - 1 {
-                                Button(action: {
-                                    withAnimation(.spring()) {
-                                        activeCardIndex += 1
-                                    }
-                                }) {
-                                    Text("Next")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 12)
-                                        .background(Color.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                            } else {
-                                Button(action: {
-                                    currentDrill.isCompleted = true
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
-                                }) {
-                                    Text(currentDrill.isCompleted ? "Completed" : "Mark Completed")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(Color.white)
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 12)
-                                        .background(currentDrill.isCompleted ? Color.green : Color.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 1)
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
-                    .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : rotationDegree))
-                    .offset(x: relativeIndex == 0 ? offset.width : 0, y: relativeIndex == 0 ? offset.height : 0)
-                    .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 150))) : 1.0)
-                    .zIndex(Double(sortedDrills.count - index))
-                    .padding(.horizontal)
-                    .padding(.bottom, 20)
-                    .gesture(
-                        relativeIndex == 0 ?
-                        DragGesture()
-                            .onChanged { gesture in
-                                offset = gesture.translation
-                            }
-                            .onEnded { _ in
-                                if offset.width < -100 && activeCardIndex < sortedDrills.count - 1 {
-                                    // Swipe left (next)
-                                    activeCardIndex += 1
-                                } else if offset.width > 100 && activeCardIndex > 0 {
-                                    // Swipe right (previous)
-                                    activeCardIndex -= 1
-                                }
-                                offset = .zero
-                            }
-                        : nil
-                    )
+                    deckCard(currentDrill, index: index, totalDrills: sortedDrills.count)
                 }
             }
         }
         .padding(.bottom, 40)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: offset)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: activeCardIndex)
+    }
+}
+
+private struct DrillCardView: View {
+    @Bindable var drill: DrillRecommendation
+    let drillIndex: Int
+    let totalDrills: Int
+    @Binding var activeCardIndex: Int
+    let dismiss: DismissAction
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center) {
+                HStack(spacing: 4) {
+                    ForEach(0..<totalDrills, id: \.self) { barIndex in
+                        Capsule()
+                            .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
+                            .frame(width: 16, height: 4)
+                    }
+                }
+
+                Spacer()
+
+                Button(action: {
+                    dismiss()
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Text("DRILL \(String(format: "%02d", drillIndex + 1))")
+                .font(.caption)
+                .fontWeight(.bold)
+                .textCase(.uppercase)
+                .foregroundColor(.secondary)
+
+            if !drill.drillTitle.isEmpty {
+                Text(drill.drillTitle)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                DrillRow(icon: "target", text: drill.drillPurpose ?? "")
+                DrillRow(icon: "repeat", text: drill.drillWork ?? "")
+                DrillRow(icon: "brain.head.profile", text: drill.drillCues ?? "")
+                DrillRow(icon: "bolt", text: drill.drillEffort ?? "")
+            }
+
+            if let target = drill.targetCadence, let prev = drill.previousCadence, !target.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Cadence Goal")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Current: \(prev) SPM → Target: \(target)")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                }
+                .padding(.top, 4)
+            }
+
+            Spacer(minLength: 16)
+
+            HStack {
+                if activeCardIndex > 0 {
+                    Button("Back") {
+                        withAnimation(.spring()) {
+                            activeCardIndex -= 1
+                        }
+                    }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.secondary)
+                } else {
+                    Button("Skip") {
+                        withAnimation(.spring()) {
+                            if activeCardIndex < totalDrills - 1 {
+                                activeCardIndex += 1
+                            }
+                        }
+                    }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if activeCardIndex < totalDrills - 1 {
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            activeCardIndex += 1
+                        }
+                    }) {
+                        Text("Next")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.accentColor)
+                            .clipShape(Capsule())
+                    }
+                } else {
+                    Button(action: {
+                        drill.isCompleted = true
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                    }) {
+                        Text(drill.isCompleted ? "Completed" : "Mark Completed")
+                            .font(.subheadline.bold())
+                            .foregroundColor(Color.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(drill.isCompleted ? Color.green : Color.accentColor)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 1)
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(20)
     }
 }
