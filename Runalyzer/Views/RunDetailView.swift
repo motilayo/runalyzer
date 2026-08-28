@@ -416,8 +416,16 @@ struct DrillDeckView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 1)
                     .padding()
-                    .background(Color(.systemBackground))
+                    .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                    .overlay(
+                        Color.black.opacity(relativeIndex == 0 ? 0 : 0.3)
+                            .cornerRadius(20)
+                    )
                     .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
                     .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : rotationDegree))
                     .offset(x: relativeIndex == 0 ? offset.width : 0, y: relativeIndex == 0 ? offset.height : 0)
