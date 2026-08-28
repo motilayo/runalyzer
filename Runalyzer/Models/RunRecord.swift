@@ -43,6 +43,10 @@ final class RunRecord {
     @Relationship(deleteRule: .cascade, inverse: \CoachingInsight.runRecord)
     var insight: CoachingInsight?
 
+    /// Tracks whether a background task is currently analyzing this run.
+    /// Added as optional for CoreData lightweight migration.
+    var isAnalyzing: Bool?
+
     /// A computed property to format `avgPace` as MM:SS (e.g., 7.50 Double -> "7:30/km")
     var formattedPace: String {
         return avgPace.formattedPaceString

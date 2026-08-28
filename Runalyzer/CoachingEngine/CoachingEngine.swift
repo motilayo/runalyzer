@@ -179,10 +179,20 @@ actor RunAnalyzerActor {
         // 1. Safely fetch the target run on the background thread
         guard let run = modelContext.model(for: runID) as? RunRecord else { return }
 
+        // Gatekeep redundant analysis
+        if run.isAnalyzing == true { return }
+
+        run.isAnalyzing = true
+        try? modelContext.save()
+
         // 2. Calculate Relative Window
         let targetDate = run.date
         let targetID = run.id
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) else { return }
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) else {
+            run.isAnalyzing = false
+            try? modelContext.save()
+            return
+        }
 
         // 3. Fetch past 30 days relative ONLY to this run
         let descriptor = FetchDescriptor<RunRecord>(
@@ -330,10 +340,13 @@ actor RunAnalyzerActor {
             insight.drillRecommendations = drillRecs
 
             run.insight = insight
+            run.isAnalyzing = false
             try modelContext.save()
 
         } catch {
             print("AI Generation Failed: \(error)")
+            run.isAnalyzing = false
+            try? modelContext.save()
         }
     }
 }

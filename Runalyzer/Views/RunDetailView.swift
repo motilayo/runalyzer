@@ -145,7 +145,7 @@ struct RunDetailView: View {
                     .padding(32)
                     .task(id: runRecord.id) {
                         if #available(iOS 26.0, *) {
-                            if runRecord.insight == nil {
+                            if runRecord.insight == nil && runRecord.isAnalyzing != true {
                                 let container = modelContext.container
                                 let runId = runRecord.persistentModelID
 
