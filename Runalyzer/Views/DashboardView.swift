@@ -163,14 +163,8 @@ struct DashboardView: View {
 
                     if filteredRunRecords.isEmpty {
                         if isSyncing && runRecords.isEmpty {
-                            VStack(spacing: 16) {
-                                ProgressView()
-                                    .scaleEffect(1.5)
-                                Text("Analyzing your running history...")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.top, 100)
+                            AnimatedLoadingView(text: "Analyzing your running history...")
+                                .padding(.top, 100)
                         } else {
                             ContentUnavailableView(
                                 "No Runs Found",
@@ -387,12 +381,15 @@ struct HeroCardView: View {
                 aiDisclaimerFooter
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Analyzing your run...")
-                        .font(.title2.bold())
-                        .foregroundColor(.primary)
-
-                    ProgressView()
-                        .padding(.top, 4)
+                    AnimatedLoadingView(
+                        text: "Analyzing your run...",
+                        isHorizontal: true,
+                        imageSize: 24,
+                        textFont: .title2.bold(),
+                        textColor: .primary,
+                        iconColor: .primary,
+                        spacing: 12
+                    )
                 }
                 .frame(minHeight: 1)
                 .task(id: runRecord.id) {
