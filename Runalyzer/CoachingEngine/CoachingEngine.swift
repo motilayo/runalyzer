@@ -63,7 +63,7 @@ struct RunInsight {
     @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach.")
     var observation: String
 
-    @Guide(description: "One to four short pre-run technique drills performed after the user's normal stretches and warm-up. The drills together must take about 5 to 10 minutes. Do not prescribe stretches, warm-ups, or a full running workout.")
+    @Guide(description: "One targeted short pre-run technique drill by default, with an optional second drill only when it directly reinforces the primary Swift directive. The drills together must take about 5 to 10 minutes. Do not prescribe stretches, warm-ups, cooldowns, or a full running workout.")
     var drills: [SuggestedDrill]
 }
 
@@ -90,14 +90,20 @@ class CoachingEngine {
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
         - speak directly to user using second person ("You", "Your")
-        - you must strictly follow the swift directive for the overall tone and drill focus
+        - treat the Swift DIRECTIVE as authoritative for the overall tone and drill focus; do not override or reinterpret it from the raw metrics
         - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided. 
         - explain what the grouped trends indicate about their form and efficiency.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
         - populate_the_workout_steps_and_target_badge_using_only_the_exact_cadence_integers_provided
         - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
         - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
-        - generate 1 to 4 drills that take about 5 to 10 minutes total
+        - generate exactly 1 targeted drill by default; add exactly 1 second drill only when it directly reinforces the primary DIRECTIVE
+        - make every returned drill highly targeted to the primary DIRECTIVE; never generate unrelated drills
+        - for overstriding or excessive vertical bounce, prefer Cadence Pyramids or Rhythm Intervals
+        - for aerobic strain or heart-rate control, prefer Rhythm Intervals
+        - for faster pace with lower heart rate, prefer Tempo Surges
+        - use Strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
+        - prefer one excellent drill over multiple generic drills
         - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
         - keep `drillWork` concise and include all sets, reps, intervals, and recovery in that field
         - respond_entirely_in_\(language)
