@@ -1,0 +1,2 @@
+// Shared project settings. Developer-specific values are loaded when present.
+#include? "DeveloperSettings.xcconfig"

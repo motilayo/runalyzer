@@ -39,11 +39,8 @@ struct SuggestedDrill {
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "The active sets and reps (e.g., '4 x 30s'). Do NOT include recovery here.")
+    @Guide(description: "The complete workout prescription, including sets, reps, intervals, and recovery (e.g., '4 x 30s, 60s easy walk recovery').")
     var drillWork: String
-
-    @Guide(description: "The rest or recovery instructions (e.g., '60s easy walk').")
-    var drillRecovery: String?
 
     @Guide(description: "A specific biomechanical form cue. Keep it short and actionable.")
     var drillCues: String
@@ -159,7 +156,7 @@ class CoachingEngine {
                 drills: [SuggestedDrill(
                     drillTitle: String(localized: "Strides"),
                     drillPurpose: String(localized: "Builds turnover and neural recruitment."),
-                    drillWork: String(localized: "4 × 20s"), drillRecovery: String(localized: "60s easy walk recovery"),
+                    drillWork: String(localized: "4 × 20s, 60s easy walk recovery"),
                     drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
                     drillEffort: String(localized: "Comfortably hard"),
                     targetCadence: nil
@@ -334,7 +331,6 @@ actor RunAnalyzerActor {
                     isCompleted: false,
                     orderIndex: index
                 )
-                drill.drillRecovery = suggestedDrill.drillRecovery
                 drillRecs.append(drill)
             }
             insight.drillRecommendations = drillRecs
