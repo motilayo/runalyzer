@@ -1,4 +1,6 @@
 import XCTest
+import HealthKit
+
 @testable import Runalyzer
 
 final class RunalyzerTests: XCTestCase {
