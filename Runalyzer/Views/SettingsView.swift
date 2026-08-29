@@ -59,7 +59,7 @@ struct SettingsView: View {
                 .alert("Clear AI Cache", isPresented: $showClearCacheAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Clear", role: .destructive) {
-                        for run in runRecords {
+                        for run in runRecords where run.insight != nil {
                             run.insight = nil
                         }
                         try? modelContext.save()
