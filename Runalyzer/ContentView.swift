@@ -90,12 +90,22 @@ struct ContentView: View {
             // Sort new workouts ascending (oldest first) so we can insert them in order and calculate correct rolling baselines.
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
 
-            // Extract all records first before saving
-            var extractedRuns: [RunRecord] = []
-            for workout in sortedNewWorkouts {
-                let newRun = try await healthKitManager.extractRunRecord(from: workout)
-                extractedRuns.append(newRun)
+            // Extract all records concurrently using TaskGroup
+            let extractedRunsUnsorted = try await withThrowingTaskGroup(of: RunRecord.self) { group in
+                for workout in sortedNewWorkouts {
+                    group.addTask {
+                        try await healthKitManager.extractRunRecord(from: workout)
+                    }
+                }
+
+                var results: [RunRecord] = []
+                for try await result in group {
+                    results.append(result)
+                }
+                return results
             }
+            // Sort again since task group results are unordered
+            let extractedRuns = extractedRunsUnsorted.sorted { $0.date < $1.date }
 
             // 4. Query the global standalone VO2 Max sample independently
             let globalVO2 = try? await healthKitManager.fetchLatestGlobalVO2Max()
