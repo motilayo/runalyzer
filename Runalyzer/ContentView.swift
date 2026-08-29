@@ -157,7 +157,7 @@ struct ContentView: View {
             // We can safely ignore this and let the next sync handle the rest.
             print("Sync data task cancelled.")
         } catch {
-            print("Failed to sync data: \(error)")
+            print("Failed to sync data: \(error.localizedDescription)")
             await MainActor.run {
                 self.syncError = error.localizedDescription
                 self.showError = true
