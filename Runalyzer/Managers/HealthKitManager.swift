@@ -1,6 +1,16 @@
 import Foundation
 import HealthKit
 
+protocol HKHealthStoreProtocol {
+    func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
+    func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus
+    func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws
+    func execute(_ query: HKQuery)
+}
+
+extension HKHealthStore: HKHealthStoreProtocol {}
+
+
 /// A singleton manager responsible for all interactions with Apple HealthKit.
 ///
 /// `HealthKitManager` requests permissions, configures background delivery, and fetches recent running workouts.
@@ -9,7 +19,8 @@ import HealthKit
 @MainActor
 class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
-    let healthStore = HKHealthStore()
+    let healthStore: HKHealthStoreProtocol
+    var isHealthDataAvailable: () -> Bool
 
     // Published so views can react to permission changes if needed
     @Published var isAuthorized: Bool = false
@@ -18,11 +29,17 @@ class HealthKitManager: ObservableObject {
 
     private var observerQuery: HKObserverQuery?
 
-    private init() {}
+    init(
+        healthStore: HKHealthStoreProtocol = HKHealthStore(),
+        isHealthDataAvailable: @escaping () -> Bool = { HKHealthStore.isHealthDataAvailable() }
+    ) {
+        self.healthStore = healthStore
+        self.isHealthDataAvailable = isHealthDataAvailable
+    }
 
     /// Request read access for required running data
     func requestAuthorization() async throws {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard isHealthDataAvailable() else {
             throw HKError(.errorHealthDataUnavailable)
         }
 
