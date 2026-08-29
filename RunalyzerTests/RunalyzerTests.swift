@@ -3,6 +3,7 @@ import XCTest
 
 final class RunalyzerTests: XCTestCase {
 
+    @MainActor
     func testPaceCalculation() throws {
         // Distance: 5 km (5000 meters)
         // Duration: 25 minutes (1500 seconds)
@@ -15,6 +16,7 @@ final class RunalyzerTests: XCTestCase {
         XCTAssertEqual(pace, 5.0, accuracy: 0.01)
     }
 
+    @MainActor
     func testCadenceCalculation() throws {
         // Duration: 25 minutes (1500 seconds)
         // Steps: 4000
