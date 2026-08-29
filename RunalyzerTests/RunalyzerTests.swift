@@ -118,7 +118,7 @@ class MockHealthStore: HKHealthStoreProtocol {
 
     var executeQueryCalled = false
 
-    func requestAuthorization(toShare typesToShare: Set<HKSampleType>?, read typesToRead: Set<HKObjectType>?) async throws {
+    func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {
         requestAuthorizationCalled = true
         requestedTypesToShare = typesToShare
         requestedTypesToRead = typesToRead
