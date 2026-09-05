@@ -21,6 +21,7 @@
 		E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */; };
 		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
 		M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */; };
+		F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */; };
 		P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Runalyzer/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyzer/Assets.xcassets */; };
 		Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyzer/Views/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyzer/Views/OnboardingView.swift */; };
 		Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyzer/Views/RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */; };
@@ -61,6 +62,7 @@
 		D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildSettings.xcconfig; sourceTree = SOURCE_ROOT; };
 		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
+		F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/FramboiseEngine.swift; sourceTree = SOURCE_ROOT; };
 
 		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
 		32B76E67608A41B989506F12 /* LiveCoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/LiveCoachEngine.swift; sourceTree = SOURCE_ROOT; };
@@ -151,6 +153,7 @@
 				Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */,
 				AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */,
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */,
+				F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */,
 				B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyzer/Assets.xcassets */,
 				10AA26382422973E1F322C8D /* RunalyzerTests */,
 			);
@@ -258,6 +261,7 @@
 				Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyzer/Views/RunDetailView.swift in Sources */,
 				554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */,
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */,
+				F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
