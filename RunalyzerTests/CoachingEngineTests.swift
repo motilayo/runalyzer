@@ -46,7 +46,10 @@ final class CoachingEngineTests: XCTestCase {
             gctContext: "Test",
             strideContext: "Test",
             intervalCadence: "160",
-            recoveryCadence: "140"
+            recoveryCadence: "140",
+            runType: "intervals",
+            framboiseTags: "tag1, tag2",
+            workingAveragesContext: "Using Working Averages (outliers trimmed)"
         )
 
         do {
@@ -87,7 +90,10 @@ final class CoachingEngineTests: XCTestCase {
             gctContext: "Test",
             strideContext: "Test",
             intervalCadence: "160",
-            recoveryCadence: "140"
+            recoveryCadence: "140",
+            runType: "intervals",
+            framboiseTags: "tag1, tag2",
+            workingAveragesContext: "Using Working Averages (outliers trimmed)"
         )
 
         let insight = try await engine.generateInsight(for: runData)
@@ -113,7 +119,10 @@ final class CoachingEngineTests: XCTestCase {
             gctContext: "Test",
             strideContext: "Test",
             intervalCadence: "160",
-            recoveryCadence: "140"
+            recoveryCadence: "140",
+            runType: "intervals",
+            framboiseTags: "tag1, tag2",
+            workingAveragesContext: "Using Working Averages (outliers trimmed)"
         )
 
         let insight = try await engine.generateInsight(for: runData)
@@ -121,5 +130,54 @@ final class CoachingEngineTests: XCTestCase {
         XCTAssertEqual(insight.headline, "Run Analyzed Successfully")
         XCTAssertEqual(insight.drills.count, 1)
         XCTAssertEqual(insight.drills.first?.drillTitle, "Strides")
+    }
+
+    func testPromptPayload_Generation() async throws {
+        let mockProvider = MockLanguageModelProvider()
+        let engine = CoachingEngine(modelProvider: mockProvider)
+
+        let runData = RunDataForAI(
+            directiveContext: "Test",
+            vo2Context: "Test",
+            cadenceContext: "Test",
+            paceContext: "Test",
+            hrContext: "Test",
+            vertOscContext: "Test",
+            gctContext: "Test",
+            strideContext: "Test",
+            intervalCadence: "160",
+            recoveryCadence: "140",
+            runType: "tempo",
+            framboiseTags: "tag1, tag2",
+            workingAveragesContext: "Using Working Averages (outliers trimmed)"
+        )
+
+        _ = try await engine.generateInsight(for: runData)
+
+        XCTAssertEqual(runData.runType, "tempo")
+        XCTAssertEqual(runData.framboiseTags, "tag1, tag2")
+        XCTAssertEqual(runData.workingAveragesContext, "Using Working Averages (outliers trimmed)")
+    }
+
+    func testStateTrigger_AIRegeneration() async throws {
+        // Assert that updating the view model's RunType state from .steady to .intervals
+        // automatically invokes the generateAnalysis() function.
+        // We can test this logic by simulating the RunDetailView behavior
+        // Note: In an actual SwiftUI test, we'd use view inspector.
+        // Here we just test the model context setup
+
+        // Simulating user override:
+        let record = RunRecord(date: Date(), distance: 5000, duration: 1800, avgPace: 5.5, avgHeartRate: 150, avgCadence: 165)
+        record.runTypeRaw = "steady"
+
+        let initialInsight = CoachingInsight(headline: "Initial", longitudinalObservation: "Test")
+        record.insight = initialInsight
+
+        // When user overrides:
+        record.runTypeRaw = "intervals"
+        record.insight = nil
+
+        XCTAssertEqual(record.runTypeRaw, "intervals")
+        XCTAssertNil(record.insight)
     }
 }

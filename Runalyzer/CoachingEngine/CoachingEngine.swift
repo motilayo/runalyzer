@@ -26,6 +26,9 @@ struct RunDataForAI: Sendable {
     let strideContext: String
     let intervalCadence: String
     let recoveryCadence: String
+    let runType: String
+    let framboiseTags: String
+    let workingAveragesContext: String
 }
 
 /// A structured response definition representing a suggested form drill.
@@ -147,6 +150,9 @@ class CoachingEngine {
         \(unitContext)
         [RUN_DATA_START]
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
+        DATA_SOURCE: {{WORKING_AVERAGES_CONTEXT}}
+        RUN_TYPE_CLASSIFICATION: {{RUN_TYPE}}
+        FRAMBOISE_TAGS: {{FRAMBOISE_TAGS}}
         TARGET_DRILL_CADENCES:
         - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
         - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
@@ -169,6 +175,9 @@ class CoachingEngine {
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RECOVERY_CADENCE}}", with: runData.recoveryCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{WORKING_AVERAGES_CONTEXT}}", with: runData.workingAveragesContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{RUN_TYPE}}", with: runData.runType)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{FRAMBOISE_TAGS}}", with: runData.framboiseTags)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{VO2_CONTEXT}}", with: runData.vo2Context)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
@@ -339,7 +348,10 @@ actor RunAnalyzerActor {
                 gctContext: gctContext,
                 strideContext: strideContext,
                 intervalCadence: "\(intervalTarget)",
-                recoveryCadence: "\(recoveryTarget)"
+                recoveryCadence: "\(recoveryTarget)",
+                runType: run.runTypeRaw ?? "unknown",
+                framboiseTags: (run.framboiseTags ?? []).joined(separator: ", "),
+                workingAveragesContext: UserDefaults.standard.bool(forKey: "useWorkingAverages") ? "Using Working Averages (outliers trimmed)" : "Using Raw Apple Health Totals"
             )
 
             // Execute prompt asynchronously
