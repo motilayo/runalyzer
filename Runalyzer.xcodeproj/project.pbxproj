@@ -274,6 +274,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1FF5952AB4CA4F83BA9D25E5 /* WatchConnectivityManager.swift in Sources */,
+				F30FBC5BC5524A8CB4BDD811 /* LiveCoachDTOs.swift in Sources */,
+				72C6805736CC47BEAE2896F8 /* WorkoutSessionManager.swift in Sources */,
 				222222222222222222222222 /* RunMetricsDTO.swift in Sources */,
 				30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */,
 				31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */,
@@ -295,6 +298,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FB137633033D4AB7B8ABE91F /* WCSessionTests.swift in Sources */,
+				708E2D189DC249BFBCC16DEC /* WorkoutSessionTests.swift in Sources */,
 				444444444444444444444444 /* MacroQueryTests.swift in Sources */,
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
