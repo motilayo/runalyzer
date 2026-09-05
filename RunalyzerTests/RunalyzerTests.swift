@@ -1,6 +1,7 @@
 import XCTest
 import HealthKit
 
+import Foundation
 @testable import Runalyzer
 
 final class RunalyzerTests: XCTestCase {
@@ -107,7 +108,8 @@ final class HealthKitManagerTests: XCTestCase {
     }
 }
 
-class MockHealthStore: HKHealthStoreProtocol {
+public class MockHealthStore: HKHealthStoreProtocol {
+    public init() {}
     var requestAuthorizationCalled = false
     var requestedTypesToShare: Set<HKSampleType>?
     var requestedTypesToRead: Set<HKObjectType>?
@@ -122,7 +124,7 @@ class MockHealthStore: HKHealthStoreProtocol {
 
     var executeQueryCalled = false
 
-    func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {
+    public func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {
         requestAuthorizationCalled = true
         requestedTypesToShare = typesToShare
         requestedTypesToRead = typesToRead
@@ -132,12 +134,12 @@ class MockHealthStore: HKHealthStoreProtocol {
         }
     }
 
-    func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus {
+    public func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus {
         authorizationStatusCalled = true
         return authorizationStatusToReturn
     }
 
-    func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {
+    public func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {
         enableBackgroundDeliveryCalled = true
         enabledBackgroundDeliveryType = type
 
@@ -146,7 +148,76 @@ class MockHealthStore: HKHealthStoreProtocol {
         }
     }
 
-    func execute(_ query: HKQuery) {
+    public func execute(_ query: HKQuery) {
         executeQueryCalled = true
+    }
+}
+
+final class FramboiseEngineTests: XCTestCase {
+
+    func testTimeBasedBucketing() {
+        let start = Date()
+        let end = start.addingTimeInterval(45 * 60) // 45 mins
+        let workout = HKWorkout(activityType: .running, start: start, end: end, duration: end.timeIntervalSince(start), totalEnergyBurned: nil, totalDistance: nil, device: nil, metadata: nil)
+
+        let buckets = FramboiseEngine.generateTimeBuckets(for: workout)
+        XCTAssertEqual(buckets.count, 45, "A 45-minute HKWorkout should yield exactly 45 buckets")
+    }
+
+    func testOutlierTrimmer_RemovesDeadStops() {
+        let input: [Double] = [150, 152, 0, 80, 155, 154]
+        let trimmed = FramboiseEngine.trimOutliers(from: input)
+        XCTAssertEqual(trimmed, [150, 152, 155, 154])
+    }
+
+    func testVarianceCheck_SteadyPace() {
+        let paceBuckets: [Double] = [300, 302, 298, 305, 301, 299]
+        let result = FramboiseEngine.checkPaceVariance(paceBuckets: paceBuckets)
+        XCTAssertEqual(result, "Maintained steady pace")
+    }
+
+    func testDeltaCheck_FadedCadence() {
+        let cadenceBuckets: [Double] = [165, 163, 160, 159, 158]
+        let result = FramboiseEngine.checkCadenceFading(cadenceBuckets: cadenceBuckets)
+        XCTAssertEqual(result, "Cadence declined at peak")
+    }
+
+    func testClassificationEngine_Intervals() {
+        let paceBuckets: [Double] = [300, 350, 250, 350, 250, 300]
+        let heartRateBuckets: [Double] = []
+        let type = FramboiseEngine.classifyRun(paceBuckets: paceBuckets, heartRateBuckets: heartRateBuckets)
+        XCTAssertEqual(type, .intervals)
+    }
+
+    func testConcurrentBucketing_Aggregation() async throws {
+        let mockStore = MockHealthStoreForBucketing()
+        let start = Date()
+        let end = start.addingTimeInterval(5 * 60)
+        let workout = HKWorkout(activityType: .running, start: start, end: end, duration: end.timeIntervalSince(start), totalEnergyBurned: nil, totalDistance: nil, device: nil, metadata: nil)
+
+        let metrics = try await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: mockStore)
+
+        // Expected empty lists since mock returns errors, but confirms concurrent execution without crash
+        XCTAssertTrue(metrics.heartRateBuckets.isEmpty)
+        XCTAssertTrue(metrics.cadenceBuckets.isEmpty)
+        XCTAssertTrue(metrics.paceBuckets.isEmpty)
+    }
+}
+
+public class MockHealthStoreForBucketing: HKHealthStoreProtocol {
+    public init() {}
+    public func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {}
+    public func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus { return .notDetermined }
+    public func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {}
+
+    public func execute(_ query: HKQuery) {
+        if let collectionQuery = query as? HKStatisticsCollectionQuery {
+            if let handler = collectionQuery.initialResultsHandler {
+                DispatchQueue.global().asyncAfter(deadline: .now() + Double.random(in: 0.1...0.3)) {
+                    let error = NSError(domain: "MockError", code: 1, userInfo: nil)
+                    handler(collectionQuery, nil, error)
+                }
+            }
+        }
     }
 }
