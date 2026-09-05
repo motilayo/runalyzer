@@ -294,13 +294,13 @@ actor RunAnalyzerActor {
 
     func fetchMacroTrends() async -> (BaselineStats?, BaselineStats?, BaselineStats?) {
         let today = Date()
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: today) else { return (nil, nil) }
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: today) else { return (nil, nil, nil) }
 
         let descriptor = FetchDescriptor<RunRecord>(
             predicate: #Predicate { $0.date >= thirtyDaysAgo }
         )
 
-        guard let records = try? modelContext.fetch(descriptor) else { return (nil, nil) }
+        guard let records = try? modelContext.fetch(descriptor) else { return (nil, nil, nil) }
 
         // Map to Sendable DTO on the Actor before passing to TaskGroup or background async context
         let dtos = records.map { RunMetricsDTO(from: $0) }
