@@ -14,9 +14,6 @@ public struct RunMetrics {
         self.paceBuckets = paceBuckets
     }
 
-    var heartRateBuckets: [Bucket] = []
-    var cadenceBuckets: [Bucket] = []
-    var paceBuckets: [Bucket] = []
 }
 
 public struct Bucket: Equatable {
@@ -28,8 +25,6 @@ public struct Bucket: Equatable {
         self.value = value
     }
 
-    let date: Date
-    let value: Double
 }
 
 public enum RunType: Equatable {

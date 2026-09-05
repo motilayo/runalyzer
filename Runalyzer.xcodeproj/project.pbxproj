@@ -57,7 +57,7 @@
 		D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildSettings.xcconfig; sourceTree = SOURCE_ROOT; };
 		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
-		F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramboiseEngine.swift; sourceTree = "<group>"; };
+		F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/FramboiseEngine.swift; sourceTree = SOURCE_ROOT; };
 
 		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };/* End PBXFileReference section */
 

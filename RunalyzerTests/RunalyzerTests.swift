@@ -1,8 +1,8 @@
 import XCTest
 import HealthKit
 
-@testable import Runalyzer
 import Foundation
+@testable import Runalyzer
 
 final class RunalyzerTests: XCTestCase {
 
