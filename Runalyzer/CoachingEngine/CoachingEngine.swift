@@ -33,6 +33,21 @@ struct RunDataForAI: Sendable {
 
 /// A structured response definition representing a suggested form drill.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map LLM text to this struct.
+
+/// A structured response definition representing weekly trend analysis.
+@available(iOS 26.0, *)
+@Generable
+struct WeeklyTrendInsight {
+    @Guide(description: "A short, engaging title summarizing the week's progression.")
+    var title: String
+
+    @Guide(description: "An analysis of the week's fatigue, recovery, and volume trends.")
+    var trendAnalysis: String
+
+    @Guide(description: "Actionable advice for the upcoming week regarding intensity and volume.")
+    var progressionAdvice: String
+}
+
 @available(iOS 26.0, *)
 @Generable
 struct SuggestedDrill {
@@ -76,6 +91,7 @@ struct RunInsight {
 protocol LanguageModelProvider {
     var isAvailable: Bool { get }
     func respond(to prompt: String, generating type: RunInsight.Type, with instructions: String) async throws -> RunInsight
+    func respond(to prompt: String, generating type: WeeklyTrendInsight.Type, with instructions: String) async throws -> WeeklyTrendInsight
 }
 
 @available(iOS 26.0, *)
@@ -85,6 +101,15 @@ struct DefaultLanguageModelProvider: LanguageModelProvider {
     }
 
     func respond(to prompt: String, generating type: RunInsight.Type, with instructions: String) async throws -> RunInsight {
+        let session = LanguageModelSession(
+            model: SystemLanguageModel.default,
+            instructions: instructions
+        )
+        let generatedInsight = try await session.respond(to: prompt, generating: type)
+        return generatedInsight.content
+    }
+
+    func respond(to prompt: String, generating type: WeeklyTrendInsight.Type, with instructions: String) async throws -> WeeklyTrendInsight {
         let session = LanguageModelSession(
             model: SystemLanguageModel.default,
             instructions: instructions
@@ -206,6 +231,53 @@ class CoachingEngine {
             )
         }
     }
+
+    func analyzeWeeklyTrends(weeklyStats: BaselineStats, previousWeeklyStats: BaselineStats) async throws -> WeeklyTrendInsight {
+        guard modelProvider.isAvailable else {
+            throw NSError(domain: "CoachingEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foundation Models are not available."])
+        }
+
+        let instructions = """
+        persona: elite_running_coach
+        task: analyze_weekly_macro_trends
+        rules:
+        - speak directly to user using second person ("You", "Your")
+        - analyze the rolling 7-day averages compared to the prior 7 days
+        - focus strictly on fatigue management, progression, and workload
+        - respond_entirely_in_\(Locale.current.language.languageCode?.identifier ?? "en")
+        """
+
+        let promptTemplate = """
+        You are an elite running coach analyzing weekly macro trends.
+
+        CURRENT WEEK AVERAGES:
+        - Distance: \(weeklyStats.avgDistance)
+        - Pace: \(weeklyStats.avgPace)
+        - Heart Rate: \(weeklyStats.avgHeartRate)
+        - Cadence: \(weeklyStats.avgCadence)
+
+        PREVIOUS WEEK AVERAGES:
+        - Distance: \(previousWeeklyStats.avgDistance)
+        - Pace: \(previousWeeklyStats.avgPace)
+        - Heart Rate: \(previousWeeklyStats.avgHeartRate)
+        - Cadence: \(previousWeeklyStats.avgCadence)
+
+        Synthesize these trends to evaluate fatigue management and progression for the upcoming week.
+        """
+
+        do {
+            let content = try await modelProvider.respond(to: promptTemplate, generating: WeeklyTrendInsight.self, with: instructions)
+            return content
+        } catch {
+            print("FoundationModels Generation Error: \(error.localizedDescription)")
+            return WeeklyTrendInsight(
+                title: String(localized: "Weekly Overview"),
+                trendAnalysis: String(localized: "Your weekly stats have been analyzed."),
+                progressionAdvice: String(localized: "Keep up the consistent work.")
+            )
+        }
+    }
+
 }
 
 /// A dedicated actor for performing background SwiftData fetches, mathematical baseline calculations, and invoking the AI `CoachingEngine`.
@@ -214,6 +286,118 @@ class CoachingEngine {
 @available(iOS 26.0, *)
 @ModelActor
 actor RunAnalyzerActor {
+
+    func fetchWeeklyTrends() async -> (BaselineStats?, BaselineStats?) {
+        let (current, previous, _) = await fetchMacroTrends()
+        return (current, previous)
+    }
+
+    func fetchMacroTrends() async -> (BaselineStats?, BaselineStats?, BaselineStats?) {
+        let today = Date()
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: today) else { return (nil, nil) }
+
+        let descriptor = FetchDescriptor<RunRecord>(
+            predicate: #Predicate { $0.date >= thirtyDaysAgo }
+        )
+
+        guard let records = try? modelContext.fetch(descriptor) else { return (nil, nil) }
+
+        // Map to Sendable DTO on the Actor before passing to TaskGroup or background async context
+        let dtos = records.map { RunMetricsDTO(from: $0) }
+
+        return await withTaskGroup(of: (Int, BaselineStats?).self) { group in
+            // Calculate 30 days
+            group.addTask {
+                let monthRecords = dtos
+                if monthRecords.isEmpty { return (2, nil) }
+
+                let avgDistance = monthRecords.map { $0.distance }.reduce(0, +) / Double(monthRecords.count)
+                let avgPace = monthRecords.map { $0.avgPace }.reduce(0, +) / Double(monthRecords.count)
+                let avgHR = monthRecords.map { $0.avgHeartRate }.reduce(0, +) / monthRecords.count
+                let avgCadence = monthRecords.map { $0.avgCadence }.reduce(0, +) / monthRecords.count
+
+                let stats = BaselineStats(
+                    avgDistance: avgDistance,
+                    avgPace: avgPace,
+                    avgHeartRate: avgHR,
+                    avgCadence: avgCadence,
+                    avgVerticalOscillation: 0,
+                    avgVo2Max: 0,
+                    avgGroundContactTime: 0,
+                    avgStrideLength: 0
+                )
+                return (2, stats)
+            }
+
+            // Calculate Current 7 days
+            group.addTask {
+                guard let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: today) else { return (0, nil) }
+                let weekRecords = dtos.filter { $0.date >= sevenDaysAgo }
+
+                if weekRecords.isEmpty { return (0, nil) }
+
+                let avgDistance = weekRecords.map { $0.distance }.reduce(0, +) / Double(weekRecords.count)
+                let avgPace = weekRecords.map { $0.avgPace }.reduce(0, +) / Double(weekRecords.count)
+                let avgHR = weekRecords.map { $0.avgHeartRate }.reduce(0, +) / weekRecords.count
+                let avgCadence = weekRecords.map { $0.avgCadence }.reduce(0, +) / weekRecords.count
+
+                let stats = BaselineStats(
+                    avgDistance: avgDistance,
+                    avgPace: avgPace,
+                    avgHeartRate: avgHR,
+                    avgCadence: avgCadence,
+                    avgVerticalOscillation: 0,
+                    avgVo2Max: 0,
+                    avgGroundContactTime: 0,
+                    avgStrideLength: 0
+                )
+                return (0, stats)
+            }
+
+            // Calculate Previous 7 days
+            group.addTask {
+                guard let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: today),
+                      let fourteenDaysAgo = Calendar.current.date(byAdding: .day, value: -14, to: today) else { return (1, nil) }
+
+                let prevWeekRecords = dtos.filter { $0.date >= fourteenDaysAgo && $0.date < sevenDaysAgo }
+
+                if prevWeekRecords.isEmpty { return (1, nil) }
+
+                let avgDistance = prevWeekRecords.map { $0.distance }.reduce(0, +) / Double(prevWeekRecords.count)
+                let avgPace = prevWeekRecords.map { $0.avgPace }.reduce(0, +) / Double(prevWeekRecords.count)
+                let avgHR = prevWeekRecords.map { $0.avgHeartRate }.reduce(0, +) / prevWeekRecords.count
+                let avgCadence = prevWeekRecords.map { $0.avgCadence }.reduce(0, +) / prevWeekRecords.count
+
+                let stats = BaselineStats(
+                    avgDistance: avgDistance,
+                    avgPace: avgPace,
+                    avgHeartRate: avgHR,
+                    avgCadence: avgCadence,
+                    avgVerticalOscillation: 0,
+                    avgVo2Max: 0,
+                    avgGroundContactTime: 0,
+                    avgStrideLength: 0
+                )
+                return (1, stats)
+            }
+
+            var currentWeek: BaselineStats? = nil
+            var previousWeek: BaselineStats? = nil
+            var thirtyDays: BaselineStats? = nil
+
+            for await (index, stats) in group {
+                if index == 0 {
+                    currentWeek = stats
+                } else if index == 1 {
+                    previousWeek = stats
+                } else if index == 2 {
+                    thirtyDays = stats
+                }
+            }
+
+            return (currentWeek, previousWeek, thirtyDays)
+        }
+    }
     func generateAnalysis(for runID: PersistentIdentifier) async {
         // 1. Safely fetch the target run on the background thread
         guard let run = modelContext.model(for: runID) as? RunRecord else { return }

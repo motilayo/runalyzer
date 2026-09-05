@@ -6,6 +6,10 @@ import SwiftData
 /// `DashboardView` presents a summary of the most recent run, a grid of aggregate metrics over the last 30 days,
 /// and a list of historical runs. It triggers data synchronization and handles the UI states for AI generation.
 struct DashboardView: View {
+    @State private var timeFilter: String = "30 Days"
+
+    @State private var weeklyInsight: WeeklyTrendInsight?
+    @State private var isLoadingTrends: Bool = false
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
@@ -70,6 +74,7 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var fitnessBaselineCard: some View {
+                    weeklyTrendsCard
         VStack(spacing: 12) {
             if let currentVO2 = latestVO2Max {
                 // TOP ROW: Current VO2 Max & Trend
@@ -154,6 +159,42 @@ struct DashboardView: View {
         .padding(.top, 8)
     }
 
+
+    @ViewBuilder
+    private var weeklyTrendsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .foregroundColor(.purple)
+                Text("Weekly Trends")
+                    .font(.headline)
+                Spacer()
+                if isLoadingTrends {
+                    ProgressView()
+                }
+            }
+
+            if let insight = weeklyInsight {
+                Text(insight.title)
+                    .font(.subheadline.bold())
+                Text(insight.trendAnalysis)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(insight.progressionAdvice)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            } else if !isLoadingTrends {
+                Text("Run more to see weekly trends.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .padding(.horizontal)
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -161,43 +202,33 @@ struct DashboardView: View {
                     // Global Fitness Pill (VO2 Max)
                     fitnessBaselineCard
 
-                    if filteredRunRecords.isEmpty {
-                        if isSyncing && runRecords.isEmpty {
-                            AnimatedLoadingView(text: "Analyzing your running history...")
-                                .padding(.top, 100)
-                        } else {
-                            ContentUnavailableView(
-                                "No Runs Found",
-                                systemImage: "figure.run.circle",
-                                description: Text("Go for a run with your Apple Watch and it will appear here.")
-                            )
-                            .padding(.top, 60)
-                        }
-                    } else {
-                        // Hero Card for the latest run insight
-                        if let latestRun = filteredRunRecords.first {
-                            NavigationLink(value: latestRun) {
-                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
-                            }
-                            .buttonStyle(.plain)
-                        }
 
-                        // List of past runs
-                        if filteredRunRecords.count > 1 {
-                            Section(header: Text("Past Runs")
-                                                .font(.title3.bold())
-                                                .padding(.horizontal)
-                                                .frame(maxWidth: .infinity, alignment: .leading)) {
-                                let pastRuns = Array(filteredRunRecords.dropFirst())
-                                ForEach(pastRuns) { run in
-                                    NavigationLink(value: run) {
-                                        RunListRowView(runRecord: run)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
+                    // Filters
+                    VStack(spacing: 16) {
+                        Picker("Time Filter", selection: $timeFilter) {
+                            Text("30 Days").tag("30 Days")
+                            Text("All Time").tag("All Time")
                         }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+
+                        VStack(alignment: .leading) {
+                            Text("Minimum Distance: \(String(format: "%.1f", minimumRunDistance)) \(useMetricSystem ? "km" : "mi")")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Slider(value: $minimumRunDistance, in: useMetricSystem ? 0.5...10.0 : 0.3...6.0, step: 0.1)
+                                .sensoryFeedback(.selection, trigger: Int(minimumRunDistance))
+                        }
+                        .padding(.horizontal)
                     }
+                    .padding(.bottom, 8)
+
+                    RunListContent(
+                        timeFilter: timeFilter,
+                        minimumDistance: minimumRunDistance,
+                        useMetricSystem: useMetricSystem,
+                        isSyncing: isSyncing
+                    )
                 }
                 .padding(.vertical)
             }
@@ -208,6 +239,21 @@ struct DashboardView: View {
                 RunDetailView(runRecord: runRecord)
             }
             .task {
+
+                if #available(iOS 26.0, *) {
+                    isLoadingTrends = true
+                    let container = modelContext.container
+
+                    let (current, previous) = await Task.detached {
+                        let actor = RunAnalyzerActor(modelContainer: container)
+                        return await actor.fetchWeeklyTrends()
+                    }.value
+
+                    if let curr = current, let prev = previous {
+                        weeklyInsight = try? await CoachingEngine.shared.analyzeWeeklyTrends(weeklyStats: curr, previousWeeklyStats: prev)
+                    }
+                    isLoadingTrends = false
+                }
                 do {
                     try await HealthKitManager.shared.requestAuthorization()
                 } catch {
@@ -585,5 +631,73 @@ struct PillTagView: View {
             .background(color.opacity(0.15))
             .foregroundColor(color)
             .clipShape(Capsule())
+    }
+}
+
+
+struct RunListContent: View {
+    @Query private var filteredRunRecords: [RunRecord]
+    var isSyncing: Bool
+
+    init(timeFilter: String, minimumDistance: Double, useMetricSystem: Bool, isSyncing: Bool) {
+        self.isSyncing = isSyncing
+        let minDistanceInMeters = useMetricSystem ? (minimumDistance * 1000.0) : (minimumDistance * 1609.344)
+
+        let descriptor: FetchDescriptor<RunRecord>
+        if timeFilter == "30 Days" {
+            let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+            let filterDist = minDistanceInMeters - 0.01
+            descriptor = FetchDescriptor<RunRecord>(
+                predicate: #Predicate { $0.date >= thirtyDaysAgo && $0.distance >= filterDist },
+                sortBy: [SortDescriptor(\RunRecord.date, order: .reverse)]
+            )
+        } else {
+            let filterDist = minDistanceInMeters - 0.01
+            descriptor = FetchDescriptor<RunRecord>(
+                predicate: #Predicate { $0.distance >= filterDist },
+                sortBy: [SortDescriptor(\RunRecord.date, order: .reverse)]
+            )
+        }
+        _filteredRunRecords = Query(descriptor)
+    }
+
+    var body: some View {
+        if filteredRunRecords.isEmpty {
+            if isSyncing {
+                AnimatedLoadingView(text: "Analyzing your running history...")
+                    .padding(.top, 100)
+            } else {
+                ContentUnavailableView(
+                    "No Runs Found",
+                    systemImage: "figure.run.circle",
+                    description: Text("Go for a run with your Apple Watch and it will appear here.")
+                )
+                .padding(.top, 60)
+            }
+        } else {
+            // Hero Card for the latest run insight
+            if let latestRun = filteredRunRecords.first {
+                NavigationLink(value: latestRun) {
+                    HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // List of past runs
+            if filteredRunRecords.count > 1 {
+                Section(header: Text("Past Runs")
+                                    .font(.title3.bold())
+                                    .padding(.horizontal)
+                                    .frame(maxWidth: .infinity, alignment: .leading)) {
+                    let pastRuns = Array(filteredRunRecords.dropFirst())
+                    ForEach(pastRuns) { run in
+                        NavigationLink(value: run) {
+                            RunListRowView(runRecord: run)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
     }
 }
