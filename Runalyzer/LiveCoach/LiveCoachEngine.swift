@@ -2,12 +2,28 @@ import Foundation
 import WorkoutKit
 import HealthKit
 import AVFoundation
+import WatchConnectivity
 #if os(watchOS)
 import WatchKit
 #endif
 
+/// A simple structure to represent the decoded drill on the watch.
+public struct WatchDrill: Equatable {
+    public let title: String
+    public let workReps: Int
+    public let workDistance: Double
+    public let targetSPM: Int
+}
+
+public protocol WorkoutSessionProtocol {
+    var state: HKWorkoutSessionState { get }
+    func start()
+    func pause()
+    func end()
+}
+
 @available(iOS 17.0, watchOS 10.0, *)
-public class LiveCoachEngine {
+public class LiveCoachEngine: NSObject, WCSessionDelegate {
 
     public var silentModeEnabled: Bool = false
     public let audioEngine = AVAudioEngine()
@@ -16,7 +32,11 @@ public class LiveCoachEngine {
     private var currentMetronomeTargetSPM: Int = 0
     private var metronomeTimer: Timer?
 
-    public init() {
+    public var decodedDrill: WatchDrill?
+    public var workoutSession: WorkoutSessionProtocol?
+
+    public override init() {
+        super.init()
         setupAudio()
     }
 
@@ -160,5 +180,38 @@ public class LiveCoachEngine {
         #if os(watchOS)
         WKInterfaceDevice.current().play(.success)
         #endif
+    }
+
+    // MARK: - WorkoutSession Management
+
+    public func startRun() {
+        workoutSession?.start()
+    }
+
+    // MARK: - WatchConnectivity WCSessionDelegate
+
+    public func decodePayload(_ payload: [String: Any]) -> WatchDrill? {
+        guard let title = payload["title"] as? String,
+              let workReps = payload["workReps"] as? Int,
+              let workDistance = payload["workDistance"] as? Double,
+              let targetSPM = payload["targetSPM"] as? Int else {
+            return nil
+        }
+        let drill = WatchDrill(title: title, workReps: workReps, workDistance: workDistance, targetSPM: targetSPM)
+        self.decodedDrill = drill
+        return drill
+    }
+
+    public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+
+    #if os(iOS)
+    public func sessionDidBecomeInactive(_ session: WCSession) {}
+    public func sessionDidDeactivate(_ session: WCSession) {}
+    #endif
+
+    public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+        if let drillPayload = message["drill"] as? [String: Any] {
+            _ = decodePayload(drillPayload)
+        }
     }
 }

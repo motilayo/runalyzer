@@ -1,8 +1,26 @@
 import XCTest
 import HealthKit
 import WorkoutKit
+import WatchConnectivity
 
 @testable import Runalyzer
+
+@available(iOS 17.0, watchOS 10.0, *)
+class MockWorkoutSession: WorkoutSessionProtocol {
+    var state: HKWorkoutSessionState = .notStarted
+
+    func start() {
+        state = .running
+    }
+
+    func pause() {
+        state = .paused
+    }
+
+    func end() {
+        state = .ended
+    }
+}
 
 @available(iOS 17.0, watchOS 10.0, *)
 final class LiveCoachEngineTests: XCTestCase {
@@ -27,7 +45,6 @@ final class LiveCoachEngineTests: XCTestCase {
         let workout = try XCTUnwrap(sut.translate(prescription: prescription))
 
         // Assert
-        // We should have 1 block with iterations = 4
         XCTAssertEqual(workout.blocks.count, 1)
         let block = workout.blocks[0]
 
@@ -52,13 +69,8 @@ final class LiveCoachEngineTests: XCTestCase {
         let targetSPM = 160
 
         // Act & Assert
-        // Current SPM is less than target, should trigger corrective haptic
         XCTAssertTrue(sut.shouldTriggerCorrectiveHaptic(currentSPM: 152, targetSPM: targetSPM))
-
-        // Current SPM is equal to target, should not trigger
         XCTAssertFalse(sut.shouldTriggerCorrectiveHaptic(currentSPM: 160, targetSPM: targetSPM))
-
-        // Current SPM is greater than target, should not trigger
         XCTAssertFalse(sut.shouldTriggerCorrectiveHaptic(currentSPM: 165, targetSPM: targetSPM))
     }
 
@@ -66,7 +78,7 @@ final class LiveCoachEngineTests: XCTestCase {
         // Arrange
         sut.silentModeEnabled = true
         let currentSPM = 152
-        let targetSPM = 160 // Dropped cadence -> should haptic, but no audio
+        let targetSPM = 160
 
         // Act
         let cues = sut.triggerCues(currentSPM: currentSPM, targetSPM: targetSPM)
@@ -88,5 +100,41 @@ final class LiveCoachEngineTests: XCTestCase {
         // Assert
         XCTAssertTrue(cues.audio, "Audio should be triggered when silent mode is disabled")
         XCTAssertTrue(cues.haptic, "Haptic should be triggered")
+    }
+
+    func testWCSession_PayloadDecoding() {
+        // Arrange
+        let payload: [String: Any] = [
+            "title": "Cadence Pyramids",
+            "workReps": 4,
+            "workDistance": 400.0,
+            "targetSPM": 165
+        ]
+
+        // Act
+        let drill = sut.decodePayload(payload)
+
+        // Assert
+        XCTAssertNotNil(drill)
+        XCTAssertEqual(drill?.title, "Cadence Pyramids")
+        XCTAssertEqual(drill?.workReps, 4)
+        XCTAssertEqual(drill?.workDistance, 400.0)
+        XCTAssertEqual(drill?.targetSPM, 165)
+        XCTAssertEqual(sut.decodedDrill, drill)
+    }
+
+    func testWorkoutSession_StateTransitions() {
+        // Arrange
+        let mockSession = MockWorkoutSession()
+        sut.workoutSession = mockSession
+
+        // Assert Initial State
+        XCTAssertEqual(mockSession.state, .notStarted)
+
+        // Act
+        sut.startRun()
+
+        // Assert Active State
+        XCTAssertEqual(mockSession.state, .running)
     }
 }

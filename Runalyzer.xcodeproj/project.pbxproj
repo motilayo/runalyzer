@@ -29,6 +29,7 @@
 		554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */; };
 		46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76E67608A41B989506F12 /* LiveCoachEngine.swift */; };
 		2793E5BE7C44484CBB4F2F3F /* LiveCoachEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */; };
+
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +68,7 @@
 		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
 		32B76E67608A41B989506F12 /* LiveCoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/LiveCoachEngine.swift; sourceTree = SOURCE_ROOT; };
 		2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/LiveCoachEngineTests.swift; sourceTree = SOURCE_ROOT; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -255,6 +257,7 @@
 				9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */,
 				1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */,
 				075FD91D330B77E5867419C9 /* ContentView.swift in Sources */,
+				46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */,
 				A2B3C4D5E6F7G8H9I0J1K2L3 /* Runalyzer/Views/DashboardView.swift in Sources */,
 				98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */,
 				Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyzer/Views/OnboardingView.swift in Sources */,
@@ -271,6 +274,7 @@
 			files = (
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
+				2793E5BE7C44484CBB4F2F3F /* LiveCoachEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
