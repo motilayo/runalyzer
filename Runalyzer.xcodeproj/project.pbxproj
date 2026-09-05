@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */; };
 		98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */; };
 		31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */; };
 		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
@@ -21,7 +20,6 @@
 		E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */; };
 		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
 		M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */; };
-		F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */; };
 		P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Runalyzer/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyzer/Assets.xcassets */; };
 		Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyzer/Views/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyzer/Views/OnboardingView.swift */; };
 		Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyzer/Views/RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */; };
@@ -30,8 +28,6 @@
 		FDB000000000000000000000 /* FetchDescriptorBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDB100000000000000000000 /* FetchDescriptorBuilder.swift */; };
 		MQ0000000000000000000000 /* MacroQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = MQ1000000000000000000000 /* MacroQuery.swift */; };
 		MQT000000000000000000000 /* MacroQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MQT100000000000000000000 /* MacroQueryTests.swift */; };
-		46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76E67608A41B989506F12 /* LiveCoachEngine.swift */; };
-		2793E5BE7C44484CBB4F2F3F /* LiveCoachEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,7 +41,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachingEngineTests.swift; sourceTree = "<group>"; };
 		768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyzer/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyzer/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
@@ -65,14 +60,11 @@
 		D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildSettings.xcconfig; sourceTree = SOURCE_ROOT; };
 		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
-		F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/FramboiseEngine.swift; sourceTree = SOURCE_ROOT; };
 
-		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };		FDB100000000000000000000 /* FetchDescriptorBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FetchDescriptorBuilder.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
+		FDB100000000000000000000 /* FetchDescriptorBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FetchDescriptorBuilder.swift; sourceTree = "<group>"; };
 		MQ1000000000000000000000 /* MacroQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroQuery.swift; sourceTree = "<group>"; };
 		MQT100000000000000000000 /* MacroQueryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroQueryTests.swift; sourceTree = "<group>"; };
-		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
-		32B76E67608A41B989506F12 /* LiveCoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/LiveCoachEngine.swift; sourceTree = SOURCE_ROOT; };
-		2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/LiveCoachEngineTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -107,8 +99,6 @@
 			isa = PBXGroup;
 			children = (
 				MQT100000000000000000000 /* MacroQueryTests.swift */,
-				A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */,
-				2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */,
 				FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */,
 			);
 			path = RunalyzerTests;
@@ -126,7 +116,6 @@
 		54B19B6DFF797ACC20446E48 /* Runalyzer */ = {
 			isa = PBXGroup;
 			children = (
-				32B76E67608A41B989506F12 /* LiveCoachEngine.swift */,
 				D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */,
 				580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */,
 			);
@@ -162,7 +151,6 @@
 				Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */,
 				AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */,
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */,
-				F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */,
 				B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyzer/Assets.xcassets */,
 				10AA26382422973E1F322C8D /* RunalyzerTests */,
 			);
@@ -272,7 +260,6 @@
 				Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyzer/Views/RunDetailView.swift in Sources */,
 				554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */,
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */,
-				F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -282,7 +269,6 @@
 			files = (
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 				MQT000000000000000000000 /* MacroQueryTests.swift in Sources */,
-				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
