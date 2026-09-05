@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		708E2D189DC249BFBCC16DEC /* WorkoutSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6E202B2A5C41D496386271 /* WorkoutSessionTests.swift */; };
+		FB137633033D4AB7B8ABE91F /* WCSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1E8B48083E497591A36B7E /* WCSessionTests.swift */; };
+		72C6805736CC47BEAE2896F8 /* WorkoutSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */; };
+		1FF5952AB4CA4F83BA9D25E5 /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDA7F361C784D2897942DC3 /* WatchConnectivityManager.swift */; };
+		F30FBC5BC5524A8CB4BDD811 /* LiveCoachDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F5AFB895C64593B72CC3E4 /* LiveCoachDTOs.swift */; };
 		C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */; };
 		98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */; };
 		31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */; };
@@ -42,6 +47,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		CD6E202B2A5C41D496386271 /* WorkoutSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/WorkoutSessionTests.swift; sourceTree = SOURCE_ROOT; };
+		AF1E8B48083E497591A36B7E /* WCSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/WCSessionTests.swift; sourceTree = SOURCE_ROOT; };
+		A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/WorkoutSessionManager.swift; sourceTree = SOURCE_ROOT; };
+		BEDA7F361C784D2897942DC3 /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/WatchConnectivityManager.swift; sourceTree = SOURCE_ROOT; };
+		30F5AFB895C64593B72CC3E4 /* LiveCoachDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/LiveCoachDTOs.swift; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachingEngineTests.swift; sourceTree = "<group>"; };
 		768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyzer/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
@@ -102,6 +112,10 @@
 			children = (
 				A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */,
 				2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */,
+				CD6E202B2A5C41D496386271 /* WorkoutSessionTests.swift */,
+
+				AF1E8B48083E497591A36B7E /* WCSessionTests.swift */,
+
 				FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */,
 			);
 			path = RunalyzerTests;
@@ -120,6 +134,12 @@
 			isa = PBXGroup;
 			children = (
 				32B76E67608A41B989506F12 /* LiveCoachEngine.swift */,
+				A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */,
+
+				BEDA7F361C784D2897942DC3 /* WatchConnectivityManager.swift */,
+
+				30F5AFB895C64593B72CC3E4 /* LiveCoachDTOs.swift */,
+
 				D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */,
 				580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */,
 			);
