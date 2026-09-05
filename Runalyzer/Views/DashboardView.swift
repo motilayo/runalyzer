@@ -5,11 +5,19 @@ import SwiftData
 ///
 /// `DashboardView` presents a summary of the most recent run, a grid of aggregate metrics over the last 30 days,
 /// and a list of historical runs. It triggers data synchronization and handles the UI states for AI generation.
+
+struct WeeklyTrendState {
+    var title: String
+    var trendAnalysis: String
+    var progressionAdvice: String
+}
+
 struct DashboardView: View {
     @State private var timeFilter: String = "30 Days"
 
-    @State private var weeklyInsight: WeeklyTrendInsight?
+    @State private var weeklyInsight: WeeklyTrendState?
     @State private var isLoadingTrends: Bool = false
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
@@ -250,7 +258,9 @@ struct DashboardView: View {
                     }.value
 
                     if let curr = current, let prev = previous {
-                        weeklyInsight = try? await CoachingEngine.shared.analyzeWeeklyTrends(weeklyStats: curr, previousWeeklyStats: prev)
+                        if let insight = try? await CoachingEngine.shared.analyzeWeeklyTrends(weeklyStats: curr, previousWeeklyStats: prev) {
+                            weeklyInsight = WeeklyTrendState(title: insight.title, trendAnalysis: insight.trendAnalysis, progressionAdvice: insight.progressionAdvice)
+                        }
                     }
                     isLoadingTrends = false
                 }
