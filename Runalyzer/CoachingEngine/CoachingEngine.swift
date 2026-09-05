@@ -67,18 +67,46 @@ struct RunInsight {
     var drills: [SuggestedDrill]
 }
 
+///
+@available(iOS 26.0, *)
+@MainActor
+protocol LanguageModelProvider {
+    var isAvailable: Bool { get }
+    func respond(to prompt: String, generating type: RunInsight.Type, with instructions: String) async throws -> RunInsight
+}
+
+@available(iOS 26.0, *)
+struct DefaultLanguageModelProvider: LanguageModelProvider {
+    var isAvailable: Bool {
+        return SystemLanguageModel.default.isAvailable
+    }
+
+    func respond(to prompt: String, generating type: RunInsight.Type, with instructions: String) async throws -> RunInsight {
+        let session = LanguageModelSession(
+            model: SystemLanguageModel.default,
+            instructions: instructions
+        )
+        let generatedInsight = try await session.respond(to: prompt, generating: type)
+        return generatedInsight.content
+    }
+}
+
 /// The primary intelligence layer responsible for interfacing with Apple's on-device FoundationModels.
 ///
 /// `CoachingEngine` handles the prompt construction, token limits, and fallback logic for generating `RunInsight`s.
 @available(iOS 26.0, *)
 @MainActor
 class CoachingEngine {
+    @MainActor
     static let shared = CoachingEngine()
+    let modelProvider: any LanguageModelProvider
 
-    private init() {}
+    init(modelProvider: (any LanguageModelProvider)? = nil) {
+        self.modelProvider = modelProvider ?? DefaultLanguageModelProvider()
+    }
 
     func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
-        guard SystemLanguageModel.default.isAvailable else {
+        guard modelProvider.isAvailable else {
             throw NSError(domain: "CoachingEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foundation Models are not available on this device."])
         }
 
@@ -109,10 +137,6 @@ class CoachingEngine {
         - respond_entirely_in_\(language)
         """
 
-        let session = LanguageModelSession(
-            model: SystemLanguageModel.default,
-            instructions: instructions
-        )
 
         let useMetric = UserDefaults.standard.bool(forKey: "useMetricSystem")
         let unitContext = useMetric ? "Pace is in min/km, Distance is in kilometers." : "Pace is in min/mi, Distance is in miles."
@@ -154,8 +178,8 @@ class CoachingEngine {
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{STRIDE_CONTEXT}}", with: runData.strideContext)
 
         do {
-            let generatedInsight = try await session.respond(to: promptTemplate, generating: RunInsight.self)
-            return generatedInsight.content
+            let content = try await modelProvider.respond(to: promptTemplate, generating: RunInsight.self, with: instructions)
+            return content
         } catch {
             print("FoundationModels Generation Error: \(error.localizedDescription)")
             // Graceful fallback for unsupported languages/locales or generation failures
