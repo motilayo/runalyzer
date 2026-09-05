@@ -108,8 +108,7 @@ final class HealthKitManagerTests: XCTestCase {
     }
 }
 
-public class MockHealthStore: HKHealthStoreProtocol {
-    public init() {}
+class MockHealthStore: HKHealthStoreProtocol {
     var requestAuthorizationCalled = false
     var requestedTypesToShare: Set<HKSampleType>?
     var requestedTypesToRead: Set<HKObjectType>?
@@ -124,7 +123,7 @@ public class MockHealthStore: HKHealthStoreProtocol {
 
     var executeQueryCalled = false
 
-    public func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {
+    func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {
         requestAuthorizationCalled = true
         requestedTypesToShare = typesToShare
         requestedTypesToRead = typesToRead
@@ -134,12 +133,12 @@ public class MockHealthStore: HKHealthStoreProtocol {
         }
     }
 
-    public func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus {
+    func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus {
         authorizationStatusCalled = true
         return authorizationStatusToReturn
     }
 
-    public func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {
+    func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {
         enableBackgroundDeliveryCalled = true
         enabledBackgroundDeliveryType = type
 
@@ -148,7 +147,7 @@ public class MockHealthStore: HKHealthStoreProtocol {
         }
     }
 
-    public func execute(_ query: HKQuery) {
+    func execute(_ query: HKQuery) {
         executeQueryCalled = true
     }
 }
@@ -204,13 +203,12 @@ final class FramboiseEngineTests: XCTestCase {
     }
 }
 
-public class MockHealthStoreForBucketing: HKHealthStoreProtocol {
-    public init() {}
-    public func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {}
-    public func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus { return .notDetermined }
-    public func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {}
+class MockHealthStoreForBucketing: HKHealthStoreProtocol {
+    func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {}
+    func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus { return .notDetermined }
+    func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {}
 
-    public func execute(_ query: HKQuery) {
+    func execute(_ query: HKQuery) {
         if let collectionQuery = query as? HKStatisticsCollectionQuery {
             if let handler = collectionQuery.initialResultsHandler {
                 DispatchQueue.global().asyncAfter(deadline: .now() + Double.random(in: 0.1...0.3)) {
