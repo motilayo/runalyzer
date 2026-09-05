@@ -73,29 +73,27 @@ final class MacroQueryTests: XCTestCase {
     }
 
     func testMacroQuery_RollingAverages() throws {
-        var mockRecords: [RunRecord] = []
+        var mockSnapshots: [RunDataSnapshot] = []
         for i in 1...15 {
             let recordDate = Calendar.current.date(byAdding: .day, value: -i, to: currentDate)!
-            let run = RunRecord(
+            let snapshot = RunDataSnapshot(
                 date: recordDate,
-                distance: 5000,
-                duration: 1500,
                 avgPace: 5.0,
                 avgHeartRate: 150,
                 avgCadence: 160
             )
-            mockRecords.append(run)
+            mockSnapshots.append(snapshot)
         }
 
         // 7-day average
-        let sevenDayAvg = MacroQuery.rollingAverages(from: mockRecords, days: 7, currentDate: currentDate)
+        let sevenDayAvg = MacroQuery.rollingAverages(from: mockSnapshots, days: 7, currentDate: currentDate)
         XCTAssertNotNil(sevenDayAvg)
         XCTAssertEqual(sevenDayAvg?.pace, 5.0, accuracy: 0.01)
         XCTAssertEqual(sevenDayAvg?.cadence, 160.0, accuracy: 0.01)
         XCTAssertEqual(sevenDayAvg?.heartRate, 150.0, accuracy: 0.01)
 
         // 30-day average
-        let thirtyDayAvg = MacroQuery.rollingAverages(from: mockRecords, days: 30, currentDate: currentDate)
+        let thirtyDayAvg = MacroQuery.rollingAverages(from: mockSnapshots, days: 30, currentDate: currentDate)
         XCTAssertNotNil(thirtyDayAvg)
         XCTAssertEqual(thirtyDayAvg?.pace, 5.0, accuracy: 0.01)
         XCTAssertEqual(thirtyDayAvg?.cadence, 160.0, accuracy: 0.01)

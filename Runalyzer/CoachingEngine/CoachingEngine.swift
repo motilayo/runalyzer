@@ -311,13 +311,10 @@ actor RunAnalyzerActor {
 
         // Macro Query Engine logic
         var macroContext = "Not enough data for macro rolling averages."
-        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: run.date) ?? Date()
-        let descriptor = FetchDescriptor<RunRecord>(
-            predicate: #Predicate { $0.date >= thirtyDaysAgo }
-        )
-        if let allRuns = try? modelContext.fetch(descriptor) {
-            if let sevenDay = MacroQuery.rollingAverages(from: allRuns, days: 7, currentDate: run.date),
-               let thirtyDay = MacroQuery.rollingAverages(from: allRuns, days: 30, currentDate: run.date) {
+        if let allRuns = try? modelContext.fetch(FetchDescriptor<RunRecord>()) {
+            let snapshots = allRuns.map { RunDataSnapshot(date: $0.date, avgPace: $0.avgPace, avgHeartRate: $0.avgHeartRate, avgCadence: $0.avgCadence) }
+            if let sevenDay = MacroQuery.rollingAverages(from: snapshots, days: 7, currentDate: targetDate),
+               let thirtyDay = MacroQuery.rollingAverages(from: snapshots, days: 30, currentDate: targetDate) {
 
                let hrDiff = sevenDay.heartRate - thirtyDay.heartRate
                let paceDiff = sevenDay.pace - thirtyDay.pace

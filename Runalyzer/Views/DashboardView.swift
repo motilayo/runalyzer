@@ -146,13 +146,15 @@ struct FilteredRunsListView: View {
     // 1. The 30-Day Average Cadence (SPM)
     var baselineCadence: Int? {
         // Use MacroQuery for 30-day average
-        guard let avgs = MacroQuery.rollingAverages(from: runRecords, days: 30) else { return nil }
+        let snapshots = runRecords.map { RunDataSnapshot(date: $0.date, avgPace: $0.avgPace, avgHeartRate: $0.avgHeartRate, avgCadence: $0.avgCadence) }
+        guard let avgs = MacroQuery.rollingAverages(from: snapshots, days: 30) else { return nil }
         return Int(avgs.cadence)
     }
 
     // 2. The 30-Day Average Pace
     var baselinePace: Double? {
-        return MacroQuery.rollingAverages(from: runRecords, days: 30)?.pace
+        let snapshots = runRecords.map { RunDataSnapshot(date: $0.date, avgPace: $0.avgPace, avgHeartRate: $0.avgHeartRate, avgCadence: $0.avgCadence) }
+        return MacroQuery.rollingAverages(from: snapshots, days: 30)?.pace
     }
 
     @ViewBuilder

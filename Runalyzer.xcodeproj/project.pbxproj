@@ -24,8 +24,7 @@
 		Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyzer/Views/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyzer/Views/OnboardingView.swift */; };
 		Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyzer/Views/RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */; };
 
-		554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */; };
-		FDB000000000000000000000 /* FetchDescriptorBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDB100000000000000000000 /* FetchDescriptorBuilder.swift */; };
+		554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */; };		FDB000000000000000000000 /* FetchDescriptorBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDB100000000000000000000 /* FetchDescriptorBuilder.swift */; };
 		MQ0000000000000000000000 /* MacroQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = MQ1000000000000000000000 /* MacroQuery.swift */; };
 		MQT000000000000000000000 /* MacroQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MQT100000000000000000000 /* MacroQueryTests.swift */; };
 /* End PBXBuildFile section */
@@ -61,11 +60,7 @@
 		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyzer/Views/RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
 
-		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
-		FDB100000000000000000000 /* FetchDescriptorBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FetchDescriptorBuilder.swift; path = Runalyzer/Models/FetchDescriptorBuilder.swift; sourceTree = "<group>"; };
-		MQ1000000000000000000000 /* MacroQuery.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MacroQuery.swift; path = Runalyzer/Models/MacroQuery.swift; sourceTree = "<group>"; };
-		MQT100000000000000000000 /* MacroQueryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MacroQueryTests.swift; path = RunalyzerTests/MacroQueryTests.swift; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };/* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		059DF1D89F96B18AEFE606CE /* Frameworks */ = {
@@ -98,7 +93,6 @@
 		10AA26382422973E1F322C8D /* RunalyzerTests */ = {
 			isa = PBXGroup;
 			children = (
-				MQT100000000000000000000 /* MacroQueryTests.swift */,
 				FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */,
 			);
 			path = RunalyzerTests;
@@ -140,8 +134,6 @@
 				8B51607F39154844B5E46210 /* CoachingInsight.swift */,
 				0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */,
 				376830066BD295E24C449FB2 /* RunRecord.swift */,
-				FDB100000000000000000000 /* FetchDescriptorBuilder.swift */,
-				MQ1000000000000000000000 /* MacroQuery.swift */,
 				2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */,
 				52FF9D9245C901D4BDBA1FFB /* RunalyzerApp.swift */,
 				C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */,
@@ -251,8 +243,6 @@
 				E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */,
 				9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */,
 				1D2A9B92689E9EC659EE4030 /* RunalyzerApp.swift in Sources */,
-				FDB000000000000000000000 /* FetchDescriptorBuilder.swift in Sources */,
-				MQ0000000000000000000000 /* MacroQuery.swift in Sources */,
 				075FD91D330B77E5867419C9 /* ContentView.swift in Sources */,
 				A2B3C4D5E6F7G8H9I0J1K2L3 /* Runalyzer/Views/DashboardView.swift in Sources */,
 				98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */,
@@ -268,7 +258,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
-				MQT000000000000000000000 /* MacroQueryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
