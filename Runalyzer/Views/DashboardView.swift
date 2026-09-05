@@ -250,7 +250,7 @@ struct DashboardView: View {
 
                 if #available(iOS 26.0, *) {
                     isLoadingTrends = true
-                    let container = modelContext.container
+                    let container = self.modelContext.container
 
                     let (current, previous) = await Task.detached {
                         let actor = RunAnalyzerActor(modelContainer: container)
@@ -451,7 +451,7 @@ struct HeroCardView: View {
                 .task(id: runRecord.id) {
                     if #available(iOS 26.0, *) {
                         if !isSyncing && runRecord.insight == nil {
-                            let container = modelContext.container
+                            let container = self.modelContext.container
                             let runId = runRecord.persistentModelID
 
                             Task.detached {
