@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */; };
 		98DB7AE1F0FD4D5A9E2AED7E /* Runalyzer/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */; };
 		31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */; };
 		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
@@ -40,6 +41,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachingEngineTests.swift; sourceTree = "<group>"; };
 		768372D4E377479C83BEA700 /* Runalyzer/Views/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyzer/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyzer/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 		10AA26382422973E1F322C8D /* RunalyzerTests */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */,
 				2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */,
 				FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */,
 			);
@@ -263,6 +266,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
+				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
