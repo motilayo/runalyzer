@@ -111,6 +111,33 @@ struct RunDetailView: View {
                                 .foregroundColor(.secondary)
                         }
 
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        HStack {
+                            Text("Detected Run Type:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Picker("Run Type", selection: $runRecord.runTypeRaw) {
+                                Text("Steady").tag(Optional("steady"))
+                                Text("Intervals").tag(Optional("intervals"))
+                                Text("Unknown").tag(Optional("unknown"))
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                            .onChange(of: runRecord.runTypeRaw) { _, _ in
+                                runRecord.insight = nil // Clear insight to trigger regeneration
+                                if #available(iOS 26.0, *) {
+                                    let container = modelContext.container
+                                    let runId = runRecord.persistentModelID
+                                    Task.detached {
+                                        let analyzer = RunAnalyzerActor(modelContainer: container)
+                                        await analyzer.generateAnalysis(for: runId)
+                                    }
+                                }
+                            }
+                        }
+
                         aiDisclaimerFooter
                     }
                     .frame(minHeight: 1)

@@ -1,5 +1,19 @@
 import SwiftUI
 import SwiftData
+import TipKit
+
+struct WorkingAveragesTip: Tip {
+    var title: Text {
+        Text("Smart Core Engine")
+    }
+    var message: Text? {
+        Text("Toggle between Working Averages (strips dead stops, warm-ups, and cool-downs) and Raw Apple Health Totals.")
+    }
+    var image: Image? {
+        Image(systemName: "brain.head.profile")
+    }
+}
+
 
 /// The settings and configuration view for the Runalyzer application.
 ///
@@ -8,6 +22,7 @@ import SwiftData
 struct SettingsView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
+    @AppStorage("useWorkingAverages") private var useWorkingAverages: Bool = true
 
     @Environment(\.modelContext) private var modelContext
     @Query private var runRecords: [RunRecord]
@@ -19,6 +34,11 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section(header: Text("Smart Core")) {
+                Toggle("Working Averages", isOn: $useWorkingAverages)
+                    .popoverTip(WorkingAveragesTip())
+            }
+
             Section(header: Text("Preferences")) {
                 Toggle("Use Metric System", isOn: $useMetricSystem)
                     .onChange(of: useMetricSystem) { _, _ in
