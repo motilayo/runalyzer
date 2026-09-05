@@ -6,200 +6,45 @@ import SwiftData
 /// `DashboardView` presents a summary of the most recent run, a grid of aggregate metrics over the last 30 days,
 /// and a list of historical runs. It triggers data synchronization and handles the UI states for AI generation.
 struct DashboardView: View {
-    @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
-
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
 
     @State private var isSyncing: Bool = true
-
-    private var filteredRunRecords: [RunRecord] {
-        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
-        return runRecords.filter { $0.distance >= (minDistanceInMeters - 0.01) }
-    }
-
-    // 1. Get the most recent valid VO2 Max score
-    var latestVO2Max: Double? {
-        filteredRunRecords.first(where: { $0.vo2Max > 0 })?.vo2Max
-    }
-
-    // 2. Calculate the trend against the 30 days prior to that recent score
-    var vo2MaxTrend: Double? {
-        let validRuns = filteredRunRecords.filter { $0.vo2Max > 0 }
-
-        // We need at least 2 valid readings to establish a trend
-        guard validRuns.count >= 2 else { return nil }
-
-        let currentRun = validRuns[0]
-        let currentVO2 = currentRun.vo2Max
-
-        // Calculate the 30-day window relative to the most recent valid run
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: currentRun.date) else { return nil }
-
-        let baselineRuns = validRuns.dropFirst().filter { $0.date >= thirtyDaysAgo }
-
-        guard !baselineRuns.isEmpty else { return nil }
-
-        let baselineAvg = baselineRuns.map(\.vo2Max).reduce(0, +) / Double(baselineRuns.count)
-        return currentVO2 - baselineAvg
-    }
-
-    // 1. The 30-Day Average Cadence (SPM)
-    var baselineCadence: Int? {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
-
-        // Filter for runs in the last 30 days that have a valid cadence
-        let recentRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo && $0.avgCadence > 0 }
-        guard !recentRuns.isEmpty else { return nil }
-
-        // Calculate the average
-        let totalCadence = recentRuns.map(\.avgCadence).reduce(0, +)
-        return totalCadence / recentRuns.count
-    }
-
-    // 2. The 30-Day Average Pace (Optional, but great for a baseline card)
-    var baselinePace: Double? {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
-        let recentRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo }
-        guard !recentRuns.isEmpty else { return nil }
-
-        return recentRuns.map(\.avgPace).reduce(0, +) / Double(recentRuns.count)
-    }
+    @State private var showLast30Days: Bool = false
 
     var onSync: ((Bool) async -> Void)? = nil
-
-    @ViewBuilder
-    private var fitnessBaselineCard: some View {
-        VStack(spacing: 12) {
-            if let currentVO2 = latestVO2Max {
-                // TOP ROW: Current VO2 Max & Trend
-                HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: "heart.text.square.fill")
-                            .foregroundColor(.red)
-                            .font(.title2)
-
-                        Text("VO2 Max")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                    }
-
-                    Spacer()
-
-                    Text(String(format: "%.1f", currentVO2))
-                        .font(.title2)
-                        .bold()
-
-                    if let trend = vo2MaxTrend {
-                        let isPositive = trend >= 0
-                        HStack(spacing: 2) {
-                            Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                                .font(.caption2)
-                                .bold()
-                            Text(String(format: "%.1f", abs(trend)))
-                                .font(.subheadline)
-                                .bold()
-                        }
-                        .foregroundColor(isPositive ? .green : .red)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(isPositive ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
-                        .clipShape(Capsule())
-                    }
-                }
-
-                // BOTTOM ROW: The 30-Day Baseline Stats
-                Divider()
-            }
-
-            if baselineCadence != nil || baselinePace != nil {
-                HStack {
-                    // LEFT SIDE: 30-Day Avg Cadence
-                    if let avgCadence = baselineCadence {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("30-DAY AVG CADENCE")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fontWeight(.semibold)
-                            Text("\(avgCadence) SPM")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                    }
-
-                    Spacer()
-
-                    // RIGHT SIDE: 30-Day Avg Pace
-                    if let avgPace = baselinePace {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("30-DAY AVG PACE")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fontWeight(.semibold)
-
-                            // Format the Double (minutes) into a M:SS string
-                            Text(avgPace.formattedPaceString)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .padding(.horizontal)
-        .padding(.top, 8)
-    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 20) {
-                    // Global Fitness Pill (VO2 Max)
-                    fitnessBaselineCard
-
-                    if filteredRunRecords.isEmpty {
-                        if isSyncing && runRecords.isEmpty {
-                            AnimatedLoadingView(text: "Analyzing your running history...")
-                                .padding(.top, 100)
-                        } else {
-                            ContentUnavailableView(
-                                "No Runs Found",
-                                systemImage: "figure.run.circle",
-                                description: Text("Go for a run with your Apple Watch and it will appear here.")
-                            )
-                            .padding(.top, 60)
-                        }
-                    } else {
-                        // Hero Card for the latest run insight
-                        if let latestRun = filteredRunRecords.first {
-                            NavigationLink(value: latestRun) {
-                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        // List of past runs
-                        if filteredRunRecords.count > 1 {
-                            Section(header: Text("Past Runs")
-                                                .font(.title3.bold())
-                                                .padding(.horizontal)
-                                                .frame(maxWidth: .infinity, alignment: .leading)) {
-                                let pastRuns = Array(filteredRunRecords.dropFirst())
-                                ForEach(pastRuns) { run in
-                                    NavigationLink(value: run) {
-                                        RunListRowView(runRecord: run)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                VStack(spacing: 16) {
+                    Picker("Time Range", selection: $showLast30Days) {
+                        Text("30 Days").tag(true)
+                        Text("All Time").tag(false)
                     }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+
+                    VStack(alignment: .leading) {
+                        Text("Minimum Distance: \(String(format: "%.1f", minimumRunDistance)) \(useMetricSystem ? "km" : "mi")")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Slider(value: $minimumRunDistance, in: 1.0...10.0, step: 0.1) {
+                            Text("Minimum Distance")
+                        } minimumValueLabel: {
+                            Text("1")
+                        } maximumValueLabel: {
+                            Text("10")
+                        }
+                        .sensoryFeedback(.selection, trigger: Int(minimumRunDistance))
+                        .tint(.purple)
+                    }
+                    .padding(.horizontal)
                 }
-                .padding(.vertical)
+                .padding(.top, 8)
+
+                FilteredRunsListView(showLast30Days: showLast30Days, minimumDistance: minimumRunDistance, useMetricSystem: useMetricSystem, isSyncing: isSyncing)
+                    .padding(.vertical)
             }
             .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 100)
@@ -254,9 +99,201 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Subviews
+struct FilteredRunsListView: View {
+    @Query private var runRecords: [RunRecord]
 
-/// A prominent card view displaying the most recent run's metrics and its associated AI Coaching Insight.
+    var isSyncing: Bool
+    var useMetricSystem: Bool
+
+    init(showLast30Days: Bool, minimumDistance: Double, useMetricSystem: Bool, isSyncing: Bool) {
+        let descriptor = FetchDescriptorBuilder.build(
+            showLast30Days: showLast30Days,
+            minimumDistance: minimumDistance,
+            useMetricSystem: useMetricSystem,
+            currentDate: Date()
+        )
+        _runRecords = Query(descriptor)
+        self.isSyncing = isSyncing
+        self.useMetricSystem = useMetricSystem
+    }
+
+    // 1. Get the most recent valid VO2 Max score
+    var latestVO2Max: Double? {
+        runRecords.first(where: { $0.vo2Max > 0 })?.vo2Max
+    }
+
+    // 2. Calculate the trend against the 30 days prior to that recent score
+    var vo2MaxTrend: Double? {
+        let validRuns = runRecords.filter { $0.vo2Max > 0 }
+
+        // We need at least 2 valid readings to establish a trend
+        guard validRuns.count >= 2 else { return nil }
+
+        let currentRun = validRuns[0]
+        let currentVO2 = currentRun.vo2Max
+
+        // Calculate the 30-day window relative to the most recent valid run
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: currentRun.date) else { return nil }
+
+        let baselineRuns = validRuns.dropFirst().filter { $0.date >= thirtyDaysAgo }
+
+        guard !baselineRuns.isEmpty else { return nil }
+
+        let baselineAvg = baselineRuns.map(\.vo2Max).reduce(0, +) / Double(baselineRuns.count)
+        return currentVO2 - baselineAvg
+    }
+
+    // 1. The 30-Day Average Cadence (SPM)
+    var baselineCadence: Int? {
+        // Use MacroQuery for 30-day average
+        guard let avgs = MacroQuery.rollingAverages(from: runRecords, days: 30) else { return nil }
+        return Int(avgs.cadence)
+    }
+
+    // 2. The 30-Day Average Pace
+    var baselinePace: Double? {
+        return MacroQuery.rollingAverages(from: runRecords, days: 30)?.pace
+    }
+
+    @ViewBuilder
+    private var fitnessBaselineCard: some View {
+        VStack(spacing: 12) {
+            if let currentVO2 = latestVO2Max {
+                // TOP ROW: Current VO2 Max & Trend
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "heart.text.square.fill")
+                            .foregroundColor(.red)
+                            .font(.title2)
+
+                        Text("VO2 Max")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                    }
+
+                    Spacer()
+
+                    Text(String(format: "%.1f", currentVO2))
+                        .font(.title2)
+                        .bold()
+
+                    if let trend = vo2MaxTrend {
+                        let isPositive = trend >= 0
+                        HStack(spacing: 2) {
+                            Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption2)
+                                .bold()
+                            Text(String(format: "%.1f", abs(trend)))
+                                .font(.caption2)
+                                .bold()
+                        }
+                        .foregroundColor(isPositive ? .green : .red)
+                    }
+                }
+
+                Divider()
+            }
+
+            // BOTTOM ROW: Average Cadence and Average Pace Baseline Cards
+            HStack(spacing: 16) {
+                // Cadence Card
+                HStack(spacing: 8) {
+                    Image(systemName: "shoeprints.fill")
+                        .foregroundColor(.blue)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("30D Avg SPM")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fontWeight(.semibold)
+
+                        Text(baselineCadence != nil ? "\(baselineCadence!)" : "--")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                }
+
+                Spacer()
+
+                // Pace Card
+                HStack(spacing: 8) {
+                    Image(systemName: "timer")
+                        .foregroundColor(.orange)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("30D Avg Pace")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fontWeight(.semibold)
+
+                        if let avgPace = baselinePace {
+                            // Format the Double (minutes) into a M:SS string
+                            Text(avgPace.formattedPaceString)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        } else {
+                            Text("--")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+
+    var body: some View {
+        LazyVStack(spacing: 20) {
+            // Global Fitness Pill (VO2 Max)
+            fitnessBaselineCard
+
+            if runRecords.isEmpty {
+                if isSyncing {
+                    AnimatedLoadingView(text: "Analyzing your running history...")
+                        .padding(.top, 100)
+                } else {
+                    ContentUnavailableView(
+                        "No Runs Found",
+                        systemImage: "figure.run.circle",
+                        description: Text("Go for a run with your Apple Watch and it will appear here.")
+                    )
+                    .padding(.top, 60)
+                }
+            } else {
+                // Hero Card for the latest run insight
+                if let latestRun = runRecords.first {
+                    NavigationLink(value: latestRun) {
+                        HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: runRecords)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // List of past runs
+                if runRecords.count > 1 {
+                    Section(header: Text("Past Runs")
+                                        .font(.title3.bold())
+                                        .padding(.horizontal)
+                                        .frame(maxWidth: .infinity, alignment: .leading)) {
+                        let pastRuns = Array(runRecords.dropFirst())
+                        ForEach(pastRuns) { run in
+                            NavigationLink(value: run) {
+                                RunListRowView(runRecord: run)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct HeroCardView: View {
     var runRecord: RunRecord
     var isSyncing: Bool

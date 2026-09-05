@@ -26,6 +26,8 @@ struct RunDataForAI: Sendable {
     let strideContext: String
     let intervalCadence: String
     let recoveryCadence: String
+    let macroContext: String
+
 }
 
 /// A structured response definition representing a suggested form drill.
@@ -93,6 +95,8 @@ class CoachingEngine {
         - treat the Swift DIRECTIVE as authoritative for the overall tone and drill focus; do not override or reinterpret it from the raw metrics
         - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided. 
         - explain what the grouped trends indicate about their form and efficiency.
+        - do_not_invent_or_calculate_math_in_the_observation_only_synthesize_the_strings
+        - evaluate fatigue using the provided Macro Baseline Query (7-Day vs 30-Day averages) when applicable.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
         - populate_the_workout_steps_and_target_badge_using_only_the_exact_cadence_integers_provided
         - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
@@ -123,6 +127,7 @@ class CoachingEngine {
         \(unitContext)
         [RUN_DATA_START]
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
+        MACRO_FATIGUE_BASELINE (7-Day vs 30-Day): {{MACRO_CONTEXT}}
         TARGET_DRILL_CADENCES:
         - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
         - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
@@ -152,6 +157,7 @@ class CoachingEngine {
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{OSCILLATION_CONTEXT}}", with: runData.vertOscContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{GCT_CONTEXT}}", with: runData.gctContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{STRIDE_CONTEXT}}", with: runData.strideContext)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{MACRO_CONTEXT}}", with: runData.macroContext)
 
         do {
             let generatedInsight = try await session.respond(to: promptTemplate, generating: RunInsight.self)
@@ -303,6 +309,27 @@ actor RunAnalyzerActor {
         let intervalTarget = min(180, max(150, Int(Double(run.avgCadence) * 1.05)))
         let recoveryTarget = max(140, run.avgCadence) // At least 140, or their current cadence
 
+        // Macro Query Engine logic
+        var macroContext = "Not enough data for macro rolling averages."
+        if let allRuns = try? modelContext.fetch(FetchDescriptor<RunRecord>()) {
+            if let sevenDay = MacroQuery.rollingAverages(from: allRuns, days: 7, currentDate: targetDate),
+               let thirtyDay = MacroQuery.rollingAverages(from: allRuns, days: 30, currentDate: targetDate) {
+
+               let hrDiff = sevenDay.heartRate - thirtyDay.heartRate
+               let paceDiff = sevenDay.pace - thirtyDay.pace
+
+               macroContext = String(format: "7-Day Avg HR: %.0f BPM, 30-Day Avg HR: %.0f BPM. 7-Day Avg Pace: %.2f, 30-Day Avg Pace: %.2f.", sevenDay.heartRate, thirtyDay.heartRate, sevenDay.pace, thirtyDay.pace)
+
+               if hrDiff > 2 && paceDiff > 0 { // Higher HR + Slower Pace = Fatigue
+                   macroContext += " The 7-day trend shows higher heart rate and slower pace compared to the 30-day baseline, indicating accumulated fatigue. Consider prioritizing recovery."
+               } else if hrDiff < -2 && paceDiff < 0 {
+                   macroContext += " The 7-day trend shows lower heart rate and faster pace compared to the 30-day baseline, indicating strong fitness progression."
+               } else {
+                   macroContext += " The 7-day trend is stable compared to the 30-day baseline."
+               }
+            }
+        }
+
         // 5. Run the LLM Prompt
         do {
             let runData = RunDataForAI(
@@ -315,7 +342,8 @@ actor RunAnalyzerActor {
                 gctContext: gctContext,
                 strideContext: strideContext,
                 intervalCadence: "\(intervalTarget)",
-                recoveryCadence: "\(recoveryTarget)"
+                recoveryCadence: "\(recoveryTarget)",
+                macroContext: macroContext
             )
 
             // Execute prompt asynchronously
