@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4ACA6C804CEB45F4A795DA99 /* ExtensionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C9944B594E434C87409C37 /* ExtensionDelegate.swift */; };
 		708E2D189DC249BFBCC16DEC /* WorkoutSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6E202B2A5C41D496386271 /* WorkoutSessionTests.swift */; };
 		FB137633033D4AB7B8ABE91F /* WCSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1E8B48083E497591A36B7E /* WCSessionTests.swift */; };
 		72C6805736CC47BEAE2896F8 /* WorkoutSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */; };
@@ -47,6 +48,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		13C9944B594E434C87409C37 /* ExtensionDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/ExtensionDelegate.swift; sourceTree = SOURCE_ROOT; };
 		CD6E202B2A5C41D496386271 /* WorkoutSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/WorkoutSessionTests.swift; sourceTree = SOURCE_ROOT; };
 		AF1E8B48083E497591A36B7E /* WCSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/WCSessionTests.swift; sourceTree = SOURCE_ROOT; };
 		A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/WorkoutSessionManager.swift; sourceTree = SOURCE_ROOT; };
@@ -134,6 +136,8 @@
 			isa = PBXGroup;
 			children = (
 				32B76E67608A41B989506F12 /* LiveCoachEngine.swift */,
+				13C9944B594E434C87409C37 /* ExtensionDelegate.swift */,
+
 				A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */,
 
 				BEDA7F361C784D2897942DC3 /* WatchConnectivityManager.swift */,

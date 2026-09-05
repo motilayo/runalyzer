@@ -1,13 +1,32 @@
 import Foundation
 import WatchConnectivity
 import SwiftData
+import HealthKit
 
 @available(iOS 17.0, watchOS 10.0, *)
 public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked Sendable {
     public static let shared = WatchConnectivityManager()
 
     // To handle SwiftData operations on main actor without being tied to view
+
+
     @MainActor public var sharedModelContext: ModelContext?
+
+    #if os(watchOS)
+    public var stashedRemoteDrill: DrillRecommendationDTO?
+    #endif
+
+
+    public var isWatchAppInstalled: Bool {
+        #if os(iOS)
+        if WCSession.isSupported() {
+            let session = WCSession.default
+            return session.isPaired && session.isWatchAppInstalled
+        }
+        #endif
+        return false
+    }
+
 
     private override init() {
         super.init()
@@ -27,6 +46,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked S
     }
     #endif
 
+
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         if let runRecordData = message["completedRun"] as? Data {
             let decoder = JSONDecoder()
@@ -38,7 +58,53 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked S
                 }
             }
         }
+
+        #if os(watchOS)
+        if let drillData = message["drillDTO"] as? Data {
+            let decoder = JSONDecoder()
+            if let dto = try? decoder.decode(DrillRecommendationDTO.self, from: drillData) {
+                DispatchQueue.main.async {
+                    // Stash the incoming drill globally to intercept when handle(_ workoutConfiguration) fires.
+                    self.stashedRemoteDrill = dto
+                }
+            }
+        }
+        #endif
     }
+
+
+
+    #if os(iOS)
+    public func startRemoteDrill(from drill: DrillRecommendation) async {
+        guard isWatchAppInstalled else { return }
+
+        let dto = DrillRecommendationDTO(
+            drillTitle: drill.drillTitle,
+            drillPurpose: drill.drillPurpose,
+            drillWork: drill.drillWork,
+            drillCues: drill.drillCues,
+            drillEffort: drill.drillEffort,
+            drillRecovery: drill.drillRecovery,
+            targetCadence: drill.targetCadence
+        )
+
+        if let data = try? JSONEncoder().encode(dto) {
+            WCSession.default.sendMessage(["drillDTO": data], replyHandler: nil) { error in
+                print("Error sending drill DTO: \(error.localizedDescription)")
+            }
+
+            let configuration = HKWorkoutConfiguration()
+            configuration.activityType = .running
+            configuration.locationType = .outdoor
+
+            do {
+                try await HKHealthStore().startWatchApp(with: configuration)
+            } catch {
+                print("Failed to start watch app: \(error.localizedDescription)")
+            }
+        }
+    }
+    #endif
 
     @MainActor
     @discardableResult

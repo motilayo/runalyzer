@@ -1,4 +1,5 @@
 import SwiftUI
+import HealthKit
 import SwiftData
 
 /// A detailed view for a single `RunRecord`, displaying in-depth metrics and the full AI Coaching Insight.
@@ -459,6 +460,7 @@ private struct DrillCardView: View {
                             .clipShape(Capsule())
                     }
                 } else {
+
                     Button(action: {
                         drill.isCompleted = true
                         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -472,6 +474,22 @@ private struct DrillCardView: View {
                             .background(drill.isCompleted ? Color.green : Color.accentColor)
                             .clipShape(Capsule())
                     }
+
+                    if WatchConnectivityManager.shared.isWatchAppInstalled {
+                        Button(action: {
+                            Task {
+                                await WatchConnectivityManager.shared.startRemoteDrill(from: drill)
+                            }
+                        }) {
+                            Image(systemName: "applewatch")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .padding(12)
+                                .background(Color.blue)
+                                .clipShape(Circle())
+                        }
+                    }
+
                 }
             }
         }
