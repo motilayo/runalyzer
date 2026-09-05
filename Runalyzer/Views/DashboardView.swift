@@ -12,6 +12,11 @@ struct DashboardView: View {
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
 
     @State private var isSyncing: Bool = true
+    @State private var showLast30Days: Bool = true
+    @State private var minimumRunDistanceSlider: Double = 1.0
+
+    @AppStorage("lastFatigueAnalysisDate") private var lastFatigueAnalysisDate: Double = 0
+    @AppStorage("lastFatigueInsight") private var lastFatigueInsight: String = ""
 
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
@@ -113,6 +118,20 @@ struct DashboardView: View {
                 Divider()
             }
 
+            if !lastFatigueInsight.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Weekly Fatigue Insight")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .fontWeight(.semibold)
+                    Text(lastFatigueInsight)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             if baselineCadence != nil || baselinePace != nil {
                 HStack {
                     // LEFT SIDE: 30-Day Avg Cadence
@@ -161,43 +180,36 @@ struct DashboardView: View {
                     // Global Fitness Pill (VO2 Max)
                     fitnessBaselineCard
 
-                    if filteredRunRecords.isEmpty {
-                        if isSyncing && runRecords.isEmpty {
-                            AnimatedLoadingView(text: "Analyzing your running history...")
-                                .padding(.top, 100)
-                        } else {
-                            ContentUnavailableView(
-                                "No Runs Found",
-                                systemImage: "figure.run.circle",
-                                description: Text("Go for a run with your Apple Watch and it will appear here.")
-                            )
-                            .padding(.top, 60)
+                    // Top Controls
+                    VStack(spacing: 12) {
+                        Picker("Time Window", selection: $showLast30Days) {
+                            Text("30 Days").tag(true)
+                            Text("All Time").tag(false)
                         }
-                    } else {
-                        // Hero Card for the latest run insight
-                        if let latestRun = filteredRunRecords.first {
-                            NavigationLink(value: latestRun) {
-                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
 
-                        // List of past runs
-                        if filteredRunRecords.count > 1 {
-                            Section(header: Text("Past Runs")
-                                                .font(.title3.bold())
-                                                .padding(.horizontal)
-                                                .frame(maxWidth: .infinity, alignment: .leading)) {
-                                let pastRuns = Array(filteredRunRecords.dropFirst())
-                                ForEach(pastRuns) { run in
-                                    NavigationLink(value: run) {
-                                        RunListRowView(runRecord: run)
-                                    }
-                                    .buttonStyle(.plain)
+                        HStack {
+                            Text("Min Distance:")
+                            Slider(value: $minimumRunDistanceSlider, in: 0...20, step: 1.0)
+                                .sensoryFeedback(.selection, trigger: Int(minimumRunDistanceSlider))
+                                .onChange(of: minimumRunDistanceSlider) { _, newValue in
+                                    minimumRunDistance = newValue
                                 }
-                            }
+                            Text("\(Int(minimumRunDistanceSlider)) \(useMetricSystem ? "km" : "mi")")
+                                .frame(width: 40, alignment: .trailing)
                         }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
                     }
+
+                    FilteredRunListView(
+                        showLast30Days: showLast30Days,
+                        minDistanceInMeters: useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344),
+                        isSyncing: isSyncing,
+                        hasRawRecords: !runRecords.isEmpty
+                    )
                 }
                 .padding(.vertical)
             }
@@ -206,6 +218,9 @@ struct DashboardView: View {
             }
             .navigationDestination(for: RunRecord.self) { runRecord in
                 RunDetailView(runRecord: runRecord)
+            }
+            .onAppear {
+                minimumRunDistanceSlider = minimumRunDistance
             }
             .task {
                 do {
@@ -217,6 +232,36 @@ struct DashboardView: View {
                 if let onSync {
                     await onSync(false)
                     isSyncing = false
+                }
+
+                // Fatigue Insight Caching & Background Calculation
+                if let latestRun = runRecords.first {
+                    let latestRunTimestamp = latestRun.date.timeIntervalSince1970
+                    if latestRunTimestamp > lastFatigueAnalysisDate {
+                        // Fetch & Map to DTO on MainActor
+                        let dtos = runRecords.map { record in
+                            RunMetricsDTO(
+                                id: record.id,
+                                date: record.date,
+                                distance: record.distance,
+                                duration: record.duration,
+                                avgPace: record.avgPace,
+                                avgHeartRate: record.avgHeartRate,
+                                avgCadence: record.avgCadence
+                            )
+                        }
+
+                        // Inherit MainActor context, await non-isolated background math, update UI
+                        Task {
+                            let sevenDayAvg = await MacroQueryEngine.calculateRollingAverages(for: dtos, within: 7)
+                            let thirtyDayAvg = await MacroQueryEngine.calculateRollingAverages(for: dtos, within: 30)
+
+                            if let insight = try? await CoachingEngine.shared.generateWeeklyFatigueInsight(sevenDayAvg: sevenDayAvg, thirtyDayAvg: thirtyDayAvg) {
+                                self.lastFatigueInsight = insight
+                                self.lastFatigueAnalysisDate = latestRunTimestamp
+                            }
+                        }
+                    }
                 }
             }
             .refreshable {
@@ -585,5 +630,77 @@ struct PillTagView: View {
             .background(color.opacity(0.15))
             .foregroundColor(color)
             .clipShape(Capsule())
+    }
+}
+
+struct FilteredRunListView: View {
+    @Query private var filteredRuns: [RunRecord]
+    let isSyncing: Bool
+    let hasRawRecords: Bool
+
+    init(showLast30Days: Bool, minDistanceInMeters: Double, isSyncing: Bool, hasRawRecords: Bool) {
+        self.isSyncing = isSyncing
+        self.hasRawRecords = hasRawRecords
+
+        var descriptor = FetchDescriptor<RunRecord>(
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+
+        let now = Date()
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now
+
+        // SwiftData Predicate doesn't always play well with complex compound closures,
+        // so we build the specific predicate based on the flags.
+        if showLast30Days {
+            descriptor.predicate = #Predicate<RunRecord> { record in
+                record.distance >= (minDistanceInMeters - 0.01) && record.date >= thirtyDaysAgo
+            }
+        } else {
+            descriptor.predicate = #Predicate<RunRecord> { record in
+                record.distance >= (minDistanceInMeters - 0.01)
+            }
+        }
+
+        _filteredRuns = Query(descriptor)
+    }
+
+    var body: some View {
+        if filteredRuns.isEmpty {
+            if isSyncing && !hasRawRecords {
+                AnimatedLoadingView(text: "Analyzing your running history...")
+                    .padding(.top, 100)
+            } else {
+                ContentUnavailableView(
+                    "No Runs Found",
+                    systemImage: "figure.run.circle",
+                    description: Text("Go for a run or adjust your filters.")
+                )
+                .padding(.top, 60)
+            }
+        } else {
+            // Hero Card for the latest run insight
+            if let latestRun = filteredRuns.first {
+                NavigationLink(value: latestRun) {
+                    HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRuns)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // List of past runs
+            if filteredRuns.count > 1 {
+                Section(header: Text("Past Runs")
+                                    .font(.title3.bold())
+                                    .padding(.horizontal)
+                                    .frame(maxWidth: .infinity, alignment: .leading)) {
+                    let pastRuns = Array(filteredRuns.dropFirst())
+                    ForEach(pastRuns) { run in
+                        NavigationLink(value: run) {
+                            RunListRowView(runRecord: run)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
     }
 }

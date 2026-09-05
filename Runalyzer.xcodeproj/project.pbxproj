@@ -34,6 +34,12 @@
 		554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */; };
 		46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76E67608A41B989506F12 /* LiveCoachEngine.swift */; };
 		2793E5BE7C44484CBB4F2F3F /* LiveCoachEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */; };
+
+		839D00B8AFEF47D4871CF9CF /* RunMetricsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = F189CD0210B74D23B6B7ED1A /* RunMetricsDTO.swift */; };
+
+		9CFE38D183FE41BAB5687AD0 /* MacroQueryEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43C4BEED41043B79588D9CE /* MacroQueryEngine.swift */; };
+
+		0C34FCF8B9474A76991FB2C7 /* MacroQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0330A03AA74F4EC9A91F411D /* MacroQueryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,6 +83,12 @@
 		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
 		32B76E67608A41B989506F12 /* LiveCoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/LiveCoach/LiveCoachEngine.swift; sourceTree = SOURCE_ROOT; };
 		2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/LiveCoachEngineTests.swift; sourceTree = SOURCE_ROOT; };
+
+		F189CD0210B74D23B6B7ED1A /* RunMetricsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunMetricsDTO.swift; sourceTree = "<group>"; };
+
+		F43C4BEED41043B79588D9CE /* MacroQueryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroQueryEngine.swift; sourceTree = "<group>"; };
+
+		0330A03AA74F4EC9A91F411D /* MacroQueryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroQueryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +122,7 @@
 		10AA26382422973E1F322C8D /* RunalyzerTests */ = {
 			isa = PBXGroup;
 			children = (
+				0330A03AA74F4EC9A91F411D /* MacroQueryTests.swift */,
 				A1B2C3D4E5F60123456789AB /* CoachingEngineTests.swift */,
 				2EC1EBC9B7F5449BA84B29E9 /* LiveCoachEngineTests.swift */,
 				CD6E202B2A5C41D496386271 /* WorkoutSessionTests.swift */,
@@ -133,6 +146,8 @@
 		54B19B6DFF797ACC20446E48 /* Runalyzer */ = {
 			isa = PBXGroup;
 			children = (
+				F43C4BEED41043B79588D9CE /* MacroQueryEngine.swift */,
+				F189CD0210B74D23B6B7ED1A /* RunMetricsDTO.swift */,
 				32B76E67608A41B989506F12 /* LiveCoachEngine.swift */,
 				A15E0E6BA2D0440FA6A879F4 /* WorkoutSessionManager.swift */,
 
@@ -269,6 +284,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CFE38D183FE41BAB5687AD0 /* MacroQueryEngine.swift in Sources */,
+				839D00B8AFEF47D4871CF9CF /* RunMetricsDTO.swift in Sources */,
 				30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */,
 				31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */,
 				E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */,
@@ -289,6 +306,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0C34FCF8B9474A76991FB2C7 /* MacroQueryTests.swift in Sources */,
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
 			);
