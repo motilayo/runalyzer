@@ -32,9 +32,9 @@ public class LiveCoachEngine {
     }
 
     /// Translates an AI drill prescription string into a CustomWorkout.
-    /// Expects a string like "4x400m intervals".
+    /// Expects a string like "4x400m at 165 SPM".
     public func translate(prescription: String) -> CustomWorkout? {
-        let pattern = #"(\d+)x(\d+)m"#
+        let pattern = #"(\d+)x(\d+)m(?:\s+at\s+(\d+)\s*SPM)?"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
               let match = regex.firstMatch(in: prescription, options: [], range: NSRange(location: 0, length: prescription.utf16.count)),
               let iterRange = Range(match.range(at: 1), in: prescription),
@@ -44,8 +44,16 @@ public class LiveCoachEngine {
             return nil
         }
 
-        let workStep = WorkoutStep(goal: .distance(distance, .meter()))
+        var workStep = WorkoutStep(goal: .distance(distance, .meter()))
         let recoveryStep = WorkoutStep(goal: .open)
+
+        // Parse target SPM and add alert
+        if match.range(at: 3).location != NSNotFound,
+           let spmRange = Range(match.range(at: 3), in: prescription),
+           let spm = Int(prescription[spmRange]) {
+            let cadenceAlert = WorkoutAlert.cadence(target: .range(Double(spm - 5)...Double(spm + 5)))
+            workStep.alerts.append(cadenceAlert)
+        }
 
         let workInterval = IntervalStep(.work, step: workStep)
         let recoveryInterval = IntervalStep(.recovery, step: recoveryStep)

@@ -90,3 +90,33 @@ final class LiveCoachEngineTests: XCTestCase {
         XCTAssertTrue(cues.haptic, "Haptic should be triggered")
     }
 }
+
+@available(iOS 17.0, watchOS 10.0, *)
+extension LiveCoachEngineTests {
+    func testWorkoutKit_TargetAlerts() {
+        let engine = LiveCoachEngine()
+        let prescription = "4x400m at 165 SPM"
+
+        let workout = engine.translate(prescription: prescription)
+
+        XCTAssertNotNil(workout)
+
+        guard let block = workout?.blocks.first,
+              let workInterval = block.steps.first else {
+            XCTFail("Missing workout block or step")
+            return
+        }
+
+        let alerts = workInterval.step.alerts
+        XCTAssertFalse(alerts.isEmpty)
+
+        guard case let .cadence(target) = alerts.first,
+              case let .range(range) = target else {
+            XCTFail("Missing cadence alert with range target")
+            return
+        }
+
+        XCTAssertEqual(range.lowerBound, 160.0)
+        XCTAssertEqual(range.upperBound, 170.0)
+    }
+}
