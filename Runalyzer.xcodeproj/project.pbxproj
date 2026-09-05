@@ -62,9 +62,9 @@
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
 
 		AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
-		FDB100000000000000000000 /* FetchDescriptorBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FetchDescriptorBuilder.swift; sourceTree = "<group>"; };
-		MQ1000000000000000000000 /* MacroQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroQuery.swift; sourceTree = "<group>"; };
-		MQT100000000000000000000 /* MacroQueryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroQueryTests.swift; sourceTree = "<group>"; };
+		FDB100000000000000000000 /* FetchDescriptorBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FetchDescriptorBuilder.swift; path = Runalyzer/Models/FetchDescriptorBuilder.swift; sourceTree = "<group>"; };
+		MQ1000000000000000000000 /* MacroQuery.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MacroQuery.swift; path = Runalyzer/Models/MacroQuery.swift; sourceTree = "<group>"; };
+		MQT100000000000000000000 /* MacroQueryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MacroQueryTests.swift; path = RunalyzerTests/MacroQueryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
