@@ -3,18 +3,36 @@ import HealthKit
 
 // MARK: - Models
 
-struct RunMetrics {
+public struct RunMetrics {
+    public var heartRateBuckets: [Bucket] = []
+    public var cadenceBuckets: [Bucket] = []
+    public var paceBuckets: [Bucket] = []
+
+    public init(heartRateBuckets: [Bucket] = [], cadenceBuckets: [Bucket] = [], paceBuckets: [Bucket] = []) {
+        self.heartRateBuckets = heartRateBuckets
+        self.cadenceBuckets = cadenceBuckets
+        self.paceBuckets = paceBuckets
+    }
+
     var heartRateBuckets: [Bucket] = []
     var cadenceBuckets: [Bucket] = []
     var paceBuckets: [Bucket] = []
 }
 
-struct Bucket: Equatable {
+public struct Bucket: Equatable {
+    public let date: Date
+    public let value: Double
+
+    public init(date: Date, value: Double) {
+        self.date = date
+        self.value = value
+    }
+
     let date: Date
     let value: Double
 }
 
-enum RunType {
+public enum RunType: Equatable {
     case steady
     case intervals
     case unknown
@@ -22,10 +40,13 @@ enum RunType {
 
 // MARK: - Framboise Engine
 
-class FramboiseEngine {
+public class FramboiseEngine {
+
+    public init() {}
+
 
     /// Concurrent Time-Based Bucketing
-    static func fetchMetricsConcurrently(for workout: HKWorkout, healthStore: HKHealthStoreProtocol) async throws -> RunMetrics {
+    public static func fetchMetricsConcurrently(for workout: HKWorkout, healthStore: HKHealthStoreProtocol) async throws -> RunMetrics {
 
         let types: [(HKQuantityTypeIdentifier, HKStatisticsOptions, HKUnit)] = [
             (.heartRate, .discreteAverage, HKUnit.count().unitDivided(by: .minute())),
@@ -117,7 +138,7 @@ class FramboiseEngine {
     }
 
     /// Helper to test time-based bucketing mathematically (since HKStatisticsCollection is unmockable)
-    static func generateTimeBuckets(for workout: HKWorkout) -> [Date] {
+    public static func generateTimeBuckets(for workout: HKWorkout) -> [Date] {
         var dates: [Date] = []
         var current = workout.startDate
         let calendar = Calendar.current
@@ -129,7 +150,7 @@ class FramboiseEngine {
     }
 
     /// Outlier Trimming
-    static func trimOutliers(from data: [Double]) -> [Double] {
+    public static func trimOutliers(from data: [Double]) -> [Double] {
         guard data.count > 2 else { return data }
 
         let sorted = data.sorted()
@@ -160,7 +181,7 @@ class FramboiseEngine {
     }
 
     /// Framboise Heuristics Engine: Pace Variance
-    static func checkPaceVariance(paceBuckets: [Double]) -> String? {
+    public static func checkPaceVariance(paceBuckets: [Double]) -> String? {
         guard !paceBuckets.isEmpty else { return nil }
 
         let mean = paceBuckets.reduce(0, +) / Double(paceBuckets.count)
@@ -179,7 +200,7 @@ class FramboiseEngine {
     }
 
     /// Framboise Heuristics Engine: Cadence Fading
-    static func checkCadenceFading(cadenceBuckets: [Double]) -> String? {
+    public static func checkCadenceFading(cadenceBuckets: [Double]) -> String? {
         guard cadenceBuckets.count >= 5 else { return nil }
 
         let twentyPercentCount = max(1, cadenceBuckets.count / 5)
@@ -200,7 +221,7 @@ class FramboiseEngine {
     }
 
     /// Classification Engine
-    static func classifyRun(paceBuckets: [Double], heartRateBuckets: [Double]) -> RunType {
+    public static func classifyRun(paceBuckets: [Double], heartRateBuckets: [Double]) -> RunType {
         guard !paceBuckets.isEmpty else { return .unknown }
 
         let mean = paceBuckets.reduce(0, +) / Double(paceBuckets.count)

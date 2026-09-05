@@ -2,6 +2,7 @@ import XCTest
 import HealthKit
 
 @testable import Runalyzer
+import Foundation
 
 final class RunalyzerTests: XCTestCase {
 
@@ -156,7 +157,7 @@ final class FramboiseEngineTests: XCTestCase {
     func testTimeBasedBucketing() {
         let start = Date()
         let end = start.addingTimeInterval(45 * 60) // 45 mins
-        let workout = HKWorkout(activityType: .running, start: start, end: end)
+        let workout = HKWorkout(activityType: .running, start: start, end: end, duration: end.timeIntervalSince(start), totalEnergyBurned: nil, totalDistance: nil, device: nil, metadata: nil)
 
         let buckets = FramboiseEngine.generateTimeBuckets(for: workout)
         XCTAssertEqual(buckets.count, 45, "A 45-minute HKWorkout should yield exactly 45 buckets")
@@ -191,7 +192,7 @@ final class FramboiseEngineTests: XCTestCase {
         let mockStore = MockHealthStoreForBucketing()
         let start = Date()
         let end = start.addingTimeInterval(5 * 60)
-        let workout = HKWorkout(activityType: .running, start: start, end: end)
+        let workout = HKWorkout(activityType: .running, start: start, end: end, duration: end.timeIntervalSince(start), totalEnergyBurned: nil, totalDistance: nil, device: nil, metadata: nil)
 
         let metrics = try await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: mockStore)
 
