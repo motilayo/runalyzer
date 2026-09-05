@@ -97,11 +97,12 @@ struct DefaultLanguageModelProvider: LanguageModelProvider {
 @available(iOS 26.0, *)
 @MainActor
 class CoachingEngine {
+    @MainActor
     static let shared = CoachingEngine()
     let modelProvider: any LanguageModelProvider
 
-    init(modelProvider: any LanguageModelProvider = DefaultLanguageModelProvider()) {
-        self.modelProvider = modelProvider
+    init(modelProvider: (any LanguageModelProvider)? = nil) {
+        self.modelProvider = modelProvider ?? DefaultLanguageModelProvider()
     }
 
     func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
