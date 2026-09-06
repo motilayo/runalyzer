@@ -38,7 +38,7 @@ final class LiveCoachEngineTests: XCTestCase {
         XCTAssertEqual(firstStep.purpose, .work)
         if case let .distance(dist, unit) = firstStep.step.goal {
             XCTAssertEqual(dist, 400.0)
-            XCTAssertEqual(unit, .meter())
+            XCTAssertEqual(unit, .meters)
         } else {
             XCTFail("First step does not have a distance goal")
         }
@@ -58,13 +58,13 @@ final class LiveCoachEngineTests: XCTestCase {
         let block = workout.blocks[0]
         let firstStep = block.steps[0]
 
-        let alerts = firstStep.step.alerts
-        XCTAssertEqual(alerts.count, 1)
+        let alert = firstStep.step.alert
+        XCTAssertNotNil(alert)
 
-        if case let .cadence(target) = alerts[0], case let .range(range) = target {
+        if let alert = alert, case let .cadence(target) = alert, case let .range(range) = target {
             // Check boundaries (165 - 5 ... 165 + 5)
-            XCTAssertEqual(range.lowerBound, 160.0)
-            XCTAssertEqual(range.upperBound, 170.0)
+            XCTAssertEqual(range.lowerBound, 160)
+            XCTAssertEqual(range.upperBound, 170)
         } else {
             XCTFail("Missing or invalid cadence alert")
         }
