@@ -11,11 +11,50 @@ struct DashboardView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
 
+    // Epic 3: Progression Hub State
+    @State private var selectedTimeFilter: TimeFilter = .thirtyDays
+    @State private var sevenDayBaseline: BaselineStats?
+    @State private var thirtyDayBaseline: BaselineStats?
+    @State private var allTimeBaseline: BaselineStats?
+    @State private var activeFatigueInsight: FatigueInsight?
+
+    @AppStorage("lastFatigueInsightDate") private var lastFatigueInsightDate: Double = 0
+    @AppStorage("cachedFatigueInsightData") private var cachedFatigueInsightData: Data = Data()
+
     @State private var isSyncing: Bool = true
+
+    @Environment(\.modelContext) private var modelContext
 
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
         return runRecords.filter { $0.distance >= (minDistanceInMeters - 0.01) }
+    }
+
+    private var activeDescriptor: FetchDescriptor<RunRecord> {
+        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+        // Subtracted 0.01 to avoid precision issues like 1000.0 >= 999.999
+        let minDistanceFloat = minDistanceInMeters - 0.01
+
+        let targetDate: Date?
+        switch selectedTimeFilter {
+        case .sevenDays:
+            targetDate = Calendar.current.date(byAdding: .day, value: -7, to: Date())
+        case .thirtyDays:
+            targetDate = Calendar.current.date(byAdding: .day, value: -30, to: Date())
+        case .allTime:
+            targetDate = nil
+        }
+
+        var descriptor = FetchDescriptor<RunRecord>(
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+
+        if let targetDate = targetDate {
+            descriptor.predicate = #Predicate { $0.distance >= minDistanceFloat && $0.date >= targetDate }
+        } else {
+            descriptor.predicate = #Predicate { $0.distance >= minDistanceFloat }
+        }
+        return descriptor
     }
 
     // 1. Get the most recent valid VO2 Max score
@@ -44,26 +83,13 @@ struct DashboardView: View {
         return currentVO2 - baselineAvg
     }
 
-    // 1. The 30-Day Average Cadence (SPM)
-    var baselineCadence: Int? {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
-
-        // Filter for runs in the last 30 days that have a valid cadence
-        let recentRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo && $0.avgCadence > 0 }
-        guard !recentRuns.isEmpty else { return nil }
-
-        // Calculate the average
-        let totalCadence = recentRuns.map(\.avgCadence).reduce(0, +)
-        return totalCadence / recentRuns.count
-    }
-
-    // 2. The 30-Day Average Pace (Optional, but great for a baseline card)
-    var baselinePace: Double? {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return nil }
-        let recentRuns = filteredRunRecords.filter { $0.date >= thirtyDaysAgo }
-        guard !recentRuns.isEmpty else { return nil }
-
-        return recentRuns.map(\.avgPace).reduce(0, +) / Double(recentRuns.count)
+    // Dynamic Active Baseline Based on Segmented Picker
+    private var activeBaseline: BaselineStats? {
+        switch selectedTimeFilter {
+        case .sevenDays: return sevenDayBaseline
+        case .thirtyDays: return thirtyDayBaseline
+        case .allTime: return allTimeBaseline
+        }
     }
 
     var onSync: ((Bool) async -> Void)? = nil
@@ -113,36 +139,31 @@ struct DashboardView: View {
                 Divider()
             }
 
-            if baselineCadence != nil || baselinePace != nil {
+            if let activeStats = activeBaseline {
                 HStack {
-                    // LEFT SIDE: 30-Day Avg Cadence
-                    if let avgCadence = baselineCadence {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("30-DAY AVG CADENCE")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fontWeight(.semibold)
-                            Text("\(avgCadence) SPM")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
+                    // LEFT SIDE: Avg Cadence
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(selectedTimeFilter.title) AVG CADENCE")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fontWeight(.semibold)
+                        Text("\(activeStats.avgCadence) SPM")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                     }
 
                     Spacer()
 
-                    // RIGHT SIDE: 30-Day Avg Pace
-                    if let avgPace = baselinePace {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("30-DAY AVG PACE")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fontWeight(.semibold)
+                    // RIGHT SIDE: Avg Pace
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(selectedTimeFilter.title) AVG PACE")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fontWeight(.semibold)
 
-                            // Format the Double (minutes) into a M:SS string
-                            Text(avgPace.formattedPaceString)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
+                        Text(activeStats.avgPace.formattedPaceString)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
                     }
                 }
             }
@@ -154,12 +175,83 @@ struct DashboardView: View {
         .padding(.top, 8)
     }
 
+    @ViewBuilder
+    private var progressionFiltersView: some View {
+        VStack(spacing: 12) {
+            Picker("Time Filter", selection: $selectedTimeFilter) {
+                Text("7 Days").tag(TimeFilter.sevenDays)
+                Text("30 Days").tag(TimeFilter.thirtyDays)
+                Text("All Time").tag(TimeFilter.allTime)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+
+            HStack {
+                Text("Min Distance:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Slider(value: $minimumRunDistance, in: 0...(useMetricSystem ? 35 : 22), step: 1)
+                    .sensoryFeedback(.selection, trigger: Int(minimumRunDistance))
+
+                Text(String(format: "%.0f %@", minimumRunDistance, useMetricSystem ? "km" : "mi"))
+                    .font(.subheadline)
+                    .frame(width: 50, alignment: .trailing)
+            }
+            .padding(.horizontal)
+        }
+        .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private var fatigueInsightCard: some View {
+        if selectedTimeFilter == .sevenDays, let insight = activeFatigueInsight {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "bolt.heart.fill")
+                        .foregroundColor(.purple)
+                    Text("Fatigue Insight")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                }
+
+                Text(insight.headline)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text(insight.observation)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Divider()
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.yellow)
+                    Text(insight.recommendation)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(16)
+            .padding(.horizontal)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 20) {
-                    // Global Fitness Pill (VO2 Max)
+                    progressionFiltersView
+
+                    // Global Fitness Pill (VO2 Max) & Macro Baseline
                     fitnessBaselineCard
+
+                    fatigueInsightCard
 
                     if filteredRunRecords.isEmpty {
                         if isSyncing && runRecords.isEmpty {
@@ -174,7 +266,7 @@ struct DashboardView: View {
                             .padding(.top, 60)
                         }
                     } else {
-                        // Hero Card for the latest run insight
+                        // Hero Card for the latest run insight (independent of filters if we wanted, but we keep it here for flow)
                         if let latestRun = filteredRunRecords.first {
                             NavigationLink(value: latestRun) {
                                 HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
@@ -182,20 +274,12 @@ struct DashboardView: View {
                             .buttonStyle(.plain)
                         }
 
-                        // List of past runs
-                        if filteredRunRecords.count > 1 {
-                            Section(header: Text("Past Runs")
-                                                .font(.title3.bold())
-                                                .padding(.horizontal)
-                                                .frame(maxWidth: .infinity, alignment: .leading)) {
-                                let pastRuns = Array(filteredRunRecords.dropFirst())
-                                ForEach(pastRuns) { run in
-                                    NavigationLink(value: run) {
-                                        RunListRowView(runRecord: run)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
+                        // List of filtered runs
+                        Section(header: Text("Filtered Runs")
+                                            .font(.title3.bold())
+                                            .padding(.horizontal)
+                                            .frame(maxWidth: .infinity, alignment: .leading)) {
+                            RunListFilteredView(descriptor: activeDescriptor)
                         }
                     }
                 }
@@ -217,6 +301,13 @@ struct DashboardView: View {
                 if let onSync {
                     await onSync(false)
                     isSyncing = false
+                }
+
+                await updateMacroAverages()
+            }
+            .onChange(of: minimumRunDistance) { _, _ in
+                Task {
+                    await updateMacroAverages()
                 }
             }
             .refreshable {
@@ -250,6 +341,53 @@ struct DashboardView: View {
             }
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(.regularMaterial, for: .navigationBar)
+        }
+    }
+
+    private func updateMacroAverages() async {
+        if #available(iOS 26.0, *) {
+            let container = modelContext.container
+            let engine = MacroQueryEngine(modelContainer: container)
+
+            let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+
+            // 1. Calculate Baselines in Background using the global filter distance
+            sevenDayBaseline = try? await engine.calculateRollingAverages(days: 7, minimumDistance: minDistanceInMeters)
+            thirtyDayBaseline = try? await engine.calculateRollingAverages(days: 30, minimumDistance: minDistanceInMeters)
+            allTimeBaseline = try? await engine.calculateRollingAverages(days: 3650, minimumDistance: minDistanceInMeters) // roughly 10 years for "all time"
+
+            // 2. Load Fatigue Insight Caching
+            if let cachedData = try? JSONDecoder().decode(FatigueInsight.self, from: cachedFatigueInsightData) {
+                activeFatigueInsight = cachedData
+            }
+
+            let lastRunDate = runRecords.first?.date.timeIntervalSince1970 ?? 0
+
+            // Only regenerate if the last run is newer than our cache timestamp
+            if lastRunDate > lastFatigueInsightDate {
+                if let newInsight = try? await engine.generateWeeklyFatigueInsight(minimumDistance: minDistanceInMeters) {
+                    activeFatigueInsight = newInsight
+                    lastFatigueInsightDate = Date().timeIntervalSince1970
+
+                    if let encoded = try? JSONEncoder().encode(newInsight) {
+                        cachedFatigueInsightData = encoded
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum TimeFilter: Int {
+    case sevenDays
+    case thirtyDays
+    case allTime
+
+    var title: String {
+        switch self {
+        case .sevenDays: return "7-DAY"
+        case .thirtyDays: return "30-DAY"
+        case .allTime: return "ALL TIME"
         }
     }
 }
