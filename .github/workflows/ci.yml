@@ -18,13 +18,41 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: Build and Test Runalyzer
+      - name: Start Simulator
+        run: |
+          DEVICE_NAME="iPhone 15"
+          RUNTIME=$(xcrun simctl list runtimes | grep -i "ios" | grep -v "unavailable" | grep "com.apple.CoreSimulator.SimRuntime.iOS" | awk '{print $NF}' | tail -n 1)
+          if [ -z "$RUNTIME" ]; then
+            echo "No iOS runtime found. Falling back to generic destination."
+            echo "USE_GENERIC=true" >> $GITHUB_ENV
+          else
+            DEVICE_ID=$(xcrun simctl create "$DEVICE_NAME" "com.apple.CoreSimulator.SimDeviceType.iPhone-15" "$RUNTIME")
+            xcrun simctl boot "$DEVICE_ID" || true
+            echo "DEVICE_ID=$DEVICE_ID" >> $GITHUB_ENV
+            echo "USE_GENERIC=false" >> $GITHUB_ENV
+          fi
+
+      - name: Build and Test Runalyzer (Simulator)
+        if: env.USE_GENERIC == 'false'
         run: |
           xcodebuild \
             -project Runalyzer.xcodeproj \
             -scheme Runalyzer \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            -destination "platform=iOS Simulator,id=${{ env.DEVICE_ID }}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build test
+
+      - name: Build and Test Runalyzer (Generic)
+        if: env.USE_GENERIC == 'true'
+        run: |
+          xcodebuild \
+            -project Runalyzer.xcodeproj \
+            -scheme Runalyzer \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \

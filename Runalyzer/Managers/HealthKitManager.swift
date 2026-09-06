@@ -172,24 +172,35 @@ class HealthKitManager: ObservableObject {
         let duration = workout.duration
         let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
 
-        // Pace (minutes per km)
-        let avgPace = Self.calculatePace(duration: duration, distance: distance)
+        // 1. Concurrent Time-Based Bucketing
+        let runMetrics = try await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: healthStore)
 
-        // Query average heart rate
-        let avgHeartRate = try await fetchAverageQuantity(
-            for: workout,
-            quantityTypeIdentifier: .heartRate,
-            unit: HKUnit.count().unitDivided(by: .minute())
-        )
+        // Extract raw values from buckets
+        let rawHR = runMetrics.heartRateBuckets.map { $0.value }
+        let rawCadence = runMetrics.cadenceBuckets.map { $0.value }
+        let rawPace = runMetrics.paceBuckets.map { $0.value }
 
-        // Calculate average cadence from step count
-        let totalSteps = try await fetchSumQuantity(
-            for: workout,
-            quantityTypeIdentifier: .stepCount,
-            unit: HKUnit.count()
-        )
+        // 2. Outlier Trimming
+        let trimmedHR = FramboiseEngine.trimOutliers(from: rawHR)
+        let trimmedCadence = FramboiseEngine.trimOutliers(from: rawCadence)
+        let trimmedPace = FramboiseEngine.trimOutliers(from: rawPace)
 
-        let avgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
+        // 3. Compute Working Averages
+        let avgHeartRate = trimmedHR.isEmpty ? 0 : Int(trimmedHR.reduce(0, +) / Double(trimmedHR.count))
+        let avgCadence = trimmedCadence.isEmpty ? 0 : Int(trimmedCadence.reduce(0, +) / Double(trimmedCadence.count))
+        let avgPace = trimmedPace.isEmpty ? 0.0 : (trimmedPace.reduce(0, +) / Double(trimmedPace.count))
+
+        // 4. Heuristics Engine
+        var tags: [String] = []
+        if let paceTag = FramboiseEngine.checkPaceVariance(paceBuckets: trimmedPace) {
+            tags.append(paceTag)
+        }
+        if let cadenceTag = FramboiseEngine.checkCadenceFading(cadenceBuckets: trimmedCadence) {
+            tags.append(cadenceTag)
+        }
+
+        // 5. Classification Engine
+        let runType = FramboiseEngine.classifyRun(paceBuckets: trimmedPace, heartRateBuckets: trimmedHR)
 
         // Query average vertical oscillation (in cm)
         let verticalOscillation = try await fetchAverageQuantity(
@@ -219,7 +230,7 @@ class HealthKitManager: ObservableObject {
             unit: HKUnit.meter()
         )
 
-        return RunRecord(
+        let record = RunRecord(
             id: workout.uuid,
             date: workout.startDate,
             distance: distance,
@@ -232,6 +243,10 @@ class HealthKitManager: ObservableObject {
             groundContactTime: groundContactTime,
             strideLength: strideLength
         )
+        // RunRecord is a SwiftData @Model which is a reference type (class) so `let` is perfectly valid.
+        record.runType = runType
+        record.framboiseTags = tags
+        return record
     }
 
     // MARK: - Calculation Helpers
