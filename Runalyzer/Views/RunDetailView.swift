@@ -408,7 +408,7 @@ private struct DrillCardView: View {
     let dismiss: DismissAction
 
     @State private var showWorkoutPreview = false
-    @State private var generatedWorkout: CustomWorkout = CustomWorkout(activity: .running, location: .unknown, displayName: "AI Drill", warmup: nil, blocks: [], cooldown: nil)
+    @State private var generatedWorkout: WorkoutPlan = WorkoutPlan(.custom(CustomWorkout(activity: .running, location: .unknown, displayName: "AI Drill", warmup: nil, blocks: [], cooldown: nil)))
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -511,7 +511,7 @@ private struct DrillCardView: View {
 
                         if let targetSPM = drill.targetSPM,
                            let workout = LiveCoachEngine().translate(prescription: drill.drillWork ?? "", targetSPM: targetSPM) {
-                            self.generatedWorkout = workout
+                            self.generatedWorkout = WorkoutPlan(.custom(workout))
                             self.showWorkoutPreview = true
                         }
                     }) {

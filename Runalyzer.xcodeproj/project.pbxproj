@@ -282,6 +282,7 @@
 				554433221100FFEEDDCCBBAA /* Runalyzer/Views/AnimatedLoadingView.swift in Sources */,
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */,
 				F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */,
+				46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -291,6 +292,7 @@
 			files = (
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
+				2793E5BE7C44484CBB4F2F3F /* LiveCoachEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
