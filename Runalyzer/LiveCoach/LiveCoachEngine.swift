@@ -47,7 +47,7 @@ public class LiveCoachEngine {
         var workStep = WorkoutStep(goal: .distance(distance, .meters))
         let lowerBound = Double(max(0, targetSPM - 5))
         let upperBound = Double(targetSPM + 5)
-        workStep.alert = WorkoutAlert.cadence(lowerBound...upperBound)
+        workStep.alert = .cadence(lowerBound...upperBound)
         let recoveryStep = WorkoutStep(goal: .open)
 
         let workInterval = IntervalStep(.work, step: workStep)
