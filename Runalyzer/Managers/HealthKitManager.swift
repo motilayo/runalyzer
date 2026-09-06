@@ -10,23 +10,28 @@ public protocol HKHealthStoreProtocol {
 
 extension HKHealthStore: HKHealthStoreProtocol {}
 
+
+/// A singleton manager responsible for all interactions with Apple HealthKit.
+///
+/// `HealthKitManager` requests permissions, configures background delivery, and fetches recent running workouts.
+/// It also queries discrete and cumulative statistics (like VO2 Max, Cadence, and Vertical Oscillation) and maps them
+/// into the app's native `RunRecord` model for processing and AI analysis.
 @MainActor
 class HealthKitManager: ObservableObject {
+    static let shared = HealthKitManager()
+    let healthStore: HKHealthStoreProtocol
+    var isHealthDataAvailable: () -> Bool
+
+    // Published so views can react to permission changes if needed
     @Published var isAuthorized: Bool = false
-    @Published var isSyncing: Bool = false
-    @Published var lastSyncError: String?
 
     var onWorkoutsUpdated: (() async -> Void)?
 
-    let healthStore: HKHealthStoreProtocol
     private var observerQuery: HKObserverQuery?
-
-    // Dependency injection wrapper for the static HealthKit availability check
-    let isHealthDataAvailable: () -> Bool
 
     init(
         healthStore: HKHealthStoreProtocol = HKHealthStore(),
-        isHealthDataAvailable: @escaping () -> Bool = HKHealthStore.isHealthDataAvailable
+        isHealthDataAvailable: @escaping () -> Bool = { HKHealthStore.isHealthDataAvailable() }
     ) {
         self.healthStore = healthStore
         self.isHealthDataAvailable = isHealthDataAvailable
@@ -47,7 +52,7 @@ class HealthKitManager: ObservableObject {
         }
     }
 
-    /// Request access to read running workouts and required quantity types
+    /// Request read access for required running data
     func requestAuthorization() async throws {
         guard isHealthDataAvailable() else {
             throw HKError(.errorHealthDataUnavailable)
@@ -56,12 +61,12 @@ class HealthKitManager: ObservableObject {
         let typesToRead: Set<HKObjectType> = [
             HKObjectType.workoutType(),
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
-            HKObjectType.quantityType(forIdentifier: .stepCount)!, // For cadence
+            HKObjectType.quantityType(forIdentifier: .runningSpeed)!,
+            HKObjectType.quantityType(forIdentifier: .stepCount)!, // Used for cadence calculation
             HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!,
             HKObjectType.quantityType(forIdentifier: .vo2Max)!,
             HKObjectType.quantityType(forIdentifier: .runningGroundContactTime)!,
-            HKObjectType.quantityType(forIdentifier: .runningStrideLength)!,
-            HKObjectType.quantityType(forIdentifier: .runningSpeed)!
+            HKObjectType.quantityType(forIdentifier: .runningStrideLength)!
         ]
 
         // We do not need to share/write any data for Runalyzer currently
