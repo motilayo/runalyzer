@@ -452,12 +452,12 @@ private struct DrillCardView: View {
                 DrillRow(icon: "bolt", text: drill.drillEffort ?? "")
             }
 
-            if let target = drill.targetCadence, let prev = drill.previousCadence, !target.isEmpty {
+            if let target = drill.targetSPM, let prev = drill.previousCadence, target > 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Cadence Goal")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("Current: \(prev) SPM → Target: \(target)")
+                    Text("Current: \(prev) SPM → Target: \(target) SPM")
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
                 }
