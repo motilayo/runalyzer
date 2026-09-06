@@ -16,7 +16,9 @@ struct DashboardView: View {
     @State private var sevenDayBaseline: BaselineStats?
     @State private var thirtyDayBaseline: BaselineStats?
     @State private var allTimeBaseline: BaselineStats?
-    @State private var activeFatigueInsight: FatigueInsight?
+    @State private var activeFatigueInsightHeadline: String?
+    @State private var activeFatigueInsightObservation: String?
+    @State private var activeFatigueInsightRecommendation: String?
 
     @AppStorage("lastFatigueInsightDate") private var lastFatigueInsightDate: Double = 0
     @AppStorage("cachedFatigueInsightData") private var cachedFatigueInsightData: Data = Data()
@@ -205,7 +207,10 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var fatigueInsightCard: some View {
-        if selectedTimeFilter == .sevenDays, let insight = activeFatigueInsight {
+        if selectedTimeFilter == .sevenDays,
+           let headline = activeFatigueInsightHeadline,
+           let observation = activeFatigueInsightObservation,
+           let recommendation = activeFatigueInsightRecommendation {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "bolt.heart.fill")
@@ -216,11 +221,11 @@ struct DashboardView: View {
                         .foregroundColor(.secondary)
                 }
 
-                Text(insight.headline)
+                Text(headline)
                     .font(.headline)
                     .foregroundColor(.primary)
 
-                Text(insight.observation)
+                Text(observation)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
@@ -229,7 +234,7 @@ struct DashboardView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "lightbulb.fill")
                         .foregroundColor(.yellow)
-                    Text(insight.recommendation)
+                    Text(recommendation)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
@@ -356,9 +361,17 @@ struct DashboardView: View {
             thirtyDayBaseline = try? await engine.calculateRollingAverages(days: 30, minimumDistance: minDistanceInMeters)
             allTimeBaseline = try? await engine.calculateRollingAverages(days: 3650, minimumDistance: minDistanceInMeters) // roughly 10 years for "all time"
 
+            struct SimpleFatigueData: Codable {
+                var headline: String
+                var observation: String
+                var recommendation: String
+            }
+
             // 2. Load Fatigue Insight Caching
-            if let cachedData = try? JSONDecoder().decode(FatigueInsight.self, from: cachedFatigueInsightData) {
-                activeFatigueInsight = cachedData
+            if let cachedData = try? JSONDecoder().decode(SimpleFatigueData.self, from: cachedFatigueInsightData) {
+                activeFatigueInsightHeadline = cachedData.headline
+                activeFatigueInsightObservation = cachedData.observation
+                activeFatigueInsightRecommendation = cachedData.recommendation
             }
 
             let lastRunDate = runRecords.first?.date.timeIntervalSince1970 ?? 0
@@ -366,10 +379,13 @@ struct DashboardView: View {
             // Only regenerate if the last run is newer than our cache timestamp
             if lastRunDate > lastFatigueInsightDate {
                 if let newInsight = try? await engine.generateWeeklyFatigueInsight(minimumDistance: minDistanceInMeters) {
-                    activeFatigueInsight = newInsight
+                    activeFatigueInsightHeadline = newInsight.headline
+                    activeFatigueInsightObservation = newInsight.observation
+                    activeFatigueInsightRecommendation = newInsight.recommendation
                     lastFatigueInsightDate = Date().timeIntervalSince1970
 
-                    if let encoded = try? JSONEncoder().encode(newInsight) {
+                    let simpleData = SimpleFatigueData(headline: newInsight.headline, observation: newInsight.observation, recommendation: newInsight.recommendation)
+                    if let encoded = try? JSONEncoder().encode(simpleData) {
                         cachedFatigueInsightData = encoded
                     }
                 }
