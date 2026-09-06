@@ -7,7 +7,7 @@ import FoundationModels
 actor MacroQueryEngine {
 
     // Calculates the rolling averages over the specified number of days back from a target date.
-    func calculateRollingAverages(days: Int, minimumDistance: Double = 0, to targetDate: Date = Date()) throws -> BaselineStats? {
+    func calculateRollingAverages(days: Int, minimumDistance: Double = 0, to targetDate: Date = Date()) async throws -> BaselineStats? {
         guard let startDate = Calendar.current.date(byAdding: .day, value: -days, to: targetDate) else {
             return nil
         }
@@ -69,7 +69,7 @@ actor MacroQueryEngine {
     func generateWeeklyFatigueInsight(minimumDistance: Double = 0, for targetDate: Date = Date(), modelProvider: (any LanguageModelProvider)? = nil) async throws -> FatigueInsight? {
         let provider = modelProvider ?? DefaultLanguageModelProvider()
 
-        guard provider.isAvailable else {
+        guard await provider.isAvailable else {
             return nil
         }
 
