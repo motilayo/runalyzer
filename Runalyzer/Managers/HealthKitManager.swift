@@ -1,6 +1,155 @@
-[Output truncated for brevity]
+import Foundation
+import HealthKit
 
- let quantityType = HKObjectType.quantityType(forIdentifier: .vo2Max) else {
+public protocol HKHealthStoreProtocol {
+    func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
+    func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus
+    func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws
+    func execute(_ query: HKQuery)
+}
+
+extension HKHealthStore: HKHealthStoreProtocol {}
+
+@MainActor
+class HealthKitManager: ObservableObject {
+    @Published var isAuthorized: Bool = false
+    @Published var isSyncing: Bool = false
+    @Published var lastSyncError: String?
+
+    var onWorkoutsUpdated: (() async -> Void)?
+
+    let healthStore: HKHealthStoreProtocol
+    private var observerQuery: HKObserverQuery?
+
+    // Dependency injection wrapper for the static HealthKit availability check
+    let isHealthDataAvailable: () -> Bool
+
+    init(
+        healthStore: HKHealthStoreProtocol = HKHealthStore(),
+        isHealthDataAvailable: @escaping () -> Bool = HKHealthStore.isHealthDataAvailable
+    ) {
+        self.healthStore = healthStore
+        self.isHealthDataAvailable = isHealthDataAvailable
+        checkAuthorizationStatus()
+    }
+
+    /// Checks if we already have authorization
+    func checkAuthorizationStatus() {
+        guard isHealthDataAvailable() else { return }
+
+        let workoutType = HKObjectType.workoutType()
+        let status = healthStore.authorizationStatus(for: workoutType)
+
+        // HealthKit doesn't explicitly tell us if read access is granted,
+        // but if we are sharingAuthorized, we assume we have full access.
+        if status == .sharingAuthorized {
+            self.isAuthorized = true
+        }
+    }
+
+    /// Request access to read running workouts and required quantity types
+    func requestAuthorization() async throws {
+        guard isHealthDataAvailable() else {
+            throw HKError(.errorHealthDataUnavailable)
+        }
+
+        let typesToRead: Set<HKObjectType> = [
+            HKObjectType.workoutType(),
+            HKObjectType.quantityType(forIdentifier: .heartRate)!,
+            HKObjectType.quantityType(forIdentifier: .stepCount)!, // For cadence
+            HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!,
+            HKObjectType.quantityType(forIdentifier: .vo2Max)!,
+            HKObjectType.quantityType(forIdentifier: .runningGroundContactTime)!,
+            HKObjectType.quantityType(forIdentifier: .runningStrideLength)!,
+            HKObjectType.quantityType(forIdentifier: .runningSpeed)!
+        ]
+
+        // We do not need to share/write any data for Runalyzer currently
+        let typesToShare: Set<HKSampleType> = []
+
+        try await healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead)
+
+        // If we get here without throwing, auth request was completed (though user may have denied some)
+        // We assume authorization is sufficient to at least try fetching.
+        DispatchQueue.main.async {
+            self.isAuthorized = true
+        }
+
+        try await enableBackgroundDelivery()
+        startObservingWorkouts()
+    }
+
+    /// Enable background delivery for workouts
+    func enableBackgroundDelivery() async throws {
+        try await healthStore.enableBackgroundDelivery(for: .workoutType(), frequency: .immediate)
+    }
+
+    /// Start observing workouts
+    func startObservingWorkouts() {
+        guard observerQuery == nil else { return }
+        let query = HKObserverQuery(sampleType: .workoutType(), predicate: nil) { [weak self] _, completionHandler, error in
+            if error == nil {
+                Task {
+                    await self?.onWorkoutsUpdated?()
+                    completionHandler()
+                }
+            } else {
+                completionHandler()
+            }
+        }
+        observerQuery = query
+        healthStore.execute(query)
+    }
+
+    /// Fetch running workouts from the last 30 days
+    func fetchRecentRunningWorkouts() async throws -> [HKWorkout] {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else {
+            return []
+        }
+
+        let typePredicate = HKQuery.predicateForWorkouts(with: .running)
+        let datePredicate = HKQuery.predicateForSamples(withStart: thirtyDaysAgo, end: nil, options: .strictStartDate)
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [typePredicate, datePredicate])
+
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: .workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let workouts = samples as? [HKWorkout] else {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
+                let minimumRunDistance = UserDefaults.standard.double(forKey: "minimumRunDistance")
+                let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+
+                let filteredWorkouts = workouts.filter { workout in
+                    let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
+                    // if minimumRunDistance is default 0 from UserDefaults (not saved), we will fallback to 1000
+                    let limit = minimumRunDistance == 0 ? 1000.0 : minDistanceInMeters
+                    return distance >= (limit - 0.01) // Small buffer
+                }
+
+                continuation.resume(returning: filteredWorkouts)
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    /// Fetches the single most recent global VO2 Max reading from HealthKit
+    func fetchLatestGlobalVO2Max() async throws -> Double? {
+        guard let quantityType = HKObjectType.quantityType(forIdentifier: .vo2Max) else {
             return nil
         }
 
