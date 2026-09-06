@@ -271,14 +271,6 @@ struct DashboardView: View {
                             .padding(.top, 60)
                         }
                     } else {
-                        // Hero Card for the latest run insight (independent of filters if we wanted, but we keep it here for flow)
-                        if let latestRun = filteredRunRecords.first {
-                            NavigationLink(value: latestRun) {
-                                HeroCardView(runRecord: latestRun, isSyncing: isSyncing, allRuns: filteredRunRecords)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
                         // List of filtered runs
                         Section(header: Text("Filtered Runs")
                                             .font(.title3.bold())
