@@ -11,6 +11,8 @@ struct RunDetailView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
 
+    @AppStorage("useWorkingAverages") private var useWorkingAverages: Bool = true
+
 
     // Baseline calculations
     private var baselineRuns: [RunRecord] {
@@ -66,6 +68,12 @@ struct RunDetailView: View {
         ScrollView {
             VStack(spacing: 24) {
 
+                VStack {
+                    Toggle("Working Averages", isOn: $useWorkingAverages)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                }
+
                 // Top: Responsive 6-Card Grid of Raw Stats
                 let columns = verticalSizeClass == .regular
                     ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
@@ -81,9 +89,14 @@ struct RunDetailView: View {
                     let seconds = Int(runRecord.duration) % 60
                     StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
 
-                    StatBox(title: "Avg Pace", value: runRecord.formattedPace, unit: "", currentValue: runRecord.avgPace, baselineValue: baselinePace, polarity: .lowerIsBetter)
-                    StatBox(title: "Avg HR", value: "\(runRecord.avgHeartRate)", unit: "BPM", currentValue: Double(runRecord.avgHeartRate), baselineValue: baselineHR, polarity: .lowerIsBetter)
-                    StatBox(title: "Avg Cadence", value: "\(runRecord.avgCadence)", unit: "SPM", currentValue: Double(runRecord.avgCadence), baselineValue: baselineCadence, polarity: .higherIsBetter)
+                    let displayPace = (useWorkingAverages ? runRecord.workingAvgPace : nil) ?? runRecord.avgPace
+                    let displayPaceStr = (useWorkingAverages ? runRecord.workingFormattedPace : nil) ?? runRecord.formattedPace
+                    let displayHR = (useWorkingAverages ? runRecord.workingAvgHeartRate : nil) ?? runRecord.avgHeartRate
+                    let displayCadence = (useWorkingAverages ? runRecord.workingAvgCadence : nil) ?? runRecord.avgCadence
+
+                    StatBox(title: "Avg Pace", value: displayPaceStr, unit: "", currentValue: displayPace, baselineValue: baselinePace, polarity: .lowerIsBetter)
+                    StatBox(title: "Avg HR", value: "\(displayHR)", unit: "BPM", currentValue: Double(displayHR), baselineValue: baselineHR, polarity: .lowerIsBetter)
+                    StatBox(title: "Avg Cadence", value: "\(displayCadence)", unit: "SPM", currentValue: Double(displayCadence), baselineValue: baselineCadence, polarity: .higherIsBetter)
                     StatBox(title: "Vert. Osc.", value: String(format: "%.1f", runRecord.verticalOscillation), unit: "cm", currentValue: runRecord.verticalOscillation, baselineValue: baselineVertOsc, polarity: .lowerIsBetter)
                 }
                 .padding(.horizontal)
@@ -385,12 +398,17 @@ struct DrillDeckView: View {
     }
 }
 
+import WorkoutKit
+
 private struct DrillCardView: View {
     @Bindable var drill: DrillRecommendation
     let drillIndex: Int
     let totalDrills: Int
     @Binding var activeCardIndex: Int
     let dismiss: DismissAction
+
+    @State private var showWorkoutPreview = false
+    @State private var generatedWorkout: CustomWorkout = CustomWorkout(activity: .running, location: .unknown, displayName: "AI Drill", warmup: nil, blocks: [], cooldown: nil)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -490,8 +508,14 @@ private struct DrillCardView: View {
                         drill.isCompleted = true
                         let generator = UIImpactFeedbackGenerator(style: .medium)
                         generator.impactOccurred()
+
+                        if let targetSPM = drill.targetSPM,
+                           let workout = LiveCoachEngine().translate(prescription: drill.drillWork ?? "", targetSPM: targetSPM) {
+                            self.generatedWorkout = workout
+                            self.showWorkoutPreview = true
+                        }
                     }) {
-                        Text(drill.isCompleted ? "Completed" : "Mark Completed")
+                        Text(drill.isCompleted ? "Completed" : "Start Drill")
                             .font(.subheadline.bold())
                             .foregroundColor(Color.white)
                             .padding(.horizontal, 24)
@@ -506,5 +530,6 @@ private struct DrillCardView: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(20)
+        .workoutPreview(generatedWorkout, isPresented: $showWorkoutPreview)
     }
 }

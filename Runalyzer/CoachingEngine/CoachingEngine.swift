@@ -243,9 +243,9 @@ actor RunAnalyzerActor {
         var baseline: BaselineStats? = nil
         if priorRuns.count >= 3 {
             let avgDistance = priorRuns.map(\.distance).reduce(0, +) / Double(priorRuns.count)
-            let avgPace = priorRuns.map(\.avgPace).reduce(0, +) / Double(priorRuns.count)
-            let avgHR = priorRuns.map(\.avgHeartRate).reduce(0, +) / priorRuns.count
-            let avgCadence = priorRuns.map(\.avgCadence).reduce(0, +) / priorRuns.count
+            let avgPace = priorRuns.map { $0.workingAvgPace ?? $0.avgPace }.reduce(0, +) / Double(priorRuns.count)
+            let avgHR = priorRuns.map { $0.workingAvgHeartRate ?? $0.avgHeartRate }.reduce(0, +) / priorRuns.count
+            let avgCadence = priorRuns.map { $0.workingAvgCadence ?? $0.avgCadence }.reduce(0, +) / priorRuns.count
             let avgVertOsc = priorRuns.map(\.verticalOscillation).reduce(0, +) / Double(priorRuns.count)
 
             let runsWithVo2 = priorRuns.filter { $0.vo2Max > 0 }
@@ -266,6 +266,10 @@ actor RunAnalyzerActor {
         let gctContext: String
         let strideContext: String
 
+        let workingPace = run.workingAvgPace ?? run.avgPace
+        let workingCadence = run.workingAvgCadence ?? run.avgCadence
+        let workingHR = run.workingAvgHeartRate ?? run.avgHeartRate
+
         if let base = baseline {
             
             // VO2 Max Logic (Higher is better)
@@ -278,22 +282,22 @@ actor RunAnalyzerActor {
             }
 
             // Cadence Logic (Higher/closer to 170+ is better)
-            let cadenceDelta = run.avgCadence - base.avgCadence
-            let isCadenceImproved = cadenceDelta >= 0 || run.avgCadence >= 170
+            let cadenceDelta = workingCadence - base.avgCadence
+            let isCadenceImproved = cadenceDelta >= 0 || workingCadence >= 170
             let cadenceImpact = isCadenceImproved ? "This is a GOOD trend for reducing impact." : "This is a BAD trend, increasing injury risk."
-            cadenceContext = "\(run.avgCadence) SPM (Delta: \(cadenceDelta)). \(cadenceImpact)"
+            cadenceContext = "\(workingCadence) SPM (Delta: \(cadenceDelta)). \(cadenceImpact)"
 
             // Pace Logic (Faster/Positive difference is better)
-            let runPaceSeconds = Int(run.avgPace * 60)
+            let runPaceSeconds = Int(workingPace * 60)
             let basePaceSeconds = Int(base.avgPace * 60)
             let paceDiff = basePaceSeconds - runPaceSeconds
             let paceImpact = paceDiff >= 0 ? "A POSITIVE trend in speed." : "A NEGATIVE trend indicating slower turnover."
-            paceContext = "\(run.formattedPace) (\(abs(paceDiff)) sec diff). \(paceImpact)"
+            paceContext = "\(workingPace.formattedPaceString) (\(abs(paceDiff)) sec diff). \(paceImpact)"
 
             // HR Logic (Lower is better)
-            let hrDelta = run.avgHeartRate - base.avgHeartRate
+            let hrDelta = workingHR - base.avgHeartRate
             let hrImpact = hrDelta <= 0 ? "A GOOD trend indicating aerobic efficiency." : "A BAD trend indicating higher cardiovascular strain."
-            hrContext = "\(run.avgHeartRate) BPM (Delta: \(hrDelta)). \(hrImpact)"
+            hrContext = "\(workingHR) BPM (Delta: \(hrDelta)). \(hrImpact)"
 
             // Vertical Oscillation Logic (Lower is better)
             let vertOscDelta = run.verticalOscillation - base.avgVerticalOscillation
@@ -310,7 +314,7 @@ actor RunAnalyzerActor {
             strideContext = String(format: "%.2f m (Delta: %.2f). Evaluate this in relation to their cadence.", run.strideLength, strideDelta)
 
             // Directive Logic (Swift Diagnoses the Issue)
-            if run.avgCadence < 150 || (run.verticalOscillation > 10.0 && run.verticalOscillation > base.avgVerticalOscillation) {
+            if workingCadence < 150 || (run.verticalOscillation > 10.0 && run.verticalOscillation > base.avgVerticalOscillation) {
                 directiveContext = "The runner is either bounding too much (high vertical oscillation) or overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence and reducing vertical bounce."
             } else if paceDiff < 0 && hrDelta > 0 {
                 directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. Praise consistency but prescribe a drill focused on Easy Aerobic Recovery and HR control."
@@ -324,17 +328,17 @@ actor RunAnalyzerActor {
             directiveContext = "Evaluate this isolated run and provide a basic introductory drill."
             vo2Context = run.vo2Max > 0 ? String(format: "%.1f (No baseline available).", run.vo2Max) : "No VO2 Max data recorded for this run."
             let cadenceFloor = 150
-            let cadenceStatus = run.avgCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
-            cadenceContext = "\(run.avgCadence) SPM (\(cadenceStatus). No baseline available)."
-            paceContext = "\(run.formattedPace) (No baseline available)."
-            hrContext = "\(run.avgHeartRate) BPM (No baseline available)."
+            let cadenceStatus = workingCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
+            cadenceContext = "\(workingCadence) SPM (\(cadenceStatus). No baseline available)."
+            paceContext = "\(workingPace.formattedPaceString) (No baseline available)."
+            hrContext = "\(workingHR) BPM (No baseline available)."
             vertOscContext = String(format: "%.1f cm (No baseline available).", run.verticalOscillation)
             gctContext = String(format: "%.0f ms (No baseline available).", run.groundContactTime)
             strideContext = String(format: "%.2f m (No baseline available).", run.strideLength)
         }
 
-        let intervalTarget = min(180, max(150, Int(Double(run.avgCadence) * 1.05)))
-        let recoveryTarget = max(140, run.avgCadence) // At least 140, or their current cadence
+        let intervalTarget = min(180, max(150, Int(Double(workingCadence) * 1.05)))
+        let recoveryTarget = max(140, workingCadence) // At least 140, or their current cadence
 
         // 5. Run the LLM Prompt
         do {
@@ -351,7 +355,7 @@ actor RunAnalyzerActor {
                 recoveryCadence: "\(recoveryTarget)",
                 runType: run.runTypeRaw ?? "unknown",
                 framboiseTags: (run.framboiseTags ?? []).joined(separator: ", "),
-                workingAveragesContext: UserDefaults.standard.bool(forKey: "useWorkingAverages") ? "Using Working Averages (outliers trimmed)" : "Using Raw Apple Health Totals"
+                workingAveragesContext: "Using Working Averages (outliers trimmed)"
             )
 
             // Execute prompt asynchronously
@@ -372,7 +376,8 @@ actor RunAnalyzerActor {
                     drillCues: suggestedDrill.drillCues,
                     drillEffort: suggestedDrill.drillEffort,
                     targetCadence: suggestedDrill.targetCadence,
-                    previousCadence: run.avgCadence,
+                    targetSPM: intervalTarget,
+                    previousCadence: workingCadence,
                     isCompleted: false,
                     orderIndex: index
                 )

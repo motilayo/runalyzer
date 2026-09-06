@@ -55,6 +55,15 @@ final class RunRecord {
     /// Added as optional for CoreData lightweight migration.
     var isAnalyzing: Bool?
 
+    /// The working average pace (outliers trimmed), stored in minutes per kilometer.
+    var workingAvgPace: Double?
+
+    /// The working average heart rate (outliers trimmed), stored in BPM.
+    var workingAvgHeartRate: Int?
+
+    /// The working average cadence (outliers trimmed), stored in SPM.
+    var workingAvgCadence: Int?
+
 
     var runType: RunType {
         get {
@@ -78,6 +87,10 @@ final class RunRecord {
 
     var formattedPace: String {
         return avgPace.formattedPaceString
+    }
+
+    var workingFormattedPace: String? {
+        return workingAvgPace?.formattedPaceString
     }
 
     init(

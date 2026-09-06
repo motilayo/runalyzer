@@ -13,6 +13,7 @@ final class DrillRecommendation {
     var drillPurpose: String?
 
     var targetCadence: String?
+    var targetSPM: Int?
     var previousCadence: Int?
     var isCompleted: Bool
 
@@ -29,6 +30,7 @@ final class DrillRecommendation {
         drillEffort: String? = nil,
         drillRecovery: String? = nil,
         targetCadence: String? = nil,
+        targetSPM: Int? = nil,
         previousCadence: Int? = nil,
         isCompleted: Bool = false,
         orderIndex: Int? = nil
@@ -40,6 +42,7 @@ final class DrillRecommendation {
         self.drillRecovery = drillRecovery
         self.drillPurpose = drillPurpose
         self.targetCadence = targetCadence
+        self.targetSPM = targetSPM
         self.previousCadence = previousCadence
         self.isCompleted = isCompleted
         self.orderIndex = orderIndex

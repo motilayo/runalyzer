@@ -8,8 +8,11 @@ class MockLanguageModelProvider: LanguageModelProvider, @unchecked Sendable {
     var isAvailable: Bool = true
     var shouldThrowError = false
     var mockInsight: RunInsight?
+    var receivedPrompt: String?
 
     func respond(to prompt: String, generating type: RunInsight.Type, with instructions: String) async throws -> RunInsight {
+        self.receivedPrompt = prompt
+
         if shouldThrowError {
             throw NSError(domain: "MockError", code: 1, userInfo: nil)
         }
@@ -157,6 +160,12 @@ final class CoachingEngineTests: XCTestCase {
         XCTAssertEqual(runData.runType, "tempo")
         XCTAssertEqual(runData.framboiseTags, "tag1, tag2")
         XCTAssertEqual(runData.workingAveragesContext, "Using Working Averages (outliers trimmed)")
+
+        let prompt = mockProvider.receivedPrompt ?? ""
+        XCTAssertTrue(prompt.contains("tempo"))
+        XCTAssertTrue(prompt.contains("tag1, tag2"))
+        XCTAssertFalse(prompt.contains("[")) // No raw arrays allowed
+        XCTAssertFalse(prompt.contains("]"))
     }
 
     func testStateTrigger_AIRegeneration() async throws {

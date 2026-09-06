@@ -219,7 +219,47 @@ class HealthKitManager: ObservableObject {
             unit: HKUnit.meter()
         )
 
-        return RunRecord(
+        var workingAvgPace: Double?
+        var workingAvgHeartRate: Int?
+        var workingAvgCadence: Int?
+        var runTypeRaw = "unknown"
+        var tags: [String] = []
+
+        if let metrics = try? await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: healthStore) {
+            let hrBuckets = metrics.heartRateBuckets.map(\.value)
+            let cadenceBuckets = metrics.cadenceBuckets.map(\.value)
+            let paceBuckets = metrics.paceBuckets.map(\.value)
+
+            let trimmedHR = FramboiseEngine.trimOutliers(from: hrBuckets)
+            let trimmedCadence = FramboiseEngine.trimOutliers(from: cadenceBuckets)
+            let trimmedPace = FramboiseEngine.trimOutliers(from: paceBuckets)
+
+            if !trimmedHR.isEmpty {
+                workingAvgHeartRate = Int(round(trimmedHR.reduce(0, +) / Double(trimmedHR.count)))
+            }
+            if !trimmedCadence.isEmpty {
+                workingAvgCadence = Int(round(trimmedCadence.reduce(0, +) / Double(trimmedCadence.count)))
+            }
+            if !trimmedPace.isEmpty {
+                workingAvgPace = trimmedPace.reduce(0, +) / Double(trimmedPace.count)
+            }
+
+            let type = FramboiseEngine.classifyRun(paceBuckets: trimmedPace, heartRateBuckets: trimmedHR)
+            switch type {
+            case .steady: runTypeRaw = "steady"
+            case .intervals: runTypeRaw = "intervals"
+            case .unknown: runTypeRaw = "unknown"
+            }
+
+            if let paceTag = FramboiseEngine.checkPaceVariance(paceBuckets: trimmedPace) {
+                tags.append(paceTag)
+            }
+            if let cadenceTag = FramboiseEngine.checkCadenceFading(cadenceBuckets: trimmedCadence) {
+                tags.append(cadenceTag)
+            }
+        }
+
+        let record = RunRecord(
             id: workout.uuid,
             date: workout.startDate,
             distance: distance,
@@ -232,6 +272,13 @@ class HealthKitManager: ObservableObject {
             groundContactTime: groundContactTime,
             strideLength: strideLength
         )
+        record.workingAvgPace = workingAvgPace
+        record.workingAvgHeartRate = workingAvgHeartRate
+        record.workingAvgCadence = workingAvgCadence
+        record.runTypeRaw = runTypeRaw
+        record.framboiseTags = tags
+
+        return record
     }
 
     // MARK: - Calculation Helpers

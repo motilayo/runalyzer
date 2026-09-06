@@ -24,7 +24,7 @@ final class LiveCoachEngineTests: XCTestCase {
         let prescription = "4x400m intervals"
 
         // Act
-        let workout = try XCTUnwrap(sut.translate(prescription: prescription))
+        let workout = try XCTUnwrap(sut.translate(prescription: prescription, targetSPM: 165))
 
         // Assert
         // We should have 1 block with iterations = 4
@@ -45,6 +45,29 @@ final class LiveCoachEngineTests: XCTestCase {
 
         let secondStep = block.steps[1]
         XCTAssertEqual(secondStep.purpose, .recovery)
+    }
+
+    func testWorkoutKit_TargetAlerts() throws {
+        // Arrange
+        let prescription = "Maintain 165 SPM in 4x400m intervals"
+
+        // Act
+        let workout = try XCTUnwrap(sut.translate(prescription: prescription, targetSPM: 165))
+
+        // Assert
+        let block = workout.blocks[0]
+        let firstStep = block.steps[0]
+
+        let alerts = firstStep.step.alerts
+        XCTAssertEqual(alerts.count, 1)
+
+        if case let .cadence(target) = alerts[0], case let .range(range) = target {
+            // Check boundaries (165 - 5 ... 165 + 5)
+            XCTAssertEqual(range.lowerBound, 160.0)
+            XCTAssertEqual(range.upperBound, 170.0)
+        } else {
+            XCTFail("Missing or invalid cadence alert")
+        }
     }
 
     func testHapticEnforcement_TriggerLogic() {
