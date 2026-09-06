@@ -67,9 +67,15 @@ actor MacroQueryEngine {
     }
 
     func generateWeeklyFatigueInsight(minimumDistance: Double = 0, for targetDate: Date = Date(), modelProvider: (any LanguageModelProvider)? = nil) async throws -> FatigueInsight? {
-        let provider = modelProvider ?? DefaultLanguageModelProvider()
+        let provider = await MainActor.run {
+            return modelProvider ?? DefaultLanguageModelProvider()
+        }
 
-        guard await provider.isAvailable else {
+        let isAvailable = await MainActor.run {
+            return provider.isAvailable
+        }
+
+        guard isAvailable else {
             return nil
         }
 
