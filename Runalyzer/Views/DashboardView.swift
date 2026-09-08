@@ -339,29 +339,8 @@ struct DashboardView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        #if DEBUG
-                        Button {
-                            Task {
-                                isSyncing = true
-                                await HealthKitSeeder.shared.seedCouchTo5K()
-                                if let onSync {
-                                    await onSync(false)
-                                }
-                                await updateMacroAverages()
-                                isSyncing = false
-                            }
-                        } label: {
-                            Image(systemName: "ladybug.fill")
-                                .foregroundColor(.red)
-                        }
-                        .disabled(isSyncing)
-                        .accessibilityLabel("Seed sample running data")
-                        #endif
-
-                        NavigationLink(destination: SettingsView(onForceSync: onSync)) {
-                            Image(systemName: "gearshape")
-                        }
+                    NavigationLink(destination: SettingsView(onForceSync: onSync)) {
+                        Image(systemName: "gearshape")
                     }
                 }
             }

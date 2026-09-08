@@ -38,7 +38,6 @@
 		DC50A4797C364301B4A0E6AC /* RunListFilteredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B899DFE5919B4CC7898C0FF1 /* RunListFilteredView.swift */; };
 		354B75CFCB6D4890A9176BCA /* MacroQueryEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 562A4EBB7D4F45339032B2B4 /* MacroQueryEngineTests.swift */; };
 		81BD64EC227F4C4D894C81C3 /* FetchDescriptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABD768E1D08412D969F8DF4 /* FetchDescriptorTests.swift */; };
-		B7E4D1A20C5F4A6B8D9E0F12 /* seeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F5E2B31D6A4B7C9E0F1A23 /* seeder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,7 +85,6 @@
 		B899DFE5919B4CC7898C0FF1 /* RunListFilteredView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunListFilteredView.swift; sourceTree = SOURCE_ROOT; };
 		562A4EBB7D4F45339032B2B4 /* MacroQueryEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/MacroQueryEngineTests.swift; sourceTree = SOURCE_ROOT; };
 		0ABD768E1D08412D969F8DF4 /* FetchDescriptorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/FetchDescriptorTests.swift; sourceTree = SOURCE_ROOT; };
-		C8F5E2B31D6A4B7C9E0F1A23 /* seeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = seeder.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -182,7 +180,6 @@
 				AABBCCDDEEFF001122334455 /* Runalyzer/Views/AnimatedLoadingView.swift */,
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */,
 				F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */,
-				C8F5E2B31D6A4B7C9E0F1A23 /* seeder.swift */,
 				B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyzer/Assets.xcassets */,
 				10AA26382422973E1F322C8D /* RunalyzerTests */,
 			);
@@ -296,7 +293,6 @@
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */,
 				F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */,
 				46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */,
-				B7E4D1A20C5F4A6B8D9E0F12 /* seeder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
