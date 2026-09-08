@@ -450,21 +450,6 @@ struct HeroCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header: Latest Run
-            HStack {
-                Text("Latest Run Insight")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(runRecord.date, style: .date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(Color(uiColor: .tertiaryLabel))
-            }
-
             // Metrics Row
             let columns = verticalSizeClass == .regular
                 ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]

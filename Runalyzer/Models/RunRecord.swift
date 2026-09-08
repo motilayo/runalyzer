@@ -127,17 +127,10 @@ extension Double {
     /// Formats decimal pace (e.g., 8.33) into standard m:ss/km format (e.g., 8:20/km)
     var formattedPaceString: String {
         let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-        if useMetricSystem {
-            let minutes = Int(self)
-            let seconds = Int((self - Double(minutes)) * 60)
-            return String(format: "%d:%02d/km", minutes, seconds)
-        } else {
-            // Convert min/km to min/mi
-            let paceInMiles = self * 1.609344
-            let minutes = Int(paceInMiles)
-            let seconds = Int((paceInMiles - Double(minutes)) * 60)
-            return String(format: "%d:%02d/mi", minutes, seconds)
-        }
+        let pace = useMetricSystem ? self : self * 1.609344
+        let totalSeconds = Int((pace * 60).rounded())
+        let unit = useMetricSystem ? "km" : "mi"
+        return String(format: "%d:%02d/%@", totalSeconds / 60, totalSeconds % 60, unit)
     }
 }
 

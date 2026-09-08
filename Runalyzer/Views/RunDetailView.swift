@@ -69,7 +69,7 @@ struct RunDetailView: View {
             VStack(spacing: 24) {
 
                 VStack {
-                    Toggle("Working Averages", isOn: $useWorkingAverages)
+                    Toggle(useWorkingAverages ? "Working Averages" : "Raw Totals", isOn: $useWorkingAverages)
                         .padding(.horizontal)
                         .padding(.top, 8)
                 }
@@ -410,6 +410,11 @@ private struct DrillCardView: View {
     @State private var showWorkoutPreview = false
     @State private var generatedWorkout: WorkoutPlan = WorkoutPlan(.custom(CustomWorkout(activity: .running, location: .unknown, displayName: "AI Drill", warmup: nil, blocks: [], cooldown: nil)))
 
+    private var deterministicTargetSPM: Int? {
+        guard let previousCadence = drill.previousCadence, previousCadence > 0 else { return drill.targetSPM }
+        return min(180, max(150, Int((Double(previousCadence) * 1.05).rounded())))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center) {
@@ -450,9 +455,10 @@ private struct DrillCardView: View {
                 DrillRow(icon: "repeat", text: drill.drillWork ?? "")
                 DrillRow(icon: "brain.head.profile", text: drill.drillCues ?? "")
                 DrillRow(icon: "bolt", text: drill.drillEffort ?? "")
+                DrillRow(icon: "pause.circle", text: drill.drillRecovery ?? "")
             }
 
-            if let target = drill.targetSPM, let prev = drill.previousCadence, target > 0 {
+            if let target = deterministicTargetSPM, let prev = drill.previousCadence, target > 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Cadence Goal")
                         .font(.caption)
@@ -509,7 +515,7 @@ private struct DrillCardView: View {
                         let generator = UIImpactFeedbackGenerator(style: .medium)
                         generator.impactOccurred()
 
-                        if let targetSPM = drill.targetSPM,
+                                if let targetSPM = deterministicTargetSPM,
                            let workout = LiveCoachEngine().translate(prescription: drill.drillWork ?? "", targetSPM: targetSPM) {
                             self.generatedWorkout = WorkoutPlan(.custom(workout))
                             self.showWorkoutPreview = true

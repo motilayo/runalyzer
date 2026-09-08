@@ -190,74 +190,37 @@ class HealthKitManager: ObservableObject {
         let duration = workout.duration
         let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
 
-        // 1. Fetch Raw Averages (for the 'Raw Totals' mode)
+        // Framboise owns the bucketed HealthKit read, trimming, heuristics, and classification.
+        let runMetrics = try await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: healthStore)
+
+        let rawHR = runMetrics.heartRateBuckets.map(\.value)
+        let rawCadence = runMetrics.cadenceBuckets.map(\.value)
+        let trimmedHR = FramboiseEngine.trimOutliers(from: rawHR)
+        let trimmedCadence = FramboiseEngine.trimOutliers(from: rawCadence)
+        let trimmedPace = FramboiseEngine.trimOutliers(from: runMetrics.paceBuckets.map(\.value))
+
+        // Raw values are calculated from the same bucketed source for the transparency toggle.
         let rawAvgPace = Self.calculatePace(duration: duration, distance: distance)
-        let rawAvgHeartRate = try await fetchAverageQuantity(for: workout, quantityTypeIdentifier: .heartRate, unit: HKUnit.count().unitDivided(by: .minute()))
-        let totalSteps = try await fetchSumQuantity(for: workout, quantityTypeIdentifier: .stepCount, unit: HKUnit.count())
-        let rawAvgCadence = Self.calculateCadence(duration: duration, steps: totalSteps)
+        let rawAvgHeartRate = rawHR.isEmpty ? 0 : Int(round(rawHR.reduce(0, +) / Double(rawHR.count)))
+        let rawAvgCadence = rawCadence.isEmpty ? 0 : Int(round(rawCadence.reduce(0, +) / Double(rawCadence.count)))
+        let workingAvgHeartRate = trimmedHR.isEmpty ? nil : Int(round(trimmedHR.reduce(0, +) / Double(trimmedHR.count)))
+        let workingAvgCadence = trimmedCadence.isEmpty ? nil : Int(round(trimmedCadence.reduce(0, +) / Double(trimmedCadence.count)))
+        let workingAvgPace = trimmedPace.isEmpty ? nil : trimmedPace.reduce(0, +) / Double(trimmedPace.count)
 
-        // 2. Concurrent Time-Based Bucketing for Working Averages
-        var workingAvgHeartRate: Int?
-        var workingAvgCadence: Int?
-        var workingAvgPace: Double?
-        var runTypeRaw = "unknown"
-        var tags: [String] = []
-
-        if let runMetrics = try? await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: healthStore) {
-            let rawHR = runMetrics.heartRateBuckets.map { $0.value }
-            let rawCadence = runMetrics.cadenceBuckets.map { $0.value }
-            let rawPace = runMetrics.paceBuckets.map { $0.value }
-
-            let trimmedHR = FramboiseEngine.trimOutliers(from: rawHR)
-            let trimmedCadence = FramboiseEngine.trimOutliers(from: rawCadence)
-            let trimmedPace = FramboiseEngine.trimOutliers(from: rawPace)
-
-            workingAvgHeartRate = trimmedHR.isEmpty ? nil : Int(round(trimmedHR.reduce(0, +) / Double(trimmedHR.count)))
-            workingAvgCadence = trimmedCadence.isEmpty ? nil : Int(round(trimmedCadence.reduce(0, +) / Double(trimmedCadence.count)))
-            workingAvgPace = trimmedPace.isEmpty ? nil : (trimmedPace.reduce(0, +) / Double(trimmedPace.count))
-
-            let type = FramboiseEngine.classifyRun(paceBuckets: trimmedPace, heartRateBuckets: trimmedHR)
-            switch type {
-            case .steady: runTypeRaw = "steady"
-            case .intervals: runTypeRaw = "intervals"
-            case .unknown: runTypeRaw = "unknown"
-            }
-
-            if let paceTag = FramboiseEngine.checkPaceVariance(paceBuckets: trimmedPace) {
-                tags.append(paceTag)
-            }
-            if let cadenceTag = FramboiseEngine.checkCadenceFading(cadenceBuckets: trimmedCadence) {
-                tags.append(cadenceTag)
-            }
+        let type = FramboiseEngine.classifyRun(paceBuckets: trimmedPace, heartRateBuckets: trimmedHR)
+        let runTypeRaw: String = switch type {
+        case .steady: "steady"
+        case .intervals: "intervals"
+        case .unknown: "unknown"
         }
+        var tags: [String] = []
+        if let paceTag = FramboiseEngine.checkPaceVariance(paceBuckets: trimmedPace) { tags.append(paceTag) }
+        if let cadenceTag = FramboiseEngine.checkCadenceFading(cadenceBuckets: trimmedCadence) { tags.append(cadenceTag) }
 
-        // Query average vertical oscillation (in cm)
-        let verticalOscillation = try await fetchAverageQuantity(
-            for: workout,
-            quantityTypeIdentifier: .runningVerticalOscillation,
-            unit: HKUnit.meterUnit(with: .centi)
-        )
-
-        // Query average VO2 Max
-        let vo2Max = try await fetchAverageQuantity(
-            for: workout,
-            quantityTypeIdentifier: .vo2Max,
-            unit: HKUnit(from: "ml/kg*min")
-        )
-
-        // Query average Ground Contact Time (in ms)
-        let groundContactTime = try await fetchAverageQuantity(
-            for: workout,
-            quantityTypeIdentifier: .runningGroundContactTime,
-            unit: HKUnit.secondUnit(with: .milli)
-        )
-
-        // Query average Stride Length (in m)
-        let strideLength = try await fetchAverageQuantity(
-            for: workout,
-            quantityTypeIdentifier: .runningStrideLength,
-            unit: HKUnit.meter()
-        )
+        func average(_ buckets: [Bucket]) -> Double {
+            guard !buckets.isEmpty else { return 0 }
+            return buckets.map(\.value).reduce(0, +) / Double(buckets.count)
+        }
 
         let record = RunRecord(
             id: workout.uuid,
@@ -265,12 +228,12 @@ class HealthKitManager: ObservableObject {
             distance: distance,
             duration: duration,
             avgPace: rawAvgPace,
-            avgHeartRate: Int(rawAvgHeartRate),
+            avgHeartRate: rawAvgHeartRate,
             avgCadence: rawAvgCadence,
-            verticalOscillation: verticalOscillation,
-            vo2Max: vo2Max,
-            groundContactTime: groundContactTime,
-            strideLength: strideLength
+            verticalOscillation: average(runMetrics.verticalOscillationBuckets),
+            vo2Max: average(runMetrics.vo2MaxBuckets),
+            groundContactTime: average(runMetrics.groundContactTimeBuckets),
+            strideLength: average(runMetrics.strideLengthBuckets)
         )
         record.workingAvgPace = workingAvgPace
         record.workingAvgHeartRate = workingAvgHeartRate
@@ -299,75 +262,4 @@ class HealthKitManager: ObservableObject {
         return 0
     }
 
-    // MARK: - Private Helpers
-
-    private func fetchAverageQuantity(
-        for workout: HKWorkout,
-        quantityTypeIdentifier: HKQuantityTypeIdentifier,
-        unit: HKUnit
-    ) async throws -> Double {
-        guard let quantityType = HKObjectType.quantityType(forIdentifier: quantityTypeIdentifier) else {
-            return 0.0
-        }
-
-        let predicate = HKQuery.predicateForObjects(from: workout)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = HKStatisticsQuery(
-                quantityType: quantityType,
-                quantitySamplePredicate: predicate,
-                options: .discreteAverage
-            ) { _, result, error in
-                if let error = error {
-                    print("HKStatisticsQuery warning for \(quantityTypeIdentifier.rawValue): \(error.localizedDescription)")
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-
-                guard let averageQuantity = result?.averageQuantity() else {
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-
-                continuation.resume(returning: averageQuantity.doubleValue(for: unit))
-            }
-            healthStore.execute(query)
-        }
-    }
-
-    private func fetchSumQuantity(
-        for workout: HKWorkout,
-        quantityTypeIdentifier: HKQuantityTypeIdentifier,
-        unit: HKUnit
-    ) async throws -> Double {
-        guard let quantityType = HKObjectType.quantityType(forIdentifier: quantityTypeIdentifier) else {
-            return 0.0
-        }
-
-        let predicate = HKQuery.predicateForObjects(from: workout)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = HKStatisticsQuery(
-                quantityType: quantityType,
-                quantitySamplePredicate: predicate,
-                options: .cumulativeSum
-            ) { _, result, error in
-                // HealthKit throws "No data available for the specified predicate" if the sample type wasn't tracked for the workout.
-                // We shouldn't fail the entire workout sync; we should just return 0.0.
-                if let error = error {
-                    print("HKStatisticsQuery warning for \(quantityTypeIdentifier.rawValue): \(error.localizedDescription)")
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-
-                guard let sumQuantity = result?.sumQuantity() else {
-                    continuation.resume(returning: 0.0)
-                    return
-                }
-
-                continuation.resume(returning: sumQuantity.doubleValue(for: unit))
-            }
-            healthStore.execute(query)
-        }
-    }
 }

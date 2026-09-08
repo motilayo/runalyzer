@@ -7,11 +7,19 @@ public struct RunMetrics {
     public var heartRateBuckets: [Bucket] = []
     public var cadenceBuckets: [Bucket] = []
     public var paceBuckets: [Bucket] = []
+    public var verticalOscillationBuckets: [Bucket] = []
+    public var vo2MaxBuckets: [Bucket] = []
+    public var groundContactTimeBuckets: [Bucket] = []
+    public var strideLengthBuckets: [Bucket] = []
 
-    public init(heartRateBuckets: [Bucket] = [], cadenceBuckets: [Bucket] = [], paceBuckets: [Bucket] = []) {
+    public init(heartRateBuckets: [Bucket] = [], cadenceBuckets: [Bucket] = [], paceBuckets: [Bucket] = [], verticalOscillationBuckets: [Bucket] = [], vo2MaxBuckets: [Bucket] = [], groundContactTimeBuckets: [Bucket] = [], strideLengthBuckets: [Bucket] = []) {
         self.heartRateBuckets = heartRateBuckets
         self.cadenceBuckets = cadenceBuckets
         self.paceBuckets = paceBuckets
+        self.verticalOscillationBuckets = verticalOscillationBuckets
+        self.vo2MaxBuckets = vo2MaxBuckets
+        self.groundContactTimeBuckets = groundContactTimeBuckets
+        self.strideLengthBuckets = strideLengthBuckets
     }
 
 }
@@ -46,7 +54,11 @@ public class FramboiseEngine {
         let types: [(HKQuantityTypeIdentifier, HKStatisticsOptions, HKUnit)] = [
             (.heartRate, .discreteAverage, HKUnit.count().unitDivided(by: .minute())),
             (.stepCount, .cumulativeSum, HKUnit.count()), // for cadence
-            (.runningSpeed, .discreteAverage, HKUnit.meter().unitDivided(by: .second())) // for pace
+            (.runningSpeed, .discreteAverage, HKUnit.meter().unitDivided(by: .second())), // for pace
+            (.runningVerticalOscillation, .discreteAverage, HKUnit.meterUnit(with: .centi)),
+            (.vo2Max, .discreteAverage, HKUnit(from: "ml/kg*min")),
+            (.runningGroundContactTime, .discreteAverage, HKUnit.secondUnit(with: .milli)),
+            (.runningStrideLength, .discreteAverage, HKUnit.meter())
         ]
 
         return try await withThrowingTaskGroup(of: (HKQuantityTypeIdentifier, [Bucket]).self) { group in
@@ -125,6 +137,14 @@ public class FramboiseEngine {
                     result.cadenceBuckets = sortedBuckets
                 } else if identifier == .runningSpeed {
                     result.paceBuckets = sortedBuckets
+                } else if identifier == .runningVerticalOscillation {
+                    result.verticalOscillationBuckets = sortedBuckets
+                } else if identifier == .vo2Max {
+                    result.vo2MaxBuckets = sortedBuckets
+                } else if identifier == .runningGroundContactTime {
+                    result.groundContactTimeBuckets = sortedBuckets
+                } else if identifier == .runningStrideLength {
+                    result.strideLengthBuckets = sortedBuckets
                 }
             }
 

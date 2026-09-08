@@ -43,6 +43,8 @@ This `AGENTS.md` file acts as the primary repository of architectural context, t
 - **Background Delivery**: When configuring HealthKit background delivery and `HKObserverQuery`, always store a reference to the active query to prevent duplicate registrations, and ensure the `completionHandler` is called only after fully awaiting asynchronous updates.
 - **Permissions Prompt**: To prompt for newly added HealthKit data types without needing app reinstallation, call `HealthKitManager.shared.requestAuthorization()` inside a `.task` modifier on the main `DashboardView`.
 - **Global Preferences**: Global user preferences (like unit system `useMetricSystem`) are managed via `@AppStorage` in SwiftUI and read via `UserDefaults.standard.object(forKey:)` in non-UI code. Dynamically inject explicit string definitions of the currently active unit system into Foundation Model prompts. Locale specific formatting (e.g. `DateFormatter.locale`) must be `en_US_POSIX`.
+- **Framboise Extraction Pipeline**: `HealthKitManager.extractRunRecord` must obtain run metrics through `FramboiseEngine.fetchMetricsConcurrently`. Framboise owns the one-minute HealthKit buckets, median-based outlier trimming, heuristic tags, run classification, and bucket-derived biomechanical averages. Do not reintroduce per-workout `HKStatisticsQuery` average or sum helpers in `HealthKitManager`.
+- **Pace Formatting**: Run pace values are stored as decimal minutes per kilometer. Always convert the selected unit's pace to total seconds, then format with `String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)` before appending `/km` or `/mi`. This shared formatter is used by dashboard summaries, filtered run rows, and run details.
 
 ## 4. SwiftUI Presentation & Layout
 
@@ -62,6 +64,15 @@ This `AGENTS.md` file acts as the primary repository of architectural context, t
   - Historical run rows should dynamically display Focus Pill tags derived from the AI insight's `drillRecommendation.drillTitle` (e.g., 'Cadence').
   - Include a prominent disclaimer stating that the insights are AI-generated, are for informational purposes only, and do not replace professional medical or coaching advice.
   - Use native SwiftUI colors like `.secondary` instead of `.tertiaryLabel`.
+- **Run Detail Transparency**: Keep the `Working Averages` / `Raw Totals` control above the metric grid. Working values use Framboise-trimmed buckets; raw values use untrimmed bucket averages or workout totals. Drill cards must display purpose, work, cues, effort, and recovery separately.
+- **WorkoutKit Handoff**: The drill `Start Drill` action must calculate its target cadence in Swift, create the native `CustomWorkout`, attach the cadence `WorkoutAlert` boundary to work steps, and present the resulting `WorkoutPlan` with `.workoutPreview`. Never delegate target calculation or workout structure to the language model.
+- **Progression Dashboard Flow**: Keep the dashboard order as filters, seven/thirty-day macro statistics and fatigue insight, then the filtered run list. Do not reintroduce a separate latest-run insight card.
+
+## 6. Documentation and Validation
+
+- Keep `README.md` aligned with the current data pipeline, privacy model, dashboard flow, and WorkoutKit handoff.
+- Validate app changes with an available simulator destination, for example `xcodebuild -project Runalyzer.xcodeproj -scheme Runalyzer -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build`.
+- The current `RunalyzerTests` target requires an `Info.plist` or `GENERATE_INFOPLIST_FILE = YES` before `build-for-testing` can code sign the test bundle. Treat that as project configuration work, not as evidence of an app-source compile failure.
 
 ## 5. Tooling Guidelines
 
