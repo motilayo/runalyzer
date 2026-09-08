@@ -134,7 +134,10 @@ struct RunDetailView: View {
                             Spacer()
                             Picker("Run Type", selection: $runRecord.runTypeRaw) {
                                 Text("Steady").tag(Optional("steady"))
+                                Text("Tempo").tag(Optional("tempo"))
+                                Text("Progressive").tag(Optional("progressive"))
                                 Text("Intervals").tag(Optional("intervals"))
+                                Text("Urban Traffic").tag(Optional("urbanTraffic"))
                                 Text("Unknown").tag(Optional("unknown"))
                             }
                             .pickerStyle(MenuPickerStyle())
@@ -407,8 +410,9 @@ private struct DrillCardView: View {
     @Binding var activeCardIndex: Int
     let dismiss: DismissAction
 
-    @State private var showWorkoutPreview = false
-    @State private var generatedWorkout: WorkoutPlan = WorkoutPlan(.custom(CustomWorkout(activity: .running, location: .unknown, displayName: "AI Drill", warmup: nil, blocks: [], cooldown: nil)))
+    @State private var isSchedulingWorkout = false
+    @State private var workoutHandoffError: String?
+    @State private var workoutHandoffSucceeded = false
 
     private var deterministicTargetSPM: Int? {
         guard let previousCadence = drill.previousCadence, previousCadence > 0 else { return drill.targetSPM }
@@ -472,70 +476,77 @@ private struct DrillCardView: View {
 
             Spacer(minLength: 16)
 
-            HStack {
-                if activeCardIndex > 0 {
-                    Button("Back") {
-                        withAnimation(.spring()) {
-                            activeCardIndex -= 1
-                        }
-                    }
-                    .font(.subheadline.bold())
-                    .foregroundColor(.secondary)
-                } else {
-                    Button("Skip") {
-                        withAnimation(.spring()) {
-                            if activeCardIndex < totalDrills - 1 {
-                                activeCardIndex += 1
-                            }
-                        }
-                    }
-                    .font(.subheadline.bold())
-                    .foregroundColor(.secondary)
+            Button {
+                if drill.isCompleted {
+                    return
                 }
 
-                Spacer()
-
-                if activeCardIndex < totalDrills - 1 {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            activeCardIndex += 1
-                        }
-                    }) {
-                        Text("Next")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.accentColor)
-                            .clipShape(Capsule())
+                isSchedulingWorkout = true
+                workoutHandoffError = nil
+                workoutHandoffSucceeded = false
+                Task {
+                    guard WorkoutScheduler.isSupported else {
+                        workoutHandoffError = "Workout scheduling is unavailable on this device."
+                        isSchedulingWorkout = false
+                        return
                     }
-                } else {
-                    Button(action: {
-                        drill.isCompleted = true
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
 
-                                if let targetSPM = deterministicTargetSPM,
-                           let workout = LiveCoachEngine().translate(prescription: drill.drillWork ?? "", targetSPM: targetSPM) {
-                            self.generatedWorkout = WorkoutPlan(.custom(workout))
-                            self.showWorkoutPreview = true
-                        }
-                    }) {
-                        Text(drill.isCompleted ? "Completed" : "Start Drill")
-                            .font(.subheadline.bold())
-                            .foregroundColor(Color.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(drill.isCompleted ? Color.green : Color.accentColor)
-                            .clipShape(Capsule())
+                    guard let targetSPM = deterministicTargetSPM,
+                          let customWorkout = LiveCoachEngine().translate(prescription: drill.drillWork ?? "", targetSPM: targetSPM) else {
+                        workoutHandoffError = "This drill does not contain a schedulable workout prescription."
+                        isSchedulingWorkout = false
+                        return
                     }
+
+                    let plan = WorkoutPlan(.custom(customWorkout))
+                    let authorizationState = await WorkoutScheduler.shared.requestAuthorization()
+                    guard authorizationState == .authorized else {
+                        workoutHandoffError = "WorkoutKit authorization is required to send this drill to Apple Watch."
+                        isSchedulingWorkout = false
+                        return
+                    }
+
+                    let scheduleDate = Calendar.current.dateComponents(
+                        [.calendar, .timeZone, .year, .month, .day, .hour, .minute],
+                        from: Date()
+                    )
+                    await WorkoutScheduler.shared.schedule(plan, at: scheduleDate)
+                    drill.isCompleted = true
+                    isSchedulingWorkout = false
+                    workoutHandoffSucceeded = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    try? await Task.sleep(for: .seconds(1.2))
+                    dismiss()
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    if isSchedulingWorkout {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(workoutHandoffSucceeded ? "Scheduled on Apple Watch" : (isSchedulingWorkout ? "Sending to Apple Watch..." : (drill.isCompleted ? "Completed" : "Start Drill")))
+                }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(workoutHandoffSucceeded || drill.isCompleted ? Color.green : Color.accentColor)
+                    .clipShape(Capsule())
+            }
+            .disabled(drill.isCompleted || isSchedulingWorkout)
+            .alert("Workout Handoff", isPresented: Binding(
+                get: { workoutHandoffError != nil },
+                set: { if !$0 { workoutHandoffError = nil } }
+            )) {
+                Button("OK", role: .cancel) { workoutHandoffError = nil }
+            } message: {
+                Text(workoutHandoffError ?? "")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 1)
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(20)
-        .workoutPreview(generatedWorkout, isPresented: $showWorkoutPreview)
     }
 }

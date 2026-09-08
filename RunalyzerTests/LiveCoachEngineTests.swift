@@ -5,6 +5,7 @@ import WorkoutKit
 @testable import Runalyzer
 
 @available(iOS 17.0, watchOS 10.0, *)
+@MainActor
 final class LiveCoachEngineTests: XCTestCase {
 
     var sut: LiveCoachEngine!

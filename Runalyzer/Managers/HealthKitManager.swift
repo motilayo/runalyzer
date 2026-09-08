@@ -1,7 +1,7 @@
 import Foundation
 import HealthKit
 
-public protocol HKHealthStoreProtocol {
+public protocol HKHealthStoreProtocol: AnyObject, Sendable {
     func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
     func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws
@@ -25,9 +25,10 @@ class HealthKitManager: ObservableObject {
     // Published so views can react to permission changes if needed
     @Published var isAuthorized: Bool = false
 
-    var onWorkoutsUpdated: (() async -> Void)?
+    var onWorkoutsUpdated: (@Sendable () async -> Void)?
 
     private var observerQuery: HKObserverQuery?
+    private var authorizationTask: Task<Void, Error>?
 
     init(
         healthStore: HKHealthStoreProtocol = HKHealthStore(),
@@ -72,7 +73,7 @@ class HealthKitManager: ObservableObject {
         // We do not need to share/write any data for Runalyzer currently
         let typesToShare: Set<HKSampleType> = []
 
-        try await healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead)
+        try await requestAuthorization(toShare: typesToShare, read: typesToRead)
 
         // If we get here without throwing, auth request was completed (though user may have denied some)
         // We assume authorization is sufficient to at least try fetching.
@@ -82,6 +83,24 @@ class HealthKitManager: ObservableObject {
 
         try await enableBackgroundDelivery()
         startObservingWorkouts()
+    }
+
+    func requestWriteAuthorization(toShare typesToShare: Set<HKSampleType>) async throws {
+        try await requestAuthorization(toShare: typesToShare, read: [])
+    }
+
+    private func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {
+        if let authorizationTask {
+            try await authorizationTask.value
+            return
+        }
+
+        let task = Task { [healthStore] in
+            try await healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead)
+        }
+        authorizationTask = task
+        defer { authorizationTask = nil }
+        try await task.value
     }
 
     /// Enable background delivery for workouts
@@ -94,9 +113,9 @@ class HealthKitManager: ObservableObject {
         guard observerQuery == nil else { return }
         let query = HKObserverQuery(sampleType: .workoutType(), predicate: nil) { [weak self] _, completionHandler, error in
             if error == nil {
-                Task {
+                completionHandler()
+                Task { @MainActor in
                     await self?.onWorkoutsUpdated?()
-                    completionHandler()
                 }
             } else {
                 completionHandler()
@@ -197,7 +216,7 @@ class HealthKitManager: ObservableObject {
         let rawCadence = runMetrics.cadenceBuckets.map(\.value)
         let trimmedHR = FramboiseEngine.trimOutliers(from: rawHR)
         let trimmedCadence = FramboiseEngine.trimOutliers(from: rawCadence)
-        let trimmedPace = FramboiseEngine.trimOutliers(from: runMetrics.paceBuckets.map(\.value))
+        let trimmedPace = FramboiseEngine.trimPaceOutliers(from: runMetrics.paceBuckets.map(\.value))
 
         // Raw values are calculated from the same bucketed source for the transparency toggle.
         let rawAvgPace = Self.calculatePace(duration: duration, distance: distance)
@@ -205,12 +224,24 @@ class HealthKitManager: ObservableObject {
         let rawAvgCadence = rawCadence.isEmpty ? 0 : Int(round(rawCadence.reduce(0, +) / Double(rawCadence.count)))
         let workingAvgHeartRate = trimmedHR.isEmpty ? nil : Int(round(trimmedHR.reduce(0, +) / Double(trimmedHR.count)))
         let workingAvgCadence = trimmedCadence.isEmpty ? nil : Int(round(trimmedCadence.reduce(0, +) / Double(trimmedCadence.count)))
-        let workingAvgPace = trimmedPace.isEmpty ? nil : trimmedPace.reduce(0, +) / Double(trimmedPace.count)
+        // Framboise pace buckets are seconds per kilometer for heuristic math;
+        // RunRecord stores pace as decimal minutes per kilometer.
+        let workingAvgPace = trimmedPace.isEmpty ? nil : (trimmedPace.reduce(0, +) / Double(trimmedPace.count)) / 60.0
 
-        let type = FramboiseEngine.classifyRun(paceBuckets: trimmedPace, heartRateBuckets: trimmedHR)
+        let rawPace = runMetrics.paceBuckets.map(\.value)
+        let type = FramboiseEngine.classifyRun(
+            paceBuckets: trimmedPace,
+            cadenceBuckets: trimmedCadence,
+            heartRateBuckets: trimmedHR,
+            distanceBuckets: runMetrics.distanceBuckets.map(\.value),
+            rawPaceBuckets: rawPace
+        )
         let runTypeRaw: String = switch type {
         case .steady: "steady"
+        case .tempo: "tempo"
+        case .progressive: "progressive"
         case .intervals: "intervals"
+        case .urbanTraffic: "urbanTraffic"
         case .unknown: "unknown"
         }
         var tags: [String] = []
@@ -218,8 +249,9 @@ class HealthKitManager: ObservableObject {
         if let cadenceTag = FramboiseEngine.checkCadenceFading(cadenceBuckets: trimmedCadence) { tags.append(cadenceTag) }
 
         func average(_ buckets: [Bucket]) -> Double {
-            guard !buckets.isEmpty else { return 0 }
-            return buckets.map(\.value).reduce(0, +) / Double(buckets.count)
+            let validValues = buckets.map(\.value).filter { $0 > 0 }
+            guard !validValues.isEmpty else { return 0 }
+            return validValues.reduce(0, +) / Double(validValues.count)
         }
 
         let record = RunRecord(

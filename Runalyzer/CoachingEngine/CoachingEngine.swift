@@ -35,24 +35,15 @@ struct RunDataForAI: Sendable {
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map LLM text to this struct.
 @available(iOS 26.0, *)
 @Generable
-struct SuggestedDrill {
-    @Guide(description: "A recognized drill name (e.g., 'Cadence Pyramids', 'Rhythm Intervals', 'Tempo Surges', 'Strides').")
-    var drillTitle: String
+struct DrillPrescription {
+    @Guide(description: "A recognized drill name: Cadence Pyramids, Rhythm Intervals, Tempo Surges, or Strides.")
+    var drillName: String
 
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "A short pre-run drill prescription including sets, reps, intervals, and recovery. Keep it concise; this drill should take about 1 to 5 minutes (e.g., '4 x 30s, 60s easy walk recovery').")
-    var drillWork: String
-
-    @Guide(description: "A specific biomechanical form cue. Keep it short and actionable.")
-    var drillCues: String
-
-    @Guide(description: "The intended intensity level (e.g., 'Moderate aerobic effort').")
-    var drillEffort: String
-
-    @Guide(description: "The targeted cadence for this drill. E.g. '160-165 SPM'. DO NOT use if no cadence is provided.")
-    var targetCadence: String?
+    @Guide(description: "One short biomechanical coaching cue. Do not include digits, percentages, or exact measurements.")
+    var coachingFocus: String
 }
 
 /// A structured response definition representing the complete AI analysis of a run.
@@ -67,13 +58,13 @@ struct RunInsight {
     var observation: String
 
     @Guide(description: "One targeted short pre-run technique drill by default, with an optional second drill only when it directly reinforces the primary Swift directive. The drills together must take about 5 to 10 minutes. Do not prescribe stretches, warm-ups, cooldowns, or a full running workout.")
-    var drills: [SuggestedDrill]
+    var drills: [DrillPrescription]
 }
 
 ///
 @available(iOS 26.0, *)
 @MainActor
-protocol LanguageModelProvider {
+protocol LanguageModelProvider: Sendable {
     var isAvailable: Bool { get }
     func respond(to prompt: String, generating type: RunInsight.Type, with instructions: String) async throws -> RunInsight
 }
@@ -121,12 +112,13 @@ class CoachingEngine {
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
         - speak directly to user using second person ("You", "Your")
+        - CRITICAL: You are strictly forbidden from outputting any numbers, digits, percentages, or exact measurements in your response. Translate all data deltas into purely qualitative biomechanical observations (e.g., 'Your cadence dropped significantly').
         - treat the Swift DIRECTIVE as authoritative for the overall tone and drill focus; do not override or reinterpret it from the raw metrics
         - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided. 
         - explain what the grouped trends indicate about their form and efficiency.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
         - populate_the_workout_steps_and_target_badge_using_only_the_exact_cadence_integers_provided
-        - drill_title_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
+        - drill_name_must_be_one_of: [Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides]
         - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
         - generate exactly 1 targeted drill by default; add exactly 1 second drill only when it directly reinforces the primary DIRECTIVE
         - make every returned drill highly targeted to the primary DIRECTIVE; never generate unrelated drills
@@ -136,7 +128,7 @@ class CoachingEngine {
         - use Strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
         - prefer one excellent drill over multiple generic drills
         - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
-        - keep `drillWork` concise and include all sets, reps, intervals, and recovery in that field
+        - return only drillName, drillPurpose, and coachingFocus; Swift constructs all workout steps, cadence targets, effort, and recovery
         - respond_entirely_in_\(language)
         """
 
@@ -149,32 +141,17 @@ class CoachingEngine {
         You are a running coach.
         \(unitContext)
         [RUN_DATA_START]
-        DIRECTIVE: {{DIRECTIVE_CONTEXT}}
-        DATA_SOURCE: {{WORKING_AVERAGES_CONTEXT}}
-        RUN_TYPE_CLASSIFICATION: {{RUN_TYPE}}
+        DETECTED_TYPE: {{RUN_TYPE}}
+        WORKING_AVERAGES: {{WORKING_AVERAGES_CONTEXT}}
         FRAMBOISE_TAGS: {{FRAMBOISE_TAGS}}
         TARGET_DRILL_CADENCES:
         - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
         - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
-        
-        --- METRIC GROUP A: CARDIOVASCULAR EFFICIENCY ---
-        HEART_RATE_BPM: {{HR_CONTEXT}}
-        VO2_MAX: {{VO2_CONTEXT}}
-        
-        --- METRIC GROUP B: RUNNING ECONOMY & FORM ---
-        CADENCE_SPM: {{CADENCE_CONTEXT}}
-        PACE: {{PACE_CONTEXT}}
-        VERTICAL_OSCILLATION: {{OSCILLATION_CONTEXT}}
-        
-        --- METRIC GROUP C: BIOMECHANICS ---
-        GROUND_CONTACT_TIME: {{GCT_CONTEXT}}
-        STRIDE_LENGTH: {{STRIDE_CONTEXT}}
         [RUN_DATA_END]
         """
 
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RECOVERY_CADENCE}}", with: runData.recoveryCadence)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{WORKING_AVERAGES_CONTEXT}}", with: runData.workingAveragesContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RUN_TYPE}}", with: runData.runType)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{FRAMBOISE_TAGS}}", with: runData.framboiseTags)
@@ -195,13 +172,10 @@ class CoachingEngine {
             return RunInsight(
                 headline: String(localized: "Run Analyzed Successfully"),
                 observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
-                drills: [SuggestedDrill(
-                    drillTitle: String(localized: "Strides"),
+                drills: [DrillPrescription(
+                    drillName: String(localized: "Strides"),
                     drillPurpose: String(localized: "Builds turnover and neural recruitment."),
-                    drillWork: String(localized: "4 × 20s, 60s easy walk recovery"),
-                    drillCues: String(localized: "Focus on relaxed shoulders and quick turnover."),
-                    drillEffort: String(localized: "Comfortably hard"),
-                    targetCadence: nil
+                    coachingFocus: String(localized: "Focus on relaxed shoulders and quick turnover.")
                 )]
             )
         }
@@ -369,13 +343,15 @@ actor RunAnalyzerActor {
 
             var drillRecs: [DrillRecommendation] = []
             for (index, suggestedDrill) in payload.drills.enumerated() {
+                let targetRange = "\(max(0, intervalTarget - 5))–\(intervalTarget + 5) SPM"
                 let drill = DrillRecommendation(
-                    drillTitle: suggestedDrill.drillTitle,
+                    drillTitle: suggestedDrill.drillName,
                     drillPurpose: suggestedDrill.drillPurpose,
-                    drillWork: suggestedDrill.drillWork,
-                    drillCues: suggestedDrill.drillCues,
-                    drillEffort: suggestedDrill.drillEffort,
-                    targetCadence: suggestedDrill.targetCadence,
+                    drillWork: "4x400m intervals",
+                    drillCues: suggestedDrill.coachingFocus,
+                    drillEffort: "Swift-calculated cadence target",
+                    drillRecovery: "Walk easily between repetitions.",
+                    targetCadence: targetRange,
                     targetSPM: intervalTarget,
                     previousCadence: workingCadence,
                     isCompleted: false,

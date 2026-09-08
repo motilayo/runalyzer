@@ -67,13 +67,10 @@ final class CoachingEngineTests: XCTestCase {
 
     func testGenerateInsightSuccess() async throws {
                 let mockProvider = MockLanguageModelProvider()
-        let expectedDrill = SuggestedDrill(
-            drillTitle: "Cadence Pyramids",
+        let expectedDrill = DrillPrescription(
+            drillName: "Cadence Pyramids",
             drillPurpose: "Purpose",
-            drillWork: "Work",
-            drillCues: "Cues",
-            drillEffort: "Effort",
-            targetCadence: "165-170"
+            coachingFocus: "Cues"
         )
         let expectedInsight = RunInsight(
             headline: "Great Run",
@@ -104,7 +101,7 @@ final class CoachingEngineTests: XCTestCase {
         XCTAssertEqual(insight.headline, "Great Run")
         XCTAssertEqual(insight.observation, "Good job")
         XCTAssertEqual(insight.drills.count, 1)
-        XCTAssertEqual(insight.drills.first?.drillTitle, "Cadence Pyramids")
+        XCTAssertEqual(insight.drills.first?.drillName, "Cadence Pyramids")
     }
 
     func testGenerateInsightFallbackOnFailure() async throws {
@@ -132,7 +129,7 @@ final class CoachingEngineTests: XCTestCase {
 
         XCTAssertEqual(insight.headline, "Run Analyzed Successfully")
         XCTAssertEqual(insight.drills.count, 1)
-        XCTAssertEqual(insight.drills.first?.drillTitle, "Strides")
+        XCTAssertEqual(insight.drills.first?.drillName, "Strides")
     }
 
     func testPromptPayload_Generation() async throws {

@@ -26,6 +26,7 @@ struct DashboardView: View {
     @State private var isSyncing: Bool = true
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
@@ -307,6 +308,13 @@ struct DashboardView: View {
                     await updateMacroAverages()
                 }
             }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active, let onSync else { return }
+                Task {
+                    await onSync(false)
+                    await updateMacroAverages()
+                }
+            }
             .refreshable {
                 if let onSync {
                     isSyncing = true
@@ -331,8 +339,29 @@ struct DashboardView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: SettingsView(onForceSync: onSync)) {
-                        Image(systemName: "gearshape")
+                    HStack(spacing: 16) {
+                        #if DEBUG
+                        Button {
+                            Task {
+                                isSyncing = true
+                                await HealthKitSeeder.shared.seedCouchTo5K()
+                                if let onSync {
+                                    await onSync(false)
+                                }
+                                await updateMacroAverages()
+                                isSyncing = false
+                            }
+                        } label: {
+                            Image(systemName: "ladybug.fill")
+                                .foregroundColor(.red)
+                        }
+                        .disabled(isSyncing)
+                        .accessibilityLabel("Seed sample running data")
+                        #endif
+
+                        NavigationLink(destination: SettingsView(onForceSync: onSync)) {
+                            Image(systemName: "gearshape")
+                        }
                     }
                 }
             }
@@ -671,26 +700,7 @@ struct RunListRowView: View {
 
             Spacer()
 
-            if let insight = runRecord.insight {
-                let firstDrill = insight.drillRecommendations?.first ?? insight.drillRecommendation
-                if let drillTitle = firstDrill?.drillTitle.lowercased() {
-                    if drillTitle.contains("cadence") {
-                        PillTagView(text: "Cadence", color: .red)
-                    } else if drillTitle.contains("tempo") {
-                        PillTagView(text: "Tempo", color: .orange)
-                    } else if drillTitle.contains("rhythm") {
-                        PillTagView(text: "Rhythm", color: .purple)
-                    } else if drillTitle.contains("stride") {
-                        PillTagView(text: "Form", color: .blue)
-                    } else {
-                        PillTagView(text: "Analyzed", color: .blue)
-                    }
-                } else {
-                    PillTagView(text: "Analyzed", color: .blue)
-                }
-            } else {
-                PillTagView(text: "Pending", color: .gray)
-            }
+            PillTagView(text: runRecord.detectedType, color: runTypeColor(for: runRecord.detectedType))
 
             Image(systemName: "chevron.right")
                 .font(.caption)
@@ -700,6 +710,17 @@ struct RunListRowView: View {
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(16)
         .padding(.horizontal)
+    }
+}
+
+private func runTypeColor(for detectedType: String) -> Color {
+    switch detectedType {
+    case "Steady": return .green
+    case "Tempo": return .orange
+    case "Progressive": return .yellow
+    case "Intervals": return .red
+    case "Urban Traffic": return .purple
+    default: return .gray
     }
 }
 

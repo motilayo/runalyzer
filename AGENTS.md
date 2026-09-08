@@ -65,7 +65,7 @@ This `AGENTS.md` file acts as the primary repository of architectural context, t
   - Include a prominent disclaimer stating that the insights are AI-generated, are for informational purposes only, and do not replace professional medical or coaching advice.
   - Use native SwiftUI colors like `.secondary` instead of `.tertiaryLabel`.
 - **Run Detail Transparency**: Keep the `Working Averages` / `Raw Totals` control above the metric grid. Working values use Framboise-trimmed buckets; raw values use untrimmed bucket averages or workout totals. Drill cards must display purpose, work, cues, effort, and recovery separately.
-- **WorkoutKit Handoff**: The drill `Start Drill` action must calculate its target cadence in Swift, create the native `CustomWorkout`, attach the cadence `WorkoutAlert` boundary to work steps, and present the resulting `WorkoutPlan` with `.workoutPreview`. Never delegate target calculation or workout structure to the language model.
+- **WorkoutKit Handoff**: The drill `Start Drill` action must calculate its target cadence in Swift, create the native `CustomWorkout`, attach the cadence `WorkoutAlert` boundary to work steps, request `WorkoutScheduler` authorization, and schedule the resulting `WorkoutPlan` for Apple Watch. Never delegate target calculation or workout structure to the language model. iOS schedules the plan; it cannot force-launch the Watch workout screen.
 - **Progression Dashboard Flow**: Keep the dashboard order as filters, seven/thirty-day macro statistics and fatigue insight, then the filtered run list. Do not reintroduce a separate latest-run insight card.
 
 ## 6. Documentation and Validation

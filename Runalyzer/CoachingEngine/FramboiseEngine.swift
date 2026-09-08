@@ -3,7 +3,8 @@ import HealthKit
 
 // MARK: - Models
 
-public struct RunMetrics {
+public struct RunMetrics: Sendable {
+    public var distanceBuckets: [Bucket] = []
     public var heartRateBuckets: [Bucket] = []
     public var cadenceBuckets: [Bucket] = []
     public var paceBuckets: [Bucket] = []
@@ -12,7 +13,8 @@ public struct RunMetrics {
     public var groundContactTimeBuckets: [Bucket] = []
     public var strideLengthBuckets: [Bucket] = []
 
-    public init(heartRateBuckets: [Bucket] = [], cadenceBuckets: [Bucket] = [], paceBuckets: [Bucket] = [], verticalOscillationBuckets: [Bucket] = [], vo2MaxBuckets: [Bucket] = [], groundContactTimeBuckets: [Bucket] = [], strideLengthBuckets: [Bucket] = []) {
+    public init(distanceBuckets: [Bucket] = [], heartRateBuckets: [Bucket] = [], cadenceBuckets: [Bucket] = [], paceBuckets: [Bucket] = [], verticalOscillationBuckets: [Bucket] = [], vo2MaxBuckets: [Bucket] = [], groundContactTimeBuckets: [Bucket] = [], strideLengthBuckets: [Bucket] = []) {
+        self.distanceBuckets = distanceBuckets
         self.heartRateBuckets = heartRateBuckets
         self.cadenceBuckets = cadenceBuckets
         self.paceBuckets = paceBuckets
@@ -24,7 +26,7 @@ public struct RunMetrics {
 
 }
 
-public struct Bucket: Equatable {
+public struct Bucket: Equatable, Sendable {
     public let date: Date
     public let value: Double
 
@@ -37,7 +39,10 @@ public struct Bucket: Equatable {
 
 public enum RunType: Equatable {
     case steady
+    case tempo
+    case progressive
     case intervals
+    case urbanTraffic
     case unknown
 }
 
@@ -52,6 +57,7 @@ public class FramboiseEngine {
     public static func fetchMetricsConcurrently(for workout: HKWorkout, healthStore: HKHealthStoreProtocol) async throws -> RunMetrics {
 
         let types: [(HKQuantityTypeIdentifier, HKStatisticsOptions, HKUnit)] = [
+            (.distanceWalkingRunning, .cumulativeSum, HKUnit.meter()),
             (.heartRate, .discreteAverage, HKUnit.count().unitDivided(by: .minute())),
             (.stepCount, .cumulativeSum, HKUnit.count()), // for cadence
             (.runningSpeed, .discreteAverage, HKUnit.meter().unitDivided(by: .second())), // for pace
@@ -131,7 +137,9 @@ public class FramboiseEngine {
                 // sort by date to maintain chronological order as tasks complete out of order
                 let sortedBuckets = buckets.sorted { $0.date < $1.date }
 
-                if identifier == .heartRate {
+                if identifier == .distanceWalkingRunning {
+                    result.distanceBuckets = sortedBuckets
+                } else if identifier == .heartRate {
                     result.heartRateBuckets = sortedBuckets
                 } else if identifier == .stepCount {
                     result.cadenceBuckets = sortedBuckets
@@ -195,6 +203,30 @@ public class FramboiseEngine {
         return trimmed
     }
 
+    /// Trims pace buckets expressed as seconds per kilometer. Pace has inverse
+    /// directionality to cadence and heart rate: a stop is zero or very slow,
+    /// while a lower positive value is a faster effort and must be retained.
+    public static func trimPaceOutliers(from data: [Double]) -> [Double] {
+        let validData = data.filter { $0 > 0 }
+        guard validData.count > 2 else { return validData }
+
+        let sorted = validData.sorted()
+        let median = sorted[sorted.count / 2]
+        let threshold = median * 1.3
+
+        var left = 0
+        var right = data.count - 1
+        while left <= right && (data[left] <= 0 || data[left] > threshold) {
+            left += 1
+        }
+        while right >= left && (data[right] <= 0 || data[right] > threshold) {
+            right -= 1
+        }
+
+        guard left <= right else { return [] }
+        return data[left...right].filter { $0 > 0 && $0 <= threshold }
+    }
+
     /// Framboise Heuristics Engine: Pace Variance
     public static func checkPaceVariance(paceBuckets: [Double]) -> String? {
         guard !paceBuckets.isEmpty else { return nil }
@@ -236,38 +268,86 @@ public class FramboiseEngine {
     }
 
     /// Classification Engine
-    public static func classifyRun(paceBuckets: [Double], heartRateBuckets: [Double]) -> RunType {
+    public static func classifyRun(
+        paceBuckets: [Double],
+        cadenceBuckets: [Double],
+        heartRateBuckets: [Double],
+        distanceBuckets: [Double] = [],
+        rawPaceBuckets: [Double] = []
+    ) -> RunType {
         guard !paceBuckets.isEmpty else { return .unknown }
 
-        let mean = paceBuckets.reduce(0, +) / Double(paceBuckets.count)
-        let sumOfSquaredDifferences = paceBuckets.reduce(0) { total, value in
-            let diff = value - mean
-            return total + (diff * diff)
+        let trafficStopCount = zip(distanceBuckets, zip(cadenceBuckets, heartRateBuckets)).filter { distance, metrics in
+            distance <= 0 || (metrics.0 <= 0 && metrics.1 > 0)
+        }.count
+        if distanceBuckets.count >= 5 && trafficStopCount > 0 {
+            return .urbanTraffic
         }
-        let variance = sumOfSquaredDifferences / Double(paceBuckets.count)
-        let stdDev = variance.squareRoot()
 
-        // Check peaks and valleys
+        let values = paceBuckets.filter { $0 > 0 }
+        let cadenceValues = cadenceBuckets.filter { $0 > 0 }
+        let heartRateValues = heartRateBuckets.filter { $0 > 0 }
+        guard values.count >= 3, cadenceValues.count >= 3 else { return .unknown }
+
+        func standardDeviation(_ values: [Double]) -> Double {
+            let mean = values.reduce(0, +) / Double(values.count)
+            let variance = values.reduce(0) { total, value in
+                let difference = value - mean
+                return total + difference * difference
+            } / Double(values.count)
+            return variance.squareRoot()
+        }
+
+        let paceMean = values.reduce(0, +) / Double(values.count)
+        let paceStdDev = standardDeviation(values)
+        let cadenceMean = cadenceValues.reduce(0, +) / Double(cadenceValues.count)
+        let cadenceStdDev = standardDeviation(cadenceValues)
+
+        // A progressive run has a sustained one-direction pace trend, not repeated peaks.
+        let midpoint = Double(values.count - 1) / 2.0
+        let denominator = values.reduce(0) { total, _ in total + pow(midpoint, 2) }
+        let slope = denominator == 0 ? 0 : values.enumerated().reduce(0) { total, item in
+            total + (Double(item.offset) - midpoint) * (item.element - paceMean)
+        } / denominator
+        let explainedVariance = paceStdDev == 0 ? 0 : values.enumerated().reduce(0) { total, item in
+            let predicted = paceMean + slope * (Double(item.offset) - midpoint)
+            return total + pow(item.element - predicted, 2)
+        }
+        let trendFit = paceStdDev == 0 ? 0 : 1 - (explainedVariance / Double(values.count)) / pow(paceStdDev, 2)
+
+        if slope < -1.5 && trendFit >= 0.55 && (values.max()! - values.min()!) >= 12 {
+            return .progressive
+        }
+
+        // Intervals require repeated, prominent alternation around the mean.
         var crossings = 0
-        let margin = stdDev * 0.5
-        var isAbove = paceBuckets[0] > mean
-        for pace in paceBuckets {
-            if isAbove && pace < mean - margin {
+        let margin = max(8, cadenceStdDev * 0.75)
+        var phase = 0
+        for cadence in cadenceValues {
+            if phase == 0 && cadence > cadenceMean + margin {
+                phase = 1
+            } else if phase == 0 && cadence < cadenceMean - margin {
+                phase = -1
+            } else if phase == 1 && cadence < cadenceMean - margin {
                 crossings += 1
-                isAbove = false
-            } else if !isAbove && pace > mean + margin {
+                phase = -1
+            } else if phase == -1 && cadence > cadenceMean + margin {
                 crossings += 1
-                isAbove = true
+                phase = 1
             }
         }
 
-        // High variance and repeating peaks/valleys -> intervals
-        if stdDev > 10 && crossings >= 2 {
+        if cadenceStdDev > 8 && paceStdDev > 15 && crossings >= 3 {
             return .intervals
         }
 
-        // Low variance -> steady
-        if stdDev <= 5 {
+        // A steady, high-effort run is tempo; progressive runs were handled above.
+        let averageHeartRate = heartRateValues.isEmpty ? 0 : heartRateValues.reduce(0, +) / Double(heartRateValues.count)
+        if cadenceStdDev <= 3 && paceStdDev <= 15 && averageHeartRate >= 162 {
+            return .tempo
+        }
+
+        if cadenceStdDev <= 3 && paceStdDev <= 15 {
             return .steady
         }
 

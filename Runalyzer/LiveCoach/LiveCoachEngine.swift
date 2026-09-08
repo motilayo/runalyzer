@@ -1,12 +1,13 @@
 import Foundation
 import WorkoutKit
 import HealthKit
-import AVFoundation
+@preconcurrency import AVFoundation
 #if os(watchOS)
 import WatchKit
 #endif
 
 @available(iOS 17.0, watchOS 10.0, *)
+@MainActor
 public class LiveCoachEngine {
 
     public var silentModeEnabled: Bool = false

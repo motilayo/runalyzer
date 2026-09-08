@@ -94,8 +94,7 @@ actor MacroQueryEngine {
         task: synthesize_weekly_fatigue_management_insight
         rules:
         - speak directly to user using second person ("You", "Your")
-        - STRICT ZERO NUMBERS RULE: forbid all numbers, digits, percentages, measurements, and unit names in the headline and observation.
-        - CRITICAL: You are strictly forbidden from using any numbers, digits, percentages, or exact measurements in your response. Translate all data deltas into purely qualitative biomechanical observations.
+        - CRITICAL: You are strictly forbidden from outputting any numbers, digits, percentages, or exact measurements in your response. Translate all data deltas into purely qualitative biomechanical observations (e.g., 'Your cadence dropped significantly').
         - focus strictly on comparing the 7-day trends against their 30-day baseline to evaluate fatigue and form breakdown.
         - respond entirely in \(Locale.current.language.languageCode?.identifier ?? "en")
         """

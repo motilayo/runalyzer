@@ -9,7 +9,7 @@ Runalyzer is a native iOS application acting as an analytical mirror for runners
 - **Correct Pace Display**: Formats pace as `minutes:seconds` for the active kilometer or mile unit across dashboard summaries, filtered runs, and run details.
 - **Private AI**: Uses native iOS on-device FoundationModels (`LanguageModelSession`) to analyze performance and suggest drills with qualitative fatigue observations.
 - **Actionable Drills**: Provides coaching headlines, aerobic and biomechanical observations, distinct work and recovery instructions, and deterministic cadence targets.
-- **WorkoutKit Handoff**: A `Start Drill` action creates a native running `CustomWorkout` with cadence alert boundaries and presents it through Apple's workout preview.
+- **WorkoutKit Handoff**: A `Start Drill` action requests WorkoutKit authorization and schedules a native running `CustomWorkout` with cadence alert boundaries for Apple Watch. iOS schedules the plan rather than force-launching the Watch workout screen.
 - **Progression Hub**: The dashboard flows from time and distance filters to seven/thirty-day macro statistics, fatigue insight, and the filtered run list.
 - **Minimalist Design**: A clean, native SwiftUI interface with high-contrast elements and compact metric surfaces.
 

@@ -108,7 +108,7 @@ final class HealthKitManagerTests: XCTestCase {
     }
 }
 
-class MockHealthStore: HKHealthStoreProtocol {
+final class MockHealthStore: HKHealthStoreProtocol, @unchecked Sendable {
     var requestAuthorizationCalled = false
     var requestedTypesToShare: Set<HKSampleType>?
     var requestedTypesToRead: Set<HKObjectType>?
@@ -169,6 +169,12 @@ final class FramboiseEngineTests: XCTestCase {
         XCTAssertEqual(trimmed, [150, 152, 155, 154])
     }
 
+    func testPaceOutlierTrimmerKeepsFasterPaceAndRemovesStops() {
+        let input: [Double] = [407, 410, 0, 900, 408, 405]
+        let trimmed = FramboiseEngine.trimPaceOutliers(from: input)
+        XCTAssertEqual(trimmed, [407, 410, 408, 405])
+    }
+
     func testVarianceCheck_SteadyPace() {
         let paceBuckets: [Double] = [300, 302, 298, 305, 301, 299]
         let result = FramboiseEngine.checkPaceVariance(paceBuckets: paceBuckets)
@@ -183,9 +189,50 @@ final class FramboiseEngineTests: XCTestCase {
 
     func testClassificationEngine_Intervals() {
         let paceBuckets: [Double] = [300, 350, 250, 350, 250, 300]
-        let heartRateBuckets: [Double] = []
-        let type = FramboiseEngine.classifyRun(paceBuckets: paceBuckets, heartRateBuckets: heartRateBuckets)
+        let cadenceBuckets: [Double] = [175, 145, 176, 144, 175, 145]
+        let type = FramboiseEngine.classifyRun(paceBuckets: paceBuckets, cadenceBuckets: cadenceBuckets, heartRateBuckets: [])
         XCTAssertEqual(type, .intervals)
+    }
+
+    func testClassificationEngine_Tempo() {
+        let paceBuckets: [Double] = [300, 306, 294, 308, 292, 301]
+        let cadenceBuckets: [Double] = [172, 174, 173, 175, 172, 174]
+        let heartRateBuckets: [Double] = [170, 172, 171, 173, 172, 171]
+        let type = FramboiseEngine.classifyRun(paceBuckets: paceBuckets, cadenceBuckets: cadenceBuckets, heartRateBuckets: heartRateBuckets)
+        XCTAssertEqual(type, .tempo)
+    }
+
+    func testClassificationEngine_Progressive() {
+        let paceBuckets: [Double] = [330, 326, 322, 318, 314, 310, 306, 302, 298]
+        let cadenceBuckets: [Double] = [155, 157, 159, 161, 163, 165, 167, 169, 171]
+        let type = FramboiseEngine.classifyRun(paceBuckets: paceBuckets, cadenceBuckets: cadenceBuckets, heartRateBuckets: [])
+        XCTAssertEqual(type, .progressive)
+    }
+
+    func testClassificationEngine_UrbanTraffic() {
+        let paceBuckets: [Double] = [300, 0, 302, 0, 298, 301]
+        let type = FramboiseEngine.classifyRun(
+            paceBuckets: [300, 302, 298, 301],
+            cadenceBuckets: [165, 165, 165, 165],
+            heartRateBuckets: [150, 150, 150, 150],
+            distanceBuckets: [180, 0, 175, 180],
+            rawPaceBuckets: paceBuckets
+        )
+        XCTAssertEqual(type, .urbanTraffic)
+    }
+
+    func testPaceFormatterConvertsDecimalMinutesToTotalSeconds() {
+        let originalValue = UserDefaults.standard.object(forKey: "useMetricSystem")
+        defer {
+            if let originalValue {
+                UserDefaults.standard.set(originalValue, forKey: "useMetricSystem")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "useMetricSystem")
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: "useMetricSystem")
+        XCTAssertEqual((6.9166667).formattedPaceString, "6:55/km")
     }
 
     func testConcurrentBucketing_Aggregation() async throws {
@@ -203,7 +250,7 @@ final class FramboiseEngineTests: XCTestCase {
     }
 }
 
-class MockHealthStoreForBucketing: HKHealthStoreProtocol {
+final class MockHealthStoreForBucketing: HKHealthStoreProtocol, @unchecked Sendable {
     func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws {}
     func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus { return .notDetermined }
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {}

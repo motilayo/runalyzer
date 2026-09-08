@@ -70,16 +70,39 @@ final class RunRecord {
             guard let raw = runTypeRaw else { return .unknown }
             switch raw {
             case "steady": return .steady
+            case "tempo": return .tempo
+            case "progressive": return .progressive
             case "intervals": return .intervals
+            case "urbanTraffic", "urban_traffic", "urban traffic": return .urbanTraffic
             default: return .unknown
             }
         }
         set {
             switch newValue {
             case .steady: runTypeRaw = "steady"
+            case .tempo: runTypeRaw = "tempo"
+            case .progressive: runTypeRaw = "progressive"
             case .intervals: runTypeRaw = "intervals"
+            case .urbanTraffic: runTypeRaw = "urbanTraffic"
             case .unknown: runTypeRaw = "unknown"
             }
+        }
+    }
+
+    /// The Framboise classification formatted for run-list presentation.
+    var detectedType: String {
+        guard let raw = runTypeRaw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return "Unknown"
+        }
+
+        switch raw.lowercased() {
+        case "steady": return "Steady"
+        case "tempo": return "Tempo"
+        case "progressive": return "Progressive"
+        case "intervals", "interval": return "Intervals"
+        case "urban traffic", "urban_traffic", "urban-traffic": return "Urban Traffic"
+        case "unknown": return "Unknown"
+        default: return raw.capitalized
         }
     }
 
@@ -130,7 +153,7 @@ extension Double {
         let pace = useMetricSystem ? self : self * 1.609344
         let totalSeconds = Int((pace * 60).rounded())
         let unit = useMetricSystem ? "km" : "mi"
-        return String(format: "%d:%02d/%@", totalSeconds / 60, totalSeconds % 60, unit)
+        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60) + "/\(unit)"
     }
 }
 
