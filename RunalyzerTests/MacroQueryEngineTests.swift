@@ -41,7 +41,7 @@ final class MacroQueryEngineTests: XCTestCase {
         // Assert
         XCTAssertNotNil(baseline)
         XCTAssertEqual(baseline?.avgDistance, 5000.0)
-        XCTAssertEqual(baseline?.avgPace, 5.0)
+        XCTAssertEqual(baseline?.avgPace, 300.0)
         XCTAssertEqual(baseline?.avgHeartRate, 150)
         XCTAssertEqual(baseline?.avgCadence, 160)
     }

@@ -1,17 +1,21 @@
 import SwiftUI
 import SwiftData
 
-/// A subview that accepts a dynamic FetchDescriptor and renders the filtered list of runs.
-/// This prevents SwiftUI re-rendering loops while enabling dynamic filtering based on parent state.
+/// A subview that accepts an array of filtered RunRecords and renders the list of runs.
+/// This guarantees reactive updates when parent filter state changes.
 struct RunListFilteredView: View {
-    @Query private var runRecords: [RunRecord]
+    let runs: [RunRecord]
+
+    init(runs: [RunRecord]) {
+        self.runs = runs
+    }
 
     init(descriptor: FetchDescriptor<RunRecord>) {
-        _runRecords = Query(descriptor)
+        self.runs = []
     }
 
     var body: some View {
-        if runRecords.isEmpty {
+        if runs.isEmpty {
             ContentUnavailableView(
                 "No Runs Match Filters",
                 systemImage: "line.3.horizontal.decrease.circle",
@@ -19,13 +23,11 @@ struct RunListFilteredView: View {
             )
             .padding(.top, 40)
         } else {
-            LazyVStack(spacing: 16) {
-                ForEach(runRecords) { run in
-                    NavigationLink(value: run) {
-                        RunListRowView(runRecord: run)
-                    }
-                    .buttonStyle(.plain)
+            ForEach(runs) { run in
+                NavigationLink(value: run) {
+                    RunListRowView(runRecord: run)
                 }
+                .buttonStyle(.plain)
             }
         }
     }

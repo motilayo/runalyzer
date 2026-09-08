@@ -1,20 +1,19 @@
 import SwiftUI
 import SwiftData
+import WorkoutKit
+import HealthKit
 
 /// A detailed view for a single `RunRecord`, displaying in-depth metrics and the full AI Coaching Insight.
-///
-/// This view includes a grid of physiological and biomechanical stats, followed by the AI-generated
-/// observation and the specific actionable technique drill prescribed by the Foundation Model.
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
     @Environment(\.modelContext) private var modelContext
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
 
-    @AppStorage("useWorkingAverages") private var useWorkingAverages: Bool = true
+    // Segment 0: Working Averages, Segment 1: Raw Totals
+    @State private var selectedAverageMode: Int = 0
 
-
-    // Baseline calculations
+    // Baseline calculations (relative rolling 30-day baseline)
     private var baselineRuns: [RunRecord] {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
         return existingRuns.filter { $0.date < runRecord.date && $0.date >= thirtyDaysAgo }
@@ -23,19 +22,19 @@ struct RunDetailView: View {
     private var baselinePace: Double? {
         let runs = baselineRuns
         guard !runs.isEmpty else { return nil }
-        return runs.map(\.avgPace).reduce(0, +) / Double(runs.count)
+        return runs.map { $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace }.reduce(0, +) / Double(runs.count)
     }
 
     private var baselineHR: Double? {
-        let runs = baselineRuns.filter { $0.avgHeartRate > 0 }
+        let runs = baselineRuns.filter { ($0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate) > 0 }
         guard !runs.isEmpty else { return nil }
-        return Double(runs.map(\.avgHeartRate).reduce(0, +)) / Double(runs.count)
+        return Double(runs.map { $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate }.reduce(0, +)) / Double(runs.count)
     }
 
     private var baselineCadence: Double? {
-        let runs = baselineRuns.filter { $0.avgCadence > 0 }
+        let runs = baselineRuns.filter { ($0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence) > 0 }
         guard !runs.isEmpty else { return nil }
-        return Double(runs.map(\.avgCadence).reduce(0, +)) / Double(runs.count)
+        return Double(runs.map { $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence }.reduce(0, +)) / Double(runs.count)
     }
 
     private var baselineVertOsc: Double? {
@@ -68,20 +67,23 @@ struct RunDetailView: View {
         ScrollView {
             VStack(spacing: 24) {
 
-                VStack {
-                    Toggle(useWorkingAverages ? "Working Averages" : "Raw Totals", isOn: $useWorkingAverages)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                // Dual-View Segmented Picker
+                Picker("Average Mode", selection: $selectedAverageMode) {
+                    Text("Working Averages").tag(0)
+                    Text("Raw Totals").tag(1)
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 8)
 
-                // Top: Responsive 6-Card Grid of Raw Stats
+                // Responsive 6-Card Grid of Stats
                 let columns = verticalSizeClass == .regular
                     ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
                     : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-                    let distanceConverted = useMetricSystem ? (runRecord.distance / 1000.0) : (runRecord.distance / 1609.344)
+                    let distanceConverted = useMetricSystem ? (runRecord.totalDistanceMeters / 1000.0) : (runRecord.totalDistanceMeters / 1609.344)
                     let distanceUnit = useMetricSystem ? "km" : "mi"
                     StatBox(title: "Distance", value: String(format: "%.2f", distanceConverted), unit: distanceUnit)
 
@@ -89,12 +91,21 @@ struct RunDetailView: View {
                     let seconds = Int(runRecord.duration) % 60
                     StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
 
-                    let displayPace = (useWorkingAverages ? runRecord.workingAvgPace : nil) ?? runRecord.avgPace
-                    let displayPaceStr = (useWorkingAverages ? runRecord.workingFormattedPace : nil) ?? runRecord.formattedPace
-                    let displayHR = (useWorkingAverages ? runRecord.workingAvgHeartRate : nil) ?? runRecord.avgHeartRate
-                    let displayCadence = (useWorkingAverages ? runRecord.workingAvgCadence : nil) ?? runRecord.avgCadence
+                    let isWorking = (selectedAverageMode == 0)
+                    let displayPaceSec = isWorking
+                        ? (runRecord.workingAvgPace > 0 ? runRecord.workingAvgPace : runRecord.rawAvgPace)
+                        : runRecord.rawAvgPace
+                    let displayPaceStr = formatDisplayPace(secondsPerKilometer: displayPaceSec)
 
-                    StatBox(title: "Avg Pace", value: displayPaceStr, unit: "", currentValue: displayPace, baselineValue: baselinePace, polarity: .lowerIsBetter)
+                    let displayHR = isWorking
+                        ? (runRecord.workingAvgHeartRate > 0 ? Int(runRecord.workingAvgHeartRate.rounded()) : Int(runRecord.rawAvgHeartRate.rounded()))
+                        : Int(runRecord.rawAvgHeartRate.rounded())
+
+                    let displayCadence = isWorking
+                        ? (runRecord.workingAvgCadence > 0 ? Int(runRecord.workingAvgCadence.rounded()) : Int(runRecord.rawAvgCadence.rounded()))
+                        : Int(runRecord.rawAvgCadence.rounded())
+
+                    StatBox(title: "Avg Pace", value: displayPaceStr, unit: "", currentValue: displayPaceSec, baselineValue: baselinePace, polarity: .lowerIsBetter)
                     StatBox(title: "Avg HR", value: "\(displayHR)", unit: "BPM", currentValue: Double(displayHR), baselineValue: baselineHR, polarity: .lowerIsBetter)
                     StatBox(title: "Avg Cadence", value: "\(displayCadence)", unit: "SPM", currentValue: Double(displayCadence), baselineValue: baselineCadence, polarity: .higherIsBetter)
                     StatBox(title: "Vert. Osc.", value: String(format: "%.1f", runRecord.verticalOscillation), unit: "cm", currentValue: runRecord.verticalOscillation, baselineValue: baselineVertOsc, polarity: .lowerIsBetter)
@@ -102,7 +113,7 @@ struct RunDetailView: View {
                 .padding(.horizontal)
 
                 if let insight = runRecord.insight {
-                    // Middle: AI Card
+                    // AI Card
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "sparkles")
@@ -127,31 +138,57 @@ struct RunDetailView: View {
                         Divider()
                             .padding(.vertical, 4)
 
+                        // Run Type Override Control
                         HStack {
                             Text("Detected Run Type:")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
+
                             Spacer()
-                            Picker("Run Type", selection: $runRecord.runTypeRaw) {
-                                Text("Steady").tag(Optional("steady"))
-                                Text("Tempo").tag(Optional("tempo"))
-                                Text("Progressive").tag(Optional("progressive"))
-                                Text("Intervals").tag(Optional("intervals"))
-                                Text("Urban Traffic").tag(Optional("urbanTraffic"))
-                                Text("Unknown").tag(Optional("unknown"))
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .onChange(of: runRecord.runTypeRaw) { _, _ in
-                                runRecord.insight = nil // Clear insight to trigger regeneration
-                                if #available(iOS 26.0, *) {
-                                    let container = modelContext.container
-                                    let runId = runRecord.persistentModelID
-                                    Task.detached {
-                                        let analyzer = RunAnalyzerActor(modelContainer: container)
-                                        await analyzer.generateAnalysis(for: runId)
+
+                            PillTagView(text: runRecord.detectedType, color: runTypeColor(for: runRecord.detectedType))
+
+                            Picker("Run Type", selection: Binding<String>(
+                                get: { runRecord.detectedTypeRaw },
+                                set: { newType in
+                                    runRecord.detectedTypeRaw = newType
+
+                                    // 1. Queue TrainingCorrection
+                                    let correction = TrainingCorrection(
+                                        averagePace: runRecord.workingAvgPace > 0 ? runRecord.workingAvgPace : runRecord.rawAvgPace,
+                                        paceCV: runRecord.paceCV,
+                                        paceSlope: runRecord.paceSlope,
+                                        percentZone4: runRecord.percentZone4,
+                                        durationMinutes: max(1.0, runRecord.duration / 60.0),
+                                        correctedLabel: newType
+                                    )
+                                    modelContext.insert(correction)
+                                    try? modelContext.save()
+
+                                    // 2. Trigger on-device retraining if batch >= 5
+                                    ModelManager.shared.processTrainingCorrections(in: modelContext)
+
+                                    // 3. Invalidate cached analysis and re-generate
+                                    runRecord.aiCoachingAnalysis = nil
+                                    runRecord.insight = nil
+                                    try? modelContext.save()
+
+                                    if #available(iOS 26.0, *) {
+                                        let container = modelContext.container
+                                        let runId = runRecord.persistentModelID
+                                        Task.detached {
+                                            let analyzer = RunAnalyzerActor(modelContainer: container)
+                                            await analyzer.generateAnalysis(for: runId)
+                                        }
                                     }
                                 }
+                            )) {
+                                Text("Steady").tag("steady")
+                                Text("Tempo").tag("tempo")
+                                Text("Intervals").tag("intervals")
+                                Text("Progressive").tag("progressive")
                             }
+                            .pickerStyle(MenuPickerStyle())
                         }
 
                         aiDisclaimerFooter
@@ -163,12 +200,11 @@ struct RunDetailView: View {
                     .cornerRadius(20)
                     .padding(.horizontal)
 
-                    // Bottom: Drill Card Deck
+                    // Drill Card Deck
                     if let drills = insight.drillRecommendations, !drills.isEmpty {
                         DrillDeckView(drills: drills)
                             .padding(.top, 24)
                     } else if let drill = insight.drillRecommendation {
-                        // Fallback for legacy single drill migrations
                         DrillDeckView(drills: [drill])
                             .padding(.top, 24)
                     }
@@ -212,8 +248,7 @@ struct RunDetailView: View {
     }
 }
 
-/// A tappable statistic box displaying a specific metric for a run.
-/// Tapping it presents an alert with a detailed definition of the metric.
+// MARK: - Subviews
 
 struct StatBox: View {
     var title: String
@@ -232,13 +267,13 @@ struct StatBox: View {
         case "total time":
             return "The total elapsed time of your run."
         case "avg pace":
-            return "Your average speed, measured in minutes per distance unit (mile or kilometer)."
+            return "Your average speed, measured in minutes and seconds per unit."
         case "avg hr":
             return "Your average heart rate during the run in Beats Per Minute (BPM)."
         case "avg cadence":
-            return "Your average step rate, measured in Steps Per Minute (SPM). A higher cadence can reduce impact forces."
+            return "Your average step rate, measured in Steps Per Minute (SPM)."
         case "vert. osc.":
-            return "Vertical Oscillation measures how much your torso bounces up and down with each step. Lower values often indicate better efficiency and less energy wasted fighting gravity."
+            return "Vertical Oscillation measures how much your torso bounces up and down with each step."
         default:
             return "A running metric tracked by HealthKit."
         }
@@ -254,9 +289,11 @@ struct StatBox: View {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.title2.bold())
-                Text(unit)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
                 if let current = currentValue, let baseline = baselineValue, let polarity = polarity {
                     let diff = current - baseline
@@ -293,12 +330,9 @@ struct StatBox: View {
             .presentationDetents([.height(200)])
             .presentationDragIndicator(.visible)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(value) \(unit). Double tap for definition.")
     }
 }
 
-/// A styled row within a drill recommendation card, combining a system icon with a descriptive text.
 struct DrillRow: View {
     var icon: String
     var text: String
@@ -389,7 +423,6 @@ struct DrillDeckView: View {
         ZStack(alignment: .top) {
             ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
                 let relativeIndex = index - activeCardIndex
-
                 if relativeIndex >= 0 && relativeIndex < 3 {
                     deckCard(currentDrill, index: index, totalDrills: sortedDrills.count)
                 }
@@ -401,7 +434,7 @@ struct DrillDeckView: View {
     }
 }
 
-import WorkoutKit
+// MARK: - Programmatic WorkoutKit Handoff Card
 
 private struct DrillCardView: View {
     @Bindable var drill: DrillRecommendation
@@ -414,9 +447,9 @@ private struct DrillCardView: View {
     @State private var workoutHandoffError: String?
     @State private var workoutHandoffSucceeded = false
 
-    private var deterministicTargetSPM: Int? {
-        guard let previousCadence = drill.previousCadence, previousCadence > 0 else { return drill.targetSPM }
-        return min(180, max(150, Int((Double(previousCadence) * 1.05).rounded())))
+    private var deterministicTargetSPM: Double {
+        let baselineCadence = Double(drill.previousCadence ?? 150)
+        return max(160.0, (baselineCadence * 1.05).rounded())
     }
 
     var body: some View {
@@ -462,12 +495,14 @@ private struct DrillCardView: View {
                 DrillRow(icon: "pause.circle", text: drill.drillRecovery ?? "")
             }
 
-            if let target = deterministicTargetSPM, let prev = drill.previousCadence, target > 0 {
+            let targetInt = Int(deterministicTargetSPM)
+            let prevInt = drill.previousCadence ?? 0
+            if prevInt > 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Cadence Goal")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("Current: \(prev) SPM → Target: \(target) SPM")
+                    Text("Current: \(prevInt) SPM → Target: \(targetInt) SPM")
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
                 }
@@ -484,6 +519,7 @@ private struct DrillCardView: View {
                 isSchedulingWorkout = true
                 workoutHandoffError = nil
                 workoutHandoffSucceeded = false
+
                 Task {
                     guard WorkoutScheduler.isSupported else {
                         workoutHandoffError = "Workout scheduling is unavailable on this device."
@@ -491,14 +527,6 @@ private struct DrillCardView: View {
                         return
                     }
 
-                    guard let targetSPM = deterministicTargetSPM,
-                          let customWorkout = LiveCoachEngine().translate(prescription: drill.drillWork ?? "", targetSPM: targetSPM) else {
-                        workoutHandoffError = "This drill does not contain a schedulable workout prescription."
-                        isSchedulingWorkout = false
-                        return
-                    }
-
-                    let plan = WorkoutPlan(.custom(customWorkout))
                     let authorizationState = await WorkoutScheduler.shared.requestAuthorization()
                     guard authorizationState == .authorized else {
                         workoutHandoffError = "WorkoutKit authorization is required to send this drill to Apple Watch."
@@ -506,17 +534,46 @@ private struct DrillCardView: View {
                         return
                     }
 
-                    let scheduleDate = Calendar.current.dateComponents(
-                        [.calendar, .timeZone, .year, .month, .day, .hour, .minute],
-                        from: Date()
-                    )
-                    await WorkoutScheduler.shared.schedule(plan, at: scheduleDate)
-                    drill.isCompleted = true
-                    isSchedulingWorkout = false
-                    workoutHandoffSucceeded = true
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    try? await Task.sleep(for: .seconds(1.2))
-                    dismiss()
+                    do {
+                        let targetSPM = deterministicTargetSPM
+                        let alertRange = (targetSPM - 3.0)...(targetSPM + 3.0)
+
+                        // 1. Build Work Interval with Target Alert
+                        var workStep = WorkoutStep(goal: .time(60, .seconds))
+                        workStep.alert = .cadence(alertRange)
+
+                        // 2. Build Recovery Interval
+                        let recoveryStep = WorkoutStep(goal: .time(60, .seconds))
+
+                        // 3. Assemble Interval Block & Workout
+                        let block = IntervalBlock(steps: [IntervalStep(.work, step: workStep), IntervalStep(.recovery, step: recoveryStep)], iterations: 5)
+                        let customWorkout = CustomWorkout(
+                            activity: .running,
+                            location: .outdoor,
+                            displayName: drill.drillTitle.isEmpty ? "Rhythm Intervals" : drill.drillTitle,
+                            warmup: WorkoutStep(goal: .time(300, .seconds)),
+                            blocks: [block],
+                            cooldown: nil
+                        )
+
+                        // 4. Schedule via WorkoutKit
+                        let plan = WorkoutPlan(.custom(customWorkout))
+                        let scheduleDate = Calendar.current.dateComponents(
+                            [.calendar, .timeZone, .year, .month, .day, .hour, .minute],
+                            from: Date()
+                        )
+                        await WorkoutScheduler.shared.schedule(plan, at: scheduleDate)
+
+                        drill.isCompleted = true
+                        isSchedulingWorkout = false
+                        workoutHandoffSucceeded = true
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        try? await Task.sleep(for: .seconds(1.2))
+                        dismiss()
+                    } catch {
+                        workoutHandoffError = "Failed to schedule workout: \(error.localizedDescription)"
+                        isSchedulingWorkout = false
+                    }
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -526,13 +583,13 @@ private struct DrillCardView: View {
                     }
                     Text(workoutHandoffSucceeded ? "Scheduled on Apple Watch" : (isSchedulingWorkout ? "Sending to Apple Watch..." : (drill.isCompleted ? "Completed" : "Start Drill")))
                 }
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(workoutHandoffSucceeded || drill.isCompleted ? Color.green : Color.accentColor)
-                    .clipShape(Capsule())
+                .font(.subheadline.bold())
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(workoutHandoffSucceeded || drill.isCompleted ? Color.green : Color.accentColor)
+                .clipShape(Capsule())
             }
             .disabled(drill.isCompleted || isSchedulingWorkout)
             .alert("Workout Handoff", isPresented: Binding(

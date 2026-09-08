@@ -8,6 +8,7 @@ struct RunalyzerApp: App {
     let container: ModelContainer = {
         let schema = Schema([
             RunRecord.self,
+            TrainingCorrection.self,
             CoachingInsight.self,
             DrillRecommendation.self
         ])
@@ -24,6 +25,7 @@ struct RunalyzerApp: App {
             .displayFrequency(.immediate),
             .datastoreLocation(.applicationDefault)
         ])
+        ModelManager.shared.provisionModelIfNeeded()
     }
 
     var body: some Scene {

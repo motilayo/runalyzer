@@ -6,30 +6,38 @@ import FoundationModels
 @ModelActor
 actor MacroQueryEngine {
 
-    // Calculates the rolling averages over the specified number of days back from a target date.
-    func calculateRollingAverages(days: Int, minimumDistance: Double = 0, to targetDate: Date = Date()) async throws -> BaselineStats? {
-        guard let startDate = Calendar.current.date(byAdding: .day, value: -days, to: targetDate) else {
-            return nil
-        }
-
+    // Calculates the rolling averages over the specified number of days back from a target date, or all-time if days is nil.
+    func calculateRollingAverages(days: Int? = nil, minimumDistance: Double = 0, to targetDate: Date = Date()) async throws -> BaselineStats? {
         // Subtracted 0.01 to avoid precision issues like 1000.0 >= 999.999
         let minDistanceFloat = minimumDistance - 0.01
 
-        let descriptor = FetchDescriptor<RunRecord>(
-            predicate: #Predicate { $0.distance >= minDistanceFloat && $0.date >= startDate && $0.date <= targetDate },
-            sortBy: [SortDescriptor(\.date)]
-        )
+        let descriptor: FetchDescriptor<RunRecord>
+        if let days = days, let startDate = Calendar.current.date(byAdding: .day, value: -days, to: targetDate) {
+            descriptor = FetchDescriptor<RunRecord>(
+                predicate: #Predicate { $0.totalDistanceMeters >= minDistanceFloat && $0.date >= startDate && $0.date <= targetDate },
+                sortBy: [SortDescriptor(\.date)]
+            )
+        } else {
+            descriptor = FetchDescriptor<RunRecord>(
+                predicate: #Predicate { $0.totalDistanceMeters >= minDistanceFloat && $0.date <= targetDate },
+                sortBy: [SortDescriptor(\.date)]
+            )
+        }
         let runs = try modelContext.fetch(descriptor)
 
         // Ensure sequential mapping on the actor to adhere to Swift 6 strict concurrency
         var dtos: [RunMetricsDTO] = []
         for run in runs {
+            let paceSec = run.workingAvgPace > 0 ? run.workingAvgPace : run.rawAvgPace
+            let hr = run.workingAvgHeartRate > 0 ? Int(run.workingAvgHeartRate.rounded()) : Int(run.rawAvgHeartRate.rounded())
+            let cadence = run.workingAvgCadence > 0 ? Int(run.workingAvgCadence.rounded()) : Int(run.rawAvgCadence.rounded())
+
             dtos.append(RunMetricsDTO(
                 date: run.date,
-                distance: run.distance,
-                avgPace: run.avgPace,
-                avgHeartRate: run.avgHeartRate,
-                avgCadence: run.avgCadence
+                distance: run.totalDistanceMeters,
+                avgPace: paceSec,
+                avgHeartRate: hr,
+                avgCadence: cadence
             ))
         }
 
@@ -39,7 +47,6 @@ actor MacroQueryEngine {
     }
 
     // Abstracting calculation to allow for dependency injection/testing with Sendable DTOs
-    // Pass the Sendable DTOs into a background TaskGroup to calculate averages
     func calculateAverages(from dtos: [RunMetricsDTO]) async throws -> BaselineStats? {
         guard !dtos.isEmpty else { return nil }
 
@@ -55,10 +62,10 @@ actor MacroQueryEngine {
                     avgPace: avgPace,
                     avgHeartRate: avgHR,
                     avgCadence: avgCadence,
-                    avgVerticalOscillation: 0.0, // Unused for these macros currently
-                    avgVo2Max: 0.0,              // Unused
-                    avgGroundContactTime: 0.0,   // Unused
-                    avgStrideLength: 0.0         // Unused
+                    avgVerticalOscillation: 0.0,
+                    avgVo2Max: 0.0,
+                    avgGroundContactTime: 0.0,
+                    avgStrideLength: 0.0
                 )
             }
 
@@ -89,14 +96,10 @@ actor MacroQueryEngine {
         let cadenceDelta = sevenDayAvg.avgCadence - thirtyDayAvg.avgCadence
         let hrDelta = sevenDayAvg.avgHeartRate - thirtyDayAvg.avgHeartRate
 
+        // Non-negotiable Zero Numbers Prompt from Section 7
         let instructions = """
-        persona: elite_running_coach
-        task: synthesize_weekly_fatigue_management_insight
-        rules:
-        - speak directly to user using second person ("You", "Your")
-        - CRITICAL: You are strictly forbidden from outputting any numbers, digits, percentages, or exact measurements in your response. Translate all data deltas into purely qualitative biomechanical observations (e.g., 'Your cadence dropped significantly').
-        - focus strictly on comparing the 7-day trends against their 30-day baseline to evaluate fatigue and form breakdown.
-        - respond entirely in \(Locale.current.language.languageCode?.identifier ?? "en")
+        You are an elite, empathetic running coach analyzing qualitative fatigue trends. You are strictly forbidden from writing any numbers, digits, percentages, or mathematical deltas in your response. Translate all data trends into purely qualitative biomechanical and physiological phrasing (e.g., 'Your cadence remained exceptionally steady', 'Your heart rate showed rising cardiovascular drift relative to your stride').
+        Respond entirely in \(Locale.current.language.languageCode?.identifier ?? "en").
         """
 
         let promptTemplate = """
@@ -122,12 +125,13 @@ actor MacroQueryEngine {
                 instructions: instructions
             )
 
-            // Note: We use the injected provider here for testing purposes, but fallback to session in real use if needed.
-            // For architecture consistency, we'll try to use the session directly as shown in FoundationModels examples.
-
             let generatedInsight = try await session.respond(to: promptTemplate, generating: FatigueInsight.self)
 
-            return generatedInsight.content
+            return FatigueInsight(
+                headline: sanitizeZeroNumbers(generatedInsight.content.headline),
+                observation: sanitizeZeroNumbers(generatedInsight.content.observation),
+                recommendation: sanitizeZeroNumbers(generatedInsight.content.recommendation)
+            )
         } catch {
             print("Failed to generate fatigue insight: \(error)")
             return nil

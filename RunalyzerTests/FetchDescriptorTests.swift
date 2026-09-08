@@ -38,7 +38,7 @@ final class FetchDescriptorTests: XCTestCase {
 
         // Simulating the predicate from activeDescriptor in DashboardView
         let descriptor = FetchDescriptor<RunRecord>(
-            predicate: #Predicate { $0.distance >= minDistanceFloat && $0.date >= thirtyDaysAgo }
+            predicate: #Predicate { $0.totalDistanceMeters >= minDistanceFloat && $0.date >= thirtyDaysAgo }
         )
         let fetchedRuns = try context.fetch(descriptor)
 
@@ -68,7 +68,7 @@ final class FetchDescriptorTests: XCTestCase {
 
         // Simulating the predicate from activeDescriptor in DashboardView for All Time
         let descriptor = FetchDescriptor<RunRecord>(
-            predicate: #Predicate { $0.distance >= minDistanceFloat }
+            predicate: #Predicate { $0.totalDistanceMeters >= minDistanceFloat }
         )
         let fetchedRuns = try context.fetch(descriptor)
 

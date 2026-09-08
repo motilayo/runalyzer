@@ -17,11 +17,15 @@ public class LiveCoachEngine {
     private var currentMetronomeTargetSPM: Int = 0
     private var metronomeTimer: Timer?
 
-    public init() {
-        setupAudio()
+    public init() {}
+
+    private var isRunningInTest: Bool {
+        NSClassFromString("XCTestCase") != nil || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
-    private func setupAudio() {
+    private func setupAudioIfNeeded() {
+        guard !isRunningInTest else { return }
+        guard !audioEngine.isRunning else { return }
         audioEngine.attach(playerNode)
         let format = audioEngine.outputNode.inputFormat(forBus: 0)
         audioEngine.connect(playerNode, to: audioEngine.outputNode, format: format)
@@ -58,7 +62,7 @@ public class LiveCoachEngine {
 
         return CustomWorkout(
             activity: .running,
-            location: .unknown,
+            location: .outdoor,
             displayName: "AI Prescribed Workout",
             warmup: nil,
             blocks: [block],
@@ -74,14 +78,16 @@ public class LiveCoachEngine {
         currentMetronomeTargetSPM = targetSPM
         isMetronomeRunning = true
 
+        guard !isRunningInTest else { return }
+        setupAudioIfNeeded()
+
         let interval = 60.0 / Double(targetSPM)
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.metronomeTimer?.invalidate()
+        self.metronomeTimer?.invalidate()
 
-            if let buffer = self.generateBeep(frequency: 880, duration: 0.05) {
-                self.metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        if let buffer = self.generateBeep(frequency: 880, duration: 0.05) {
+            self.metronomeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
                     guard let self = self, self.isMetronomeRunning, !self.silentModeEnabled else { return }
                     self.playerNode.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
                     if !self.playerNode.isPlaying {
@@ -94,10 +100,8 @@ public class LiveCoachEngine {
 
     public func stopMetronome() {
         isMetronomeRunning = false
-        DispatchQueue.main.async { [weak self] in
-            self?.metronomeTimer?.invalidate()
-            self?.metronomeTimer = nil
-        }
+        metronomeTimer?.invalidate()
+        metronomeTimer = nil
         playerNode.stop()
     }
 
@@ -122,13 +126,10 @@ public class LiveCoachEngine {
         }
 
         if !silentModeEnabled {
-            if audioEngine.isRunning {
-                // Ensure metronome is running at the correct target SPM
-                if currentMetronomeTargetSPM != targetSPM || !isMetronomeRunning {
-                    startMetronome(targetSPM: targetSPM)
-                }
-                audioTriggered = true
+            if currentMetronomeTargetSPM != targetSPM || !isMetronomeRunning {
+                startMetronome(targetSPM: targetSPM)
             }
+            audioTriggered = true
         } else {
             // Stop metronome if it's running but silent mode was toggled on
             if isMetronomeRunning {

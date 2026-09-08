@@ -125,15 +125,17 @@ class HealthKitManager: ObservableObject {
         healthStore.execute(query)
     }
 
-    /// Fetch running workouts from the last 30 days
-    func fetchRecentRunningWorkouts() async throws -> [HKWorkout] {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else {
-            return []
-        }
-
+    /// Fetch running workouts from HealthKit.
+    /// If startDate is provided, fetches workouts from that date onwards. Otherwise fetches all running workouts.
+    func fetchRecentRunningWorkouts(startDate: Date? = nil) async throws -> [HKWorkout] {
         let typePredicate = HKQuery.predicateForWorkouts(with: .running)
-        let datePredicate = HKQuery.predicateForSamples(withStart: thirtyDaysAgo, end: nil, options: .strictStartDate)
-        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [typePredicate, datePredicate])
+        let predicate: NSPredicate
+        if let startDate = startDate {
+            let datePredicate = HKQuery.predicateForSamples(withStart: startDate, end: nil, options: .strictStartDate)
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [typePredicate, datePredicate])
+        } else {
+            predicate = typePredicate
+        }
 
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
 
@@ -154,18 +156,15 @@ class HealthKitManager: ObservableObject {
                     return
                 }
 
-                let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-                let minimumRunDistance = UserDefaults.standard.double(forKey: "minimumRunDistance")
-                let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
-
-                let filteredWorkouts = workouts.filter { workout in
+                // Ingest all valid running workouts with distance > 0 into SwiftData.
+                // Distance filtering (minimumRunDistance slider) is applied dynamically in presentation views (DashboardView)
+                // so that shorter runs are preserved in SwiftData for baseline metrics and unfiltered queries.
+                let validWorkouts = workouts.filter { workout in
                     let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
-                    // if minimumRunDistance is default 0 from UserDefaults (not saved), we will fallback to 1000
-                    let limit = minimumRunDistance == 0 ? 1000.0 : minDistanceInMeters
-                    return distance >= (limit - 0.01) // Small buffer
+                    return distance > 0
                 }
 
-                continuation.resume(returning: filteredWorkouts)
+                continuation.resume(returning: validWorkouts)
             }
             healthStore.execute(query)
         }
@@ -209,69 +208,50 @@ class HealthKitManager: ObservableObject {
         let duration = workout.duration
         let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
 
-        // Framboise owns the bucketed HealthKit read, trimming, heuristics, and classification.
-        let runMetrics = try await FramboiseEngine.fetchMetricsConcurrently(for: workout, healthStore: healthStore)
+        // Framboise owns the bucketed HealthKit read, trimming, heuristics, and mathematical feature extraction.
+        let trimmedMetrics = try await FramboiseEngine.extractTrimmedMetrics(for: workout, healthStore: healthStore)
 
-        let rawHR = runMetrics.heartRateBuckets.map(\.value)
-        let rawCadence = runMetrics.cadenceBuckets.map(\.value)
-        let trimmedHR = FramboiseEngine.trimOutliers(from: rawHR)
-        let trimmedCadence = FramboiseEngine.trimOutliers(from: rawCadence)
-        let trimmedPace = FramboiseEngine.trimPaceOutliers(from: runMetrics.paceBuckets.map(\.value))
-
-        // Raw values are calculated from the same bucketed source for the transparency toggle.
-        let rawAvgPace = Self.calculatePace(duration: duration, distance: distance)
-        let rawAvgHeartRate = rawHR.isEmpty ? 0 : Int(round(rawHR.reduce(0, +) / Double(rawHR.count)))
-        let rawAvgCadence = rawCadence.isEmpty ? 0 : Int(round(rawCadence.reduce(0, +) / Double(rawCadence.count)))
-        let workingAvgHeartRate = trimmedHR.isEmpty ? nil : Int(round(trimmedHR.reduce(0, +) / Double(trimmedHR.count)))
-        let workingAvgCadence = trimmedCadence.isEmpty ? nil : Int(round(trimmedCadence.reduce(0, +) / Double(trimmedCadence.count)))
-        // Framboise pace buckets are seconds per kilometer for heuristic math;
-        // RunRecord stores pace as decimal minutes per kilometer.
-        let workingAvgPace = trimmedPace.isEmpty ? nil : (trimmedPace.reduce(0, +) / Double(trimmedPace.count)) / 60.0
-
-        let rawPace = runMetrics.paceBuckets.map(\.value)
-        let type = FramboiseEngine.classifyRun(
-            paceBuckets: trimmedPace,
-            cadenceBuckets: trimmedCadence,
-            heartRateBuckets: trimmedHR,
-            distanceBuckets: runMetrics.distanceBuckets.map(\.value),
-            rawPaceBuckets: rawPace
+        // CoreML Classification against writable model
+        let features = RunFeatures(
+            averagePace: trimmedMetrics.workingAvgPace,
+            paceCV: trimmedMetrics.paceCV,
+            paceSlope: trimmedMetrics.paceSlope,
+            percentZone4: trimmedMetrics.percentZone4,
+            durationMinutes: trimmedMetrics.durationMinutes
         )
-        let runTypeRaw: String = switch type {
-        case .steady: "steady"
-        case .tempo: "tempo"
-        case .progressive: "progressive"
-        case .intervals: "intervals"
-        case .urbanTraffic: "urbanTraffic"
-        case .unknown: "unknown"
-        }
-        var tags: [String] = []
-        if let paceTag = FramboiseEngine.checkPaceVariance(paceBuckets: trimmedPace) { tags.append(paceTag) }
-        if let cadenceTag = FramboiseEngine.checkCadenceFading(cadenceBuckets: trimmedCadence) { tags.append(cadenceTag) }
 
-        func average(_ buckets: [Bucket]) -> Double {
-            let validValues = buckets.map(\.value).filter { $0 > 0 }
-            guard !validValues.isEmpty else { return 0 }
-            return validValues.reduce(0, +) / Double(validValues.count)
+        let modelPrediction = ModelManager.shared.classify(features: features)
+        let predictedTypeRaw: String
+        if modelPrediction != "unknown" && !modelPrediction.isEmpty && modelPrediction != "urbanTraffic" {
+            predictedTypeRaw = modelPrediction
+        } else if trimmedMetrics.detectedType != .unknown && trimmedMetrics.detectedType != .urbanTraffic {
+            predictedTypeRaw = trimmedMetrics.detectedType.rawValue
+        } else {
+            predictedTypeRaw = "steady"
         }
 
         let record = RunRecord(
             id: workout.uuid,
+            hkWorkoutID: workout.uuid,
             date: workout.startDate,
-            distance: distance,
             duration: duration,
-            avgPace: rawAvgPace,
-            avgHeartRate: rawAvgHeartRate,
-            avgCadence: rawAvgCadence,
-            verticalOscillation: average(runMetrics.verticalOscillationBuckets),
-            vo2Max: average(runMetrics.vo2MaxBuckets),
-            groundContactTime: average(runMetrics.groundContactTimeBuckets),
-            strideLength: average(runMetrics.strideLengthBuckets)
+            totalDistanceMeters: distance,
+            rawAvgPace: trimmedMetrics.rawAvgPace,
+            rawAvgCadence: trimmedMetrics.rawAvgCadence,
+            rawAvgHeartRate: trimmedMetrics.rawAvgHeartRate,
+            workingAvgPace: trimmedMetrics.workingAvgPace,
+            workingAvgCadence: trimmedMetrics.workingAvgCadence,
+            workingAvgHeartRate: trimmedMetrics.workingAvgHeartRate,
+            paceCV: trimmedMetrics.paceCV,
+            paceSlope: trimmedMetrics.paceSlope,
+            percentZone4: trimmedMetrics.percentZone4,
+            detectedTypeRaw: predictedTypeRaw,
+            framboiseTags: trimmedMetrics.framboiseTags,
+            verticalOscillation: trimmedMetrics.verticalOscillation,
+            vo2Max: trimmedMetrics.vo2Max,
+            groundContactTime: trimmedMetrics.groundContactTime,
+            strideLength: trimmedMetrics.strideLength
         )
-        record.workingAvgPace = workingAvgPace
-        record.workingAvgHeartRate = workingAvgHeartRate
-        record.workingAvgCadence = workingAvgCadence
-        record.runTypeRaw = runTypeRaw
-        record.framboiseTags = tags
 
         return record
     }

@@ -31,6 +31,26 @@ struct RunDataForAI: Sendable {
     let workingAveragesContext: String
 }
 
+/// A Sendable DTO for drill prescription metadata
+public struct DrillPrescriptionDTO: Codable, Sendable {
+    public let drillName: String      // E.g., "Rhythm Intervals"
+    public let drillPurpose: String   // Biomechanical objective
+    public let coachingFocus: String  // Form cues
+
+    public init(drillName: String, drillPurpose: String, coachingFocus: String) {
+        self.drillName = drillName
+        self.drillPurpose = drillPurpose
+        self.coachingFocus = coachingFocus
+    }
+}
+
+/// Helper function enforcing the "Zero Numbers" AI rule by stripping any digits or % symbols
+public func sanitizeZeroNumbers(_ text: String) -> String {
+    let stripped = text.replacingOccurrences(of: #"[0-9%]"#, with: "", options: .regularExpression)
+    return stripped.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 /// A structured response definition representing a suggested form drill.
 /// The `@Generable` macro allows `LanguageModelSession` to automatically map LLM text to this struct.
 @available(iOS 26.0, *)
@@ -39,7 +59,7 @@ struct DrillPrescription {
     @Guide(description: "A recognized drill name: Cadence Pyramids, Rhythm Intervals, Tempo Surges, or Strides.")
     var drillName: String
 
-    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
+    @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct. Strictly forbid all numbers and digits.")
     var drillPurpose: String
 
     @Guide(description: "One short biomechanical coaching cue. Do not include digits, percentages, or exact measurements.")
@@ -140,14 +160,14 @@ class CoachingEngine {
         var promptTemplate = """
         You are a running coach.
         \(unitContext)
-        [RUN_DATA_START]
+        --- RUN DATA START ---
         DETECTED_TYPE: {{RUN_TYPE}}
         WORKING_AVERAGES: {{WORKING_AVERAGES_CONTEXT}}
         FRAMBOISE_TAGS: {{FRAMBOISE_TAGS}}
         TARGET_DRILL_CADENCES:
         - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
         - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
-        [RUN_DATA_END]
+        --- RUN DATA END ---
         """
 
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
@@ -165,7 +185,17 @@ class CoachingEngine {
 
         do {
             let content = try await modelProvider.respond(to: promptTemplate, generating: RunInsight.self, with: instructions)
-            return content
+            return RunInsight(
+                headline: sanitizeZeroNumbers(content.headline),
+                observation: sanitizeZeroNumbers(content.observation),
+                drills: content.drills.map {
+                    DrillPrescription(
+                        drillName: sanitizeZeroNumbers($0.drillName),
+                        drillPurpose: sanitizeZeroNumbers($0.drillPurpose),
+                        coachingFocus: sanitizeZeroNumbers($0.coachingFocus)
+                    )
+                }
+            )
         } catch {
             print("FoundationModels Generation Error: \(error.localizedDescription)")
             // Graceful fallback for unsupported languages/locales or generation failures
@@ -216,10 +246,10 @@ actor RunAnalyzerActor {
         // 4. Swift calculates the baseline math (No AI involved)
         var baseline: BaselineStats? = nil
         if priorRuns.count >= 3 {
-            let avgDistance = priorRuns.map(\.distance).reduce(0, +) / Double(priorRuns.count)
-            let avgPace = priorRuns.map { $0.workingAvgPace ?? $0.avgPace }.reduce(0, +) / Double(priorRuns.count)
-            let avgHR = priorRuns.map { $0.workingAvgHeartRate ?? $0.avgHeartRate }.reduce(0, +) / priorRuns.count
-            let avgCadence = priorRuns.map { $0.workingAvgCadence ?? $0.avgCadence }.reduce(0, +) / priorRuns.count
+            let avgDistance = priorRuns.map(\.totalDistanceMeters).reduce(0, +) / Double(priorRuns.count)
+            let avgPace = priorRuns.map { $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace }.reduce(0, +) / Double(priorRuns.count)
+            let avgHR = Int(priorRuns.map { $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate }.reduce(0, +) / Double(priorRuns.count))
+            let avgCadence = Int(priorRuns.map { $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence }.reduce(0, +) / Double(priorRuns.count))
             let avgVertOsc = priorRuns.map(\.verticalOscillation).reduce(0, +) / Double(priorRuns.count)
 
             let runsWithVo2 = priorRuns.filter { $0.vo2Max > 0 }
@@ -240,12 +270,11 @@ actor RunAnalyzerActor {
         let gctContext: String
         let strideContext: String
 
-        let workingPace = run.workingAvgPace ?? run.avgPace
-        let workingCadence = run.workingAvgCadence ?? run.avgCadence
-        let workingHR = run.workingAvgHeartRate ?? run.avgHeartRate
+        let workingPace = run.workingAvgPace > 0 ? run.workingAvgPace : run.rawAvgPace
+        let workingCadence = run.workingAvgCadence > 0 ? Int(run.workingAvgCadence.rounded()) : Int(run.rawAvgCadence.rounded())
+        let workingHR = run.workingAvgHeartRate > 0 ? Int(run.workingAvgHeartRate.rounded()) : Int(run.rawAvgHeartRate.rounded())
 
         if let base = baseline {
-            
             // VO2 Max Logic (Higher is better)
             if run.vo2Max > 0 && base.avgVo2Max > 0 {
                 let vo2Delta = run.vo2Max - base.avgVo2Max
@@ -261,12 +290,12 @@ actor RunAnalyzerActor {
             let cadenceImpact = isCadenceImproved ? "This is a GOOD trend for reducing impact." : "This is a BAD trend, increasing injury risk."
             cadenceContext = "\(workingCadence) SPM (Delta: \(cadenceDelta)). \(cadenceImpact)"
 
-            // Pace Logic (Faster/Positive difference is better)
-            let runPaceSeconds = Int(workingPace * 60)
-            let basePaceSeconds = Int(base.avgPace * 60)
+            // Pace Logic (Faster/Lower seconds is better)
+            let runPaceSeconds = Int(workingPace.rounded())
+            let basePaceSeconds = Int(base.avgPace.rounded())
             let paceDiff = basePaceSeconds - runPaceSeconds
             let paceImpact = paceDiff >= 0 ? "A POSITIVE trend in speed." : "A NEGATIVE trend indicating slower turnover."
-            paceContext = "\(workingPace.formattedPaceString) (\(abs(paceDiff)) sec diff). \(paceImpact)"
+            paceContext = "\(formatDisplayPace(secondsPerKilometer: workingPace)) (\(abs(paceDiff)) sec diff). \(paceImpact)"
 
             // HR Logic (Lower is better)
             let hrDelta = workingHR - base.avgHeartRate
@@ -283,7 +312,7 @@ actor RunAnalyzerActor {
             let gctImpact = gctDelta <= 0 ? "A GOOD trend showing quicker, lighter steps." : "A BAD trend showing heavy, prolonged impact."
             gctContext = String(format: "%.0f ms (Delta: %.0f). %@", run.groundContactTime, gctDelta, gctImpact)
 
-            // Stride Length (Neutral context depending on cadence)
+            // Stride Length
             let strideDelta = run.strideLength - base.avgStrideLength
             strideContext = String(format: "%.2f m (Delta: %.2f). Evaluate this in relation to their cadence.", run.strideLength, strideDelta)
 
@@ -304,7 +333,7 @@ actor RunAnalyzerActor {
             let cadenceFloor = 150
             let cadenceStatus = workingCadence < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
             cadenceContext = "\(workingCadence) SPM (\(cadenceStatus). No baseline available)."
-            paceContext = "\(workingPace.formattedPaceString) (No baseline available)."
+            paceContext = "\(formatDisplayPace(secondsPerKilometer: workingPace)) (No baseline available)."
             hrContext = "\(workingHR) BPM (No baseline available)."
             vertOscContext = String(format: "%.1f cm (No baseline available).", run.verticalOscillation)
             gctContext = String(format: "%.0f ms (No baseline available).", run.groundContactTime)
@@ -312,7 +341,7 @@ actor RunAnalyzerActor {
         }
 
         let intervalTarget = min(180, max(150, Int(Double(workingCadence) * 1.05)))
-        let recoveryTarget = max(140, workingCadence) // At least 140, or their current cadence
+        let recoveryTarget = max(140, workingCadence)
 
         // 5. Run the LLM Prompt
         do {
@@ -327,8 +356,8 @@ actor RunAnalyzerActor {
                 strideContext: strideContext,
                 intervalCadence: "\(intervalTarget)",
                 recoveryCadence: "\(recoveryTarget)",
-                runType: run.runTypeRaw ?? "unknown",
-                framboiseTags: (run.framboiseTags ?? []).joined(separator: ", "),
+                runType: run.detectedTypeRaw,
+                framboiseTags: run.framboiseTags.joined(separator: ", "),
                 workingAveragesContext: "Using Working Averages (outliers trimmed)"
             )
 
@@ -362,6 +391,7 @@ actor RunAnalyzerActor {
             insight.drillRecommendations = drillRecs
 
             run.insight = insight
+            run.aiCoachingAnalysis = payload.observation
             run.isAnalyzing = false
             try modelContext.save()
 

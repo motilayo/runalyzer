@@ -38,6 +38,10 @@
 		DC50A4797C364301B4A0E6AC /* RunListFilteredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B899DFE5919B4CC7898C0FF1 /* RunListFilteredView.swift */; };
 		354B75CFCB6D4890A9176BCA /* MacroQueryEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 562A4EBB7D4F45339032B2B4 /* MacroQueryEngineTests.swift */; };
 		81BD64EC227F4C4D894C81C3 /* FetchDescriptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABD768E1D08412D969F8DF4 /* FetchDescriptorTests.swift */; };
+		TRN001CORRECTION /* TrainingCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRN001REF /* TrainingCorrection.swift */; };
+		MDL001MANAGER /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = MDL001REF /* ModelManager.swift */; };
+		MLM001MODEL /* PersonalizedRunClassifier.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = MLM001REF /* PersonalizedRunClassifier.mlmodelc */; };
+		V2T001BUILD /* V2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V2T001REF /* V2Tests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +89,10 @@
 		B899DFE5919B4CC7898C0FF1 /* RunListFilteredView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyzer/Views/RunListFilteredView.swift; sourceTree = SOURCE_ROOT; };
 		562A4EBB7D4F45339032B2B4 /* MacroQueryEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/MacroQueryEngineTests.swift; sourceTree = SOURCE_ROOT; };
 		0ABD768E1D08412D969F8DF4 /* FetchDescriptorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunalyzerTests/FetchDescriptorTests.swift; sourceTree = SOURCE_ROOT; };
+		TRN001REF /* TrainingCorrection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TrainingCorrection.swift; path = Runalyzer/Models/TrainingCorrection.swift; sourceTree = "<group>"; };
+		MDL001REF /* ModelManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ModelManager.swift; path = Runalyzer/Managers/ModelManager.swift; sourceTree = "<group>"; };
+		MLM001REF /* PersonalizedRunClassifier.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = PersonalizedRunClassifier.mlmodelc; path = Runalyzer/PersonalizedRunClassifier.mlmodelc; sourceTree = "<group>"; };
+		V2T001REF /* V2Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = V2Tests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -124,6 +132,7 @@
 				AF1E8B48083E497591A36B7E /* WCSessionTests.swift */,
 
 				FF95A44AF1613AFBF9ED4688 /* RunalyzerTests.swift */,
+				V2T001REF /* V2Tests.swift */,
 			);
 			path = RunalyzerTests;
 			sourceTree = "<group>";
@@ -181,6 +190,9 @@
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift */,
 				F1R2A3M4B5O6I7S8E9E0N1G3 /* FramboiseEngine.swift */,
 				B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyzer/Assets.xcassets */,
+				TRN001REF /* TrainingCorrection.swift */,
+				MDL001REF /* ModelManager.swift */,
+				MLM001REF /* PersonalizedRunClassifier.mlmodelc */,
 				10AA26382422973E1F322C8D /* RunalyzerTests */,
 			);
 			sourceTree = "<group>";
@@ -258,6 +270,7 @@
 			files = (
 				P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Runalyzer/Assets.xcassets in Resources */,
 				E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */,
+				MLM001MODEL /* PersonalizedRunClassifier.mlmodelc in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,6 +306,8 @@
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyzer/CoachingEngine/CoachingEngine.swift in Sources */,
 				F1R2A3M4B5O6I7S8E9E0N1G2 /* FramboiseEngine.swift in Sources */,
 				46D9CC7361B74115AD2FC83C /* LiveCoachEngine.swift in Sources */,
+				TRN001CORRECTION /* TrainingCorrection.swift in Sources */,
+				MDL001MANAGER /* ModelManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -305,6 +320,7 @@
 				A42C7740988216A73236241C /* RunalyzerTests.swift in Sources */,
 				C1D2E3F4E5F60123456789CD /* CoachingEngineTests.swift in Sources */,
 				2793E5BE7C44484CBB4F2F3F /* LiveCoachEngineTests.swift in Sources */,
+				V2T001BUILD /* V2Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -457,6 +473,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalyzerTests;
@@ -471,6 +488,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalyzerTests;

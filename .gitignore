@@ -2,3 +2,4 @@ DeveloperSettings.xcconfig
 Runalyzer.xcodeproj/project.xcworkspace/
 Runalyzer.xcodeproj/xcuserdata/
 Build/
+seeder.swift

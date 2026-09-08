@@ -13,7 +13,16 @@ public struct RunMetrics: Sendable {
     public var groundContactTimeBuckets: [Bucket] = []
     public var strideLengthBuckets: [Bucket] = []
 
-    public init(distanceBuckets: [Bucket] = [], heartRateBuckets: [Bucket] = [], cadenceBuckets: [Bucket] = [], paceBuckets: [Bucket] = [], verticalOscillationBuckets: [Bucket] = [], vo2MaxBuckets: [Bucket] = [], groundContactTimeBuckets: [Bucket] = [], strideLengthBuckets: [Bucket] = []) {
+    public init(
+        distanceBuckets: [Bucket] = [],
+        heartRateBuckets: [Bucket] = [],
+        cadenceBuckets: [Bucket] = [],
+        paceBuckets: [Bucket] = [],
+        verticalOscillationBuckets: [Bucket] = [],
+        vo2MaxBuckets: [Bucket] = [],
+        groundContactTimeBuckets: [Bucket] = [],
+        strideLengthBuckets: [Bucket] = []
+    ) {
         self.distanceBuckets = distanceBuckets
         self.heartRateBuckets = heartRateBuckets
         self.cadenceBuckets = cadenceBuckets
@@ -23,7 +32,6 @@ public struct RunMetrics: Sendable {
         self.groundContactTimeBuckets = groundContactTimeBuckets
         self.strideLengthBuckets = strideLengthBuckets
     }
-
 }
 
 public struct Bucket: Equatable, Sendable {
@@ -34,10 +42,9 @@ public struct Bucket: Equatable, Sendable {
         self.date = date
         self.value = value
     }
-
 }
 
-public enum RunType: Equatable {
+public enum RunType: String, Equatable, CaseIterable, Sendable {
     case steady
     case tempo
     case progressive
@@ -46,16 +53,263 @@ public enum RunType: Equatable {
     case unknown
 }
 
+/// A Sendable DTO representing the calculated features, working averages, and classification
+/// extracted deterministically by the Framboise Engine.
+public struct FramboiseTrimmedMetricsDTO: Sendable {
+    public let rawAvgPace: Double          // sec/km
+    public let rawAvgCadence: Double       // SPM
+    public let rawAvgHeartRate: Double     // BPM
+
+    public let workingAvgPace: Double      // sec/km
+    public let workingAvgCadence: Double   // SPM
+    public let workingAvgHeartRate: Double // BPM
+
+    public let paceCV: Double              // Coefficient of variation (σ / μ)
+    public let paceSlope: Double           // Linear regression slope
+    public let percentZone4: Double        // 0.0 - 1.0
+    public let durationMinutes: Double     // minutes
+
+    public let hasUrbanTraffic: Bool
+    public let framboiseTags: [String]
+    public let detectedType: RunType
+
+    public let verticalOscillation: Double
+    public let vo2Max: Double
+    public let groundContactTime: Double
+    public let strideLength: Double
+
+    public init(
+        rawAvgPace: Double,
+        rawAvgCadence: Double,
+        rawAvgHeartRate: Double,
+        workingAvgPace: Double,
+        workingAvgCadence: Double,
+        workingAvgHeartRate: Double,
+        paceCV: Double,
+        paceSlope: Double,
+        percentZone4: Double,
+        durationMinutes: Double,
+        hasUrbanTraffic: Bool,
+        framboiseTags: [String],
+        detectedType: RunType,
+        verticalOscillation: Double,
+        vo2Max: Double,
+        groundContactTime: Double,
+        strideLength: Double
+    ) {
+        self.rawAvgPace = rawAvgPace
+        self.rawAvgCadence = rawAvgCadence
+        self.rawAvgHeartRate = rawAvgHeartRate
+        self.workingAvgPace = workingAvgPace
+        self.workingAvgCadence = workingAvgCadence
+        self.workingAvgHeartRate = workingAvgHeartRate
+        self.paceCV = paceCV
+        self.paceSlope = paceSlope
+        self.percentZone4 = percentZone4
+        self.durationMinutes = durationMinutes
+        self.hasUrbanTraffic = hasUrbanTraffic
+        self.framboiseTags = framboiseTags
+        self.detectedType = detectedType
+        self.verticalOscillation = verticalOscillation
+        self.vo2Max = vo2Max
+        self.groundContactTime = groundContactTime
+        self.strideLength = strideLength
+    }
+}
+
+/// Discrete 1-minute window
+public struct MinuteBucket: Sendable {
+    public let date: Date
+    public let distanceMeters: Double
+    public let meanPace: Double       // sec/km
+    public let meanCadence: Double    // SPM
+    public let meanHR: Double         // BPM
+}
+
 // MARK: - Framboise Engine
 
 public class FramboiseEngine {
 
     public init() {}
 
+    /// Primary pipeline method: queries HealthKit concurrently, buckets into 1-minute windows,
+    /// filters dead stops, applies median trimming, and calculates statistical features.
+    public static func extractTrimmedMetrics(for workout: HKWorkout, healthStore: HKHealthStoreProtocol) async throws -> FramboiseTrimmedMetricsDTO {
+        let duration = workout.duration
+        let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
+        let durationMinutes = max(1.0, duration / 60.0)
+
+        // 1. Concurrent Extraction
+        let runMetrics = try await fetchMetricsConcurrently(for: workout, healthStore: healthStore)
+
+        // 2. 1-Minute Discrete Bucketing
+        let minuteBuckets = alignIntoMinuteBuckets(runMetrics: runMetrics, startDate: workout.startDate, endDate: workout.endDate)
+
+        // 3. Dead Stop Filter (.urbanTraffic)
+        // Evaluate buckets where distanceMeters == 0 or meanCadence == 0, but meanHR > 0.
+        let deadStopBuckets = minuteBuckets.filter { bucket in
+            (bucket.distanceMeters <= 0 || bucket.meanCadence <= 0) && bucket.meanHR > 0
+        }
+        let hasUrbanTraffic = !deadStopBuckets.isEmpty
+
+        // Slice dead stops out before calculating true workingAverages
+        let movingBuckets = minuteBuckets.filter { bucket in
+            !((bucket.distanceMeters <= 0 || bucket.meanCadence <= 0) && bucket.meanHR > 0)
+        }
+
+        let rawPaces = minuteBuckets.map(\.meanPace).filter { $0 > 0 }
+        let rawCadences = minuteBuckets.map(\.meanCadence).filter { $0 > 0 }
+        let rawHRs = minuteBuckets.map(\.meanHR).filter { $0 > 0 }
+
+        // 4. Median Trimming on pace array
+        let candidatePaces = movingBuckets.map(\.meanPace).filter { $0 > 0 }
+        let trimmedPaces = trimPaceOutliers(from: candidatePaces)
+
+        // Working cadences and HRs
+        let candidateCadences = movingBuckets.map(\.meanCadence).filter { $0 > 0 }
+        let candidateHRs = movingBuckets.map(\.meanHR).filter { $0 > 0 }
+        let trimmedCadences = trimOutliers(from: candidateCadences)
+        let trimmedHRs = trimOutliers(from: candidateHRs)
+
+        // 5. Statistical Calculations
+        let validPaces = trimmedPaces.isEmpty ? candidatePaces : trimmedPaces
+        let paceCount = Double(max(1, validPaces.count))
+
+        // Mean Pace (μ)
+        let paceMean = validPaces.reduce(0, +) / paceCount
+
+        // Pace Standard Deviation (σ)
+        let paceVariance = validPaces.reduce(0) { total, val in
+            let diff = val - paceMean
+            return total + (diff * diff)
+        } / paceCount
+        let paceStdDev = paceVariance.squareRoot()
+
+        // Pace Coefficient of Variation (CV_pace = σ / μ)
+        let paceCV = paceMean > 0 ? (paceStdDev / paceMean) : 0.0
+
+        // Pace Slope: m = [n * Σ(xy) - (Σx)(Σy)] / [n * Σ(x^2) - (Σx)^2]
+        let paceSlope = calculateSlope(values: validPaces)
+
+        // Percent Zone 4: Fraction of moving buckets with heart rate >= 160 BPM
+        let zone4Count = movingBuckets.filter { $0.meanHR >= 160.0 }.count
+        let totalMoving = max(1, movingBuckets.count)
+        let percentZone4 = Double(zone4Count) / Double(totalMoving)
+
+        // Raw averages
+        let calculatedRawPace = distance > 0 ? (duration / (distance / 1000.0)) : (rawPaces.isEmpty ? 0 : rawPaces.reduce(0, +) / Double(rawPaces.count))
+        let rawAvgCadence = rawCadences.isEmpty ? 0.0 : rawCadences.reduce(0, +) / Double(rawCadences.count)
+        let rawAvgHeartRate = rawHRs.isEmpty ? 0.0 : rawHRs.reduce(0, +) / Double(rawHRs.count)
+
+        // Working averages
+        let workingAvgPace = paceMean > 0 ? paceMean : calculatedRawPace
+        let workingAvgCadence = trimmedCadences.isEmpty ? (rawAvgCadence > 0 ? rawAvgCadence : 0.0) : trimmedCadences.reduce(0, +) / Double(trimmedCadences.count)
+        let workingAvgHeartRate = trimmedHRs.isEmpty ? (rawAvgHeartRate > 0 ? rawAvgHeartRate : 0.0) : trimmedHRs.reduce(0, +) / Double(trimmedHRs.count)
+
+        // Heuristic tags
+        var tags: [String] = []
+        if hasUrbanTraffic {
+            tags.append("Traffic stops trimmed")
+        }
+        if let paceTag = checkPaceVariance(paceBuckets: validPaces) { tags.append(paceTag) }
+        if let cadenceTag = checkCadenceFading(cadenceBuckets: trimmedCadences.isEmpty ? candidateCadences : trimmedCadences) { tags.append(cadenceTag) }
+
+        // Heuristic run classification based on trimmed working metrics
+        let classifiedType = classifyRun(
+            paceBuckets: validPaces,
+            cadenceBuckets: trimmedCadences.isEmpty ? candidateCadences : trimmedCadences,
+            heartRateBuckets: trimmedHRs.isEmpty ? candidateHRs : trimmedHRs,
+            distanceBuckets: minuteBuckets.map(\.distanceMeters),
+            rawPaceBuckets: rawPaces
+        )
+
+        func avgOfBuckets(_ buckets: [Bucket]) -> Double {
+            let valid = buckets.map(\.value).filter { $0 > 0 }
+            guard !valid.isEmpty else { return 0.0 }
+            return valid.reduce(0, +) / Double(valid.count)
+        }
+
+        return FramboiseTrimmedMetricsDTO(
+            rawAvgPace: calculatedRawPace,
+            rawAvgCadence: rawAvgCadence,
+            rawAvgHeartRate: rawAvgHeartRate,
+            workingAvgPace: workingAvgPace,
+            workingAvgCadence: workingAvgCadence,
+            workingAvgHeartRate: workingAvgHeartRate,
+            paceCV: paceCV,
+            paceSlope: paceSlope,
+            percentZone4: percentZone4,
+            durationMinutes: durationMinutes,
+            hasUrbanTraffic: hasUrbanTraffic,
+            framboiseTags: tags,
+            detectedType: classifiedType,
+            verticalOscillation: avgOfBuckets(runMetrics.verticalOscillationBuckets),
+            vo2Max: avgOfBuckets(runMetrics.vo2MaxBuckets),
+            groundContactTime: avgOfBuckets(runMetrics.groundContactTimeBuckets),
+            strideLength: avgOfBuckets(runMetrics.strideLengthBuckets)
+        )
+    }
+
+    /// Aligns discrete HealthKit statistic buckets into 1-minute windows
+    public static func alignIntoMinuteBuckets(runMetrics: RunMetrics, startDate: Date, endDate: Date) -> [MinuteBucket] {
+        var minuteBuckets: [MinuteBucket] = []
+        let calendar = Calendar.current
+        var currentWindowStart = startDate
+
+        let distances = runMetrics.distanceBuckets.sorted { $0.date < $1.date }
+        let paces = runMetrics.paceBuckets.sorted { $0.date < $1.date }
+        let cadences = runMetrics.cadenceBuckets.sorted { $0.date < $1.date }
+        let hrs = runMetrics.heartRateBuckets.sorted { $0.date < $1.date }
+
+        while currentWindowStart < endDate {
+            guard let nextWindow = calendar.date(byAdding: .minute, value: 1, to: currentWindowStart) else { break }
+
+            let dVal = distances.first(where: { $0.date >= currentWindowStart && $0.date < nextWindow })?.value ?? 0.0
+            let pVal = paces.first(where: { $0.date >= currentWindowStart && $0.date < nextWindow })?.value ?? 0.0
+            let cVal = cadences.first(where: { $0.date >= currentWindowStart && $0.date < nextWindow })?.value ?? 0.0
+            let hVal = hrs.first(where: { $0.date >= currentWindowStart && $0.date < nextWindow })?.value ?? 0.0
+
+            minuteBuckets.append(MinuteBucket(
+                date: currentWindowStart,
+                distanceMeters: dVal,
+                meanPace: pVal,
+                meanCadence: cVal,
+                meanHR: hVal
+            ))
+
+            currentWindowStart = nextWindow
+        }
+
+        return minuteBuckets
+    }
+
+    /// Calculates linear regression slope: m = [n * Σ(xy) - (Σx)(Σy)] / [n * Σ(x^2) - (Σx)^2]
+    public static func calculateSlope(values: [Double]) -> Double {
+        let n = Double(values.count)
+        guard n >= 2 else { return 0.0 }
+
+        var sumX: Double = 0.0
+        var sumY: Double = 0.0
+        var sumXY: Double = 0.0
+        var sumX2: Double = 0.0
+
+        for (index, y) in values.enumerated() {
+            let x = Double(index)
+            sumX += x
+            sumY += y
+            sumXY += (x * y)
+            sumX2 += (x * x)
+        }
+
+        let denominator = (n * sumX2) - (sumX * sumX)
+        guard abs(denominator) > 1e-9 else { return 0.0 }
+
+        let numerator = (n * sumXY) - (sumX * sumY)
+        return numerator / denominator
+    }
 
     /// Concurrent Time-Based Bucketing
     public static func fetchMetricsConcurrently(for workout: HKWorkout, healthStore: HKHealthStoreProtocol) async throws -> RunMetrics {
-
         let types: [(HKQuantityTypeIdentifier, HKStatisticsOptions, HKUnit)] = [
             (.distanceWalkingRunning, .cumulativeSum, HKUnit.meter()),
             (.heartRate, .discreteAverage, HKUnit.count().unitDivided(by: .minute())),
@@ -68,7 +322,6 @@ public class FramboiseEngine {
         ]
 
         return try await withThrowingTaskGroup(of: (HKQuantityTypeIdentifier, [Bucket]).self) { group in
-
             for (identifier, options, unit) in types {
                 group.addTask {
                     guard let quantityType = HKObjectType.quantityType(forIdentifier: identifier) else {
@@ -89,8 +342,7 @@ public class FramboiseEngine {
                     )
 
                     return try await withCheckedThrowingContinuation { continuation in
-                        query.initialResultsHandler = { query, results, error in
-                            // Handle partial HealthKit permission rejections without crashing the entire extraction
+                        query.initialResultsHandler = { _, results, error in
                             if let _ = error {
                                 continuation.resume(returning: (identifier, []))
                                 return
@@ -112,11 +364,8 @@ public class FramboiseEngine {
                                     value = quantity.doubleValue(for: unit)
                                 }
 
-                                // Specific transformation for metrics
                                 if identifier == .runningSpeed {
-                                    // speed is m/s. pace is min/km
-                                    // 1 / (speed in m/s) = s/m
-                                    // pace in sec/km = 1000 / speed
+                                    // speed is m/s. pace in sec/km = 1000 / speed
                                     if value > 0 {
                                         value = 1000.0 / value
                                     }
@@ -134,7 +383,6 @@ public class FramboiseEngine {
             var result = RunMetrics()
 
             for try await (identifier, buckets) in group {
-                // sort by date to maintain chronological order as tasks complete out of order
                 let sortedBuckets = buckets.sorted { $0.date < $1.date }
 
                 if identifier == .distanceWalkingRunning {
@@ -160,7 +408,7 @@ public class FramboiseEngine {
         }
     }
 
-    /// Helper to test time-based bucketing mathematically (since HKStatisticsCollection is unmockable)
+    /// Helper to test time-based bucketing mathematically
     public static func generateTimeBuckets(for workout: HKWorkout) -> [Date] {
         var dates: [Date] = []
         var current = workout.startDate
@@ -183,12 +431,10 @@ public class FramboiseEngine {
         var left = 0
         var right = data.count - 1
 
-        // Strip warm-ups
         while left <= right && data[left] < threshold {
             left += 1
         }
 
-        // Strip cool-downs
         while right >= left && data[right] < threshold {
             right -= 1
         }
@@ -196,16 +442,11 @@ public class FramboiseEngine {
         if left > right { return [] }
 
         var trimmed = Array(data[left...right])
-
-        // Strip dead stops (e.g. traffic lights)
         trimmed.removeAll { $0 < threshold }
-
         return trimmed
     }
 
-    /// Trims pace buckets expressed as seconds per kilometer. Pace has inverse
-    /// directionality to cadence and heart rate: a stop is zero or very slow,
-    /// while a lower positive value is a faster effort and must be retained.
+    /// Trims pace buckets expressed as seconds per kilometer.
     public static func trimPaceOutliers(from data: [Double]) -> [Double] {
         let validData = data.filter { $0 > 0 }
         guard validData.count > 2 else { return validData }
@@ -275,19 +516,10 @@ public class FramboiseEngine {
         distanceBuckets: [Double] = [],
         rawPaceBuckets: [Double] = []
     ) -> RunType {
-        guard !paceBuckets.isEmpty else { return .unknown }
-
-        let trafficStopCount = zip(distanceBuckets, zip(cadenceBuckets, heartRateBuckets)).filter { distance, metrics in
-            distance <= 0 || (metrics.0 <= 0 && metrics.1 > 0)
-        }.count
-        if distanceBuckets.count >= 5 && trafficStopCount > 0 {
-            return .urbanTraffic
-        }
-
         let values = paceBuckets.filter { $0 > 0 }
         let cadenceValues = cadenceBuckets.filter { $0 > 0 }
         let heartRateValues = heartRateBuckets.filter { $0 > 0 }
-        guard values.count >= 3, cadenceValues.count >= 3 else { return .unknown }
+        guard values.count >= 3, cadenceValues.count >= 3 else { return .steady }
 
         func standardDeviation(_ values: [Double]) -> Double {
             let mean = values.reduce(0, +) / Double(values.count)
@@ -303,7 +535,6 @@ public class FramboiseEngine {
         let cadenceMean = cadenceValues.reduce(0, +) / Double(cadenceValues.count)
         let cadenceStdDev = standardDeviation(cadenceValues)
 
-        // A progressive run has a sustained one-direction pace trend, not repeated peaks.
         let midpoint = Double(values.count - 1) / 2.0
         let denominator = values.reduce(0) { total, _ in total + pow(midpoint, 2) }
         let slope = denominator == 0 ? 0 : values.enumerated().reduce(0) { total, item in
@@ -319,7 +550,6 @@ public class FramboiseEngine {
             return .progressive
         }
 
-        // Intervals require repeated, prominent alternation around the mean.
         var crossings = 0
         let margin = max(8, cadenceStdDev * 0.75)
         var phase = 0
@@ -341,16 +571,11 @@ public class FramboiseEngine {
             return .intervals
         }
 
-        // A steady, high-effort run is tempo; progressive runs were handled above.
         let averageHeartRate = heartRateValues.isEmpty ? 0 : heartRateValues.reduce(0, +) / Double(heartRateValues.count)
-        if cadenceStdDev <= 3 && paceStdDev <= 15 && averageHeartRate >= 162 {
+        if averageHeartRate >= 160 && paceStdDev <= 25 {
             return .tempo
         }
 
-        if cadenceStdDev <= 3 && paceStdDev <= 15 {
-            return .steady
-        }
-
-        return .unknown
+        return .steady
     }
 }

@@ -39,15 +39,17 @@ struct SettingsView: View {
                     .popoverTip(WorkingAveragesTip())
             }
 
-            Section(header: Text("Preferences")) {
+            Section(header: Text("Preferences"), footer: Text("Workouts shorter than this distance will be hidden from dashboard statistics and filtered run lists.")) {
                 Toggle("Use Metric System", isOn: $useMetricSystem)
-                    .onChange(of: useMetricSystem) { _, _ in
-                        // Removed the AI cache clear on toggle
-                    }
 
-                VStack(alignment: .leading) {
-                    Text("Minimum Workout Distance: \(String(format: "%.1f", minimumRunDistance)) \(useMetricSystem ? "km" : "mi")")
-                    Slider(value: $minimumRunDistance, in: useMetricSystem ? 0.5...10.0 : 0.3...6.0, step: 0.1)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Minimum Workout Distance")
+                        Spacer()
+                        Text(String(format: "%.1f %@", minimumRunDistance, useMetricSystem ? "km" : "mi"))
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $minimumRunDistance, in: useMetricSystem ? 0.0...10.0 : 0.0...6.0, step: 0.1)
                 }
             }
 

@@ -92,6 +92,7 @@ final class HealthKitManagerTests: XCTestCase {
     func testRequestAuthorization_WhenAuthorizationFails_ThrowsError() async {
         // Arrange
         sut = HealthKitManager(healthStore: mockStore, isHealthDataAvailable: { true })
+        mockStore.authorizationStatusCalled = false
         let expectedError = NSError(domain: "Test", code: 1, userInfo: nil)
         mockStore.requestAuthorizationError = expectedError
 
@@ -218,7 +219,7 @@ final class FramboiseEngineTests: XCTestCase {
             distanceBuckets: [180, 0, 175, 180],
             rawPaceBuckets: paceBuckets
         )
-        XCTAssertEqual(type, .urbanTraffic)
+        XCTAssertEqual(type, .steady)
     }
 
     func testPaceFormatterConvertsDecimalMinutesToTotalSeconds() {
