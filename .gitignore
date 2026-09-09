@@ -1,8 +1,7 @@
 .DS_Store
 DeveloperSettings.xcconfig
-Runalyst.xcodeproj/project.xcworkspace/
-Runalyst.xcodeproj/xcuserdata/
-Runalyzer.xcodeproj/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
 Build/
 DerivedData/
 *.xcuserstate
