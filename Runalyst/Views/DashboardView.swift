@@ -356,11 +356,6 @@ struct DashboardView: View {
     @ViewBuilder
     private var fitnessBaselineCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("V1 Hero Card")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal)
-
             VStack(spacing: 16) {
                 // Top Row: VO2 Max + Trend Badge
                 HStack(alignment: .top) {
@@ -865,7 +860,7 @@ struct RunListRowView: View {
 
                 Spacer()
 
-                Text("[ \(runRecord.detectedTypeRaw) ]")
+                Text(runRecord.detectedTypeRaw)
                     .font(.caption2.bold())
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)

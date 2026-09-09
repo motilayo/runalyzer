@@ -108,8 +108,11 @@ struct RunDetailView: View {
                             }
                         } label: {
                             HStack(spacing: 4) {
-                                Text("[ \(runRecord.detectedTypeRaw) ▾ ]")
+                                Text(runRecord.detectedTypeRaw)
                                     .font(.subheadline.bold())
+                                    .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
+                                Image(systemName: "chevron.down")
+                                    .font(.caption2.bold())
                                     .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
                             }
                         }

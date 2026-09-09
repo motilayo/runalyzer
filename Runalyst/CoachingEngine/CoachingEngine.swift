@@ -52,7 +52,7 @@ struct SuggestedDrill {
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "A specific biomechanical form cue. Keep it short and actionable.")
+    @Guide(description: "A specific biomechanical form cue. If cueing cadence, reference INTERVAL_CADENCE. Keep it short and actionable.")
     var drillCues: String
 }
 
@@ -102,6 +102,7 @@ class CoachingEngine {
         - for faster pace with lower heart rate, prefer tempo_surges
         - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
         - prefer one excellent drill over multiple generic drills
+        - when providing drill cues for cadence drills, reference the target INTERVAL_CADENCE; never instruct the runner to maintain their current or lower cadence
         - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
         - respond_entirely_in_\(language)
         """
