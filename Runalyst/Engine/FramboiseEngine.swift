@@ -32,31 +32,44 @@ struct BucketData: Sendable {
 /// noise-filtered metrics (working averages, CV, linear regression, and rule-based classification).
 actor FramboiseEngine {
     
-    // MARK: - Dead Stop Trimming
+    // MARK: - Dead Stop & Walking Filter
     
-    /// Filters out buckets where the user was stationary (e.g., waiting at traffic lights).
-    /// A bucket is considered a dead stop if distance is 0 or cadence is 0, but HR is > 0.
-    func trimDeadStops(buckets: [BucketData]) -> [BucketData] {
+    /// Filters out stationary time, traffic stops, and walking breaks.
+    /// Strictly filters to KEEP samples where speed is greater than the walking threshold
+    /// (e.g., speed > 1.5 m/s or cadence > 130 SPM). Drops everything else.
+    func filterRunningSamples(buckets: [BucketData]) -> [BucketData] {
         return buckets.filter { bucket in
-            let isMoving = bucket.distanceMeters > 0.5 && bucket.meanCadence > 40
-            return isMoving
+            let speedMetersPerSecond = bucket.distanceMeters / 60.0
+            let isRunning = speedMetersPerSecond > 1.5 || bucket.meanCadence > 130.0
+            return isRunning
         }
     }
     
-    // MARK: - Working Averages
+    /// Alias for filterRunningSamples to maintain backward compatibility with callers.
+    func trimDeadStops(buckets: [BucketData]) -> [BucketData] {
+        return filterRunningSamples(buckets: buckets)
+    }
     
-    /// Calculates true working average pace from total trimmed time and distance, avoiding ratio averaging skew.
-    func calculateWorkingAverages(trimmed: [BucketData]) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double, workingDistance: Double, workingDuration: Double) {
+    // MARK: - Working Averages & Aggregate Pace
+    
+    /// Calculates true working averages by strictly summing the filtered running samples.
+    /// - Strictly sums the duration of only the kept/filtered samples.
+    /// - Enforces hard safety constraint: workingDuration <= rawWorkoutDuration.
+    /// - Calculates pace using pure aggregate ratios (workingDuration / workingDistanceKm) to eliminate harmonic distortion.
+    func calculateWorkingAverages(
+        trimmed: [BucketData],
+        rawWorkoutDuration: Double? = nil
+    ) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double, workingDistance: Double, workingDuration: Double) {
         guard !trimmed.isEmpty else { return (0, 0, 0, 0, 0, 0) }
         
-        var totalDistance: Double = 0
+        var totalDistanceMeters: Double = 0
         var totalCadence: Double = 0
         var totalHR: Double = 0
         var totalOscillation: Double = 0
         var oscillationBucketCount: Int = 0
         
         for bucket in trimmed {
-            totalDistance += bucket.distanceMeters
+            totalDistanceMeters += bucket.distanceMeters
             totalCadence += bucket.meanCadence
             totalHR += bucket.meanHR
             if bucket.meanVerticalOscillation > 0 {
@@ -65,14 +78,23 @@ actor FramboiseEngine {
             }
         }
         
-        let totalTimeSeconds = Double(trimmed.count * 60)
-        let workingDistanceKm = totalDistance / 1000.0
-        let workingPace = workingDistanceKm > 0 ? (totalTimeSeconds / workingDistanceKm) : 0
+        // Strictly sum the duration of only the kept/filtered samples (60s per bucket)
+        var workingDuration = Double(trimmed.count * 60)
+        
+        // Hard safety constraint: workingDuration must be <= rawWorkout.duration
+        if let rawDuration = rawWorkoutDuration, rawDuration > 0 {
+            workingDuration = min(workingDuration, rawDuration)
+        }
+        
+        // Pure aggregate ratio: Divide newly calculated workingDuration (in seconds) by workingDistance (in kilometers)
+        let workingDistanceKm = totalDistanceMeters / 1000.0
+        let workingPace = workingDistanceKm > 0 ? (workingDuration / workingDistanceKm) : 0.0
+        
         let workingCadence = totalCadence / Double(trimmed.count)
         let workingHR = totalHR / Double(trimmed.count)
         let workingOscillation = oscillationBucketCount > 0 ? (totalOscillation / Double(oscillationBucketCount)) : 0.0
         
-        return (workingPace, workingCadence, workingHR, workingOscillation, totalDistance, totalTimeSeconds)
+        return (workingPace, workingCadence, workingHR, workingOscillation, totalDistanceMeters, workingDuration)
     }
     
     // MARK: - Mathematical Features

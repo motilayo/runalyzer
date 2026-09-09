@@ -93,28 +93,15 @@ struct RunDetailView: View {
 
                         Spacer()
 
-                        Menu {
+                        Picker("Classification", selection: $runRecord.detectedTypeRaw) {
                             ForEach(classificationOptions, id: \.self) { option in
-                                Button(action: {
-                                    updateClassification(to: option)
-                                }) {
-                                    HStack {
-                                        Text(option)
-                                        if runRecord.detectedTypeRaw == option {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
+                                Text(option).tag(option)
                             }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(runRecord.detectedTypeRaw)
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
-                                Image(systemName: "chevron.down")
-                                    .font(.caption2.bold())
-                                    .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
-                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(Color(red: 0.05, green: 0.45, blue: 0.5))
+                        .onChange(of: runRecord.detectedTypeRaw) { oldValue, newValue in
+                            updateClassification(to: newValue, from: oldValue)
                         }
                     }
 
@@ -308,10 +295,12 @@ struct RunDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func updateClassification(to newType: String) {
+    private func updateClassification(to newType: String, from oldType: String? = nil) {
+        let previous = oldType ?? runRecord.detectedTypeRaw
+        guard newType != previous else { return }
         let correction = TrainingCorrection(
             runRecordID: runRecord.id,
-            originalLabel: runRecord.detectedTypeRaw,
+            originalLabel: previous,
             correctedLabel: newType,
             featureVector: [runRecord.workingAvgPace, runRecord.paceCV, runRecord.paceSlope, runRecord.percentZone4, runRecord.duration / 60.0]
         )

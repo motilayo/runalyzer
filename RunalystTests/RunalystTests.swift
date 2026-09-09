@@ -188,6 +188,48 @@ final class FramboiseEngineTests: XCTestCase {
         XCTAssertEqual(averages.workingOscillation, 9.0, accuracy: 0.01)
     }
     
+    func testFilterRunningSamples_DropsStationaryAndWalking() async {
+        let buckets = [
+            // Stationary: 0 m/s, 0 SPM -> Drop
+            BucketData(startTime: Date(), distanceMeters: 0, meanPaceSecPerKm: 0, meanCadence: 0, meanHR: 90),
+            // Walking break: 60m in 60s = 1.0 m/s (< 1.5), cadence 105 (< 130) -> Drop
+            BucketData(startTime: Date(), distanceMeters: 60, meanPaceSecPerKm: 1000, meanCadence: 105, meanHR: 110),
+            // Running by speed: 120m in 60s = 2.0 m/s (> 1.5), cadence 125 -> Keep
+            BucketData(startTime: Date(), distanceMeters: 120, meanPaceSecPerKm: 500, meanCadence: 125, meanHR: 145),
+            // Running by cadence: 80m in 60s = 1.33 m/s, cadence 150 (> 130) -> Keep
+            BucketData(startTime: Date(), distanceMeters: 80, meanPaceSecPerKm: 750, meanCadence: 150, meanHR: 140)
+        ]
+        
+        let filtered = await engine.filterRunningSamples(buckets: buckets)
+        XCTAssertEqual(filtered.count, 2)
+        XCTAssertEqual(filtered[0].distanceMeters, 120)
+        XCTAssertEqual(filtered[1].distanceMeters, 80)
+    }
+
+    func testCalculateWorkingAverages_EnforcesDurationSafetyConstraint() async {
+        let buckets = [
+            BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 160, meanHR: 140),
+            BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 160, meanHR: 140)
+        ]
+        // 2 buckets = 120 seconds, but raw workout duration was 100 seconds
+        let averages = await engine.calculateWorkingAverages(trimmed: buckets, rawWorkoutDuration: 100)
+        XCTAssertEqual(averages.workingDuration, 100, "workingDuration must be <= rawWorkoutDuration")
+    }
+
+    func testCalculateWorkingAverages_PureAggregateRatioPace() async {
+        // Harmonic distortion check:
+        // Bucket 1: 100m in 60s (pace = 600 s/km)
+        // Bucket 2: 300m in 60s (pace = 200 s/km)
+        // Arithmetic mean of paces = (600 + 200) / 2 = 400 s/km (WRONG)
+        // Aggregate ratio = 120s / 0.4km = 300 s/km (CORRECT)
+        let buckets = [
+            BucketData(startTime: Date(), distanceMeters: 100, meanPaceSecPerKm: 600, meanCadence: 150, meanHR: 130),
+            BucketData(startTime: Date(), distanceMeters: 300, meanPaceSecPerKm: 200, meanCadence: 170, meanHR: 160)
+        ]
+        let averages = await engine.calculateWorkingAverages(trimmed: buckets)
+        XCTAssertEqual(averages.workingPace, 300, accuracy: 0.01, "workingPace must use pure aggregate ratio (duration / distanceKm)")
+    }
+    
     func testCalculatePaceCV() async {
         let paces = [300.0, 300.0, 300.0, 300.0]
         let cv = await engine.calculatePaceCV(bucketPaces: paces)
