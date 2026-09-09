@@ -170,6 +170,8 @@ final class FramboiseEngineTests: XCTestCase {
         let averages = await engine.calculateWorkingAverages(trimmed: buckets)
         XCTAssertEqual(averages.workingCadence, 162)
         XCTAssertEqual(averages.workingHR, 142)
+        XCTAssertEqual(averages.workingDistance, 400, accuracy: 0.01)
+        XCTAssertEqual(averages.workingDuration, 120, accuracy: 0.01)
         // 400 meters in 120 seconds -> 120 / 0.4 = 300 sec/km
         XCTAssertEqual(averages.workingPace, 300, accuracy: 0.01)
     }
@@ -252,3 +254,36 @@ final class PaceFormatterTests: XCTestCase {
         XCTAssertEqual(pace1, "8:03/mi")
     }
 }
+
+final class DrillTemplateTests: XCTestCase {
+    func testDrillTemplateBaselinesAndCueInterpolation() {
+        let template = DrillTemplate.template(for: .cadencePyramids)
+        let thirtyDayCadence = 151
+        let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
+        
+        // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158)
+        XCTAssertEqual(computedTarget, 158)
+        
+        // Instructional cues must interpolate computed target output, NOT the raw baseline
+        let cue = template.generateInstructionalCue(computedTarget)
+        XCTAssertTrue(cue.contains("158 SPM"), "Instructional cue should interpolate the computed target: \(cue)")
+        XCTAssertFalse(cue.contains("151 SPM"), "Instructional cue must not repeat the raw baseline: \(cue)")
+    }
+}
+
+final class CardiacGuardrailTests: XCTestCase {
+    func testCardiacGuardrailHighHR() async {
+        let framboise = FramboiseEngine()
+        
+        // High HR run (175 BPM, zone 4 = 0.5) must never be classified as Easy Run or Recovery Run
+        let highHRClass = await framboise.classifyRun(cv: 0.04, slope: -0.1, zone4: 0.5, durationMinutes: 30, averageHR: 175)
+        XCTAssertNotEqual(highHRClass, "Easy Run")
+        XCTAssertNotEqual(highHRClass, "Recovery Run")
+        XCTAssertTrue(highHRClass == "Tempo Run" || highHRClass == "Intervals" || highHRClass == "Progression Run")
+        
+        // Low HR run (125 BPM, zone 4 = 0.04, duration 45 min) is Easy Run
+        let lowHRClass = await framboise.classifyRun(cv: 0.04, slope: -0.1, zone4: 0.04, durationMinutes: 45, averageHR: 125)
+        XCTAssertEqual(lowHRClass, "Easy Run")
+    }
+}
+

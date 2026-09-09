@@ -305,8 +305,13 @@ actor RunAnalyzerActor {
             hrContext = "\(Int(run.workingAvgHeartRate)) BPM (No baseline available)."
         }
 
-        let intervalTarget = min(180, max(150, Int(run.workingAvgCadence * 1.05)))
-        let recoveryTarget = max(140, Int(run.workingAvgCadence))
+        // Enforce 30-day baselines in target calculation
+        let thirtyDayCadence = Int(baseline?.avgCadence ?? (run.workingAvgCadence > 0 ? run.workingAvgCadence : 155))
+        let thirtyDayPace = baseline?.avgPace ?? (run.workingAvgPace > 0 ? run.workingAvgPace : 380.0)
+
+        let defaultTemplate = DrillTemplate.template(for: .cadencePyramids)
+        let intervalTarget = defaultTemplate.calculateTargetCadence(thirtyDayCadence)
+        let recoveryTarget = max(140, thirtyDayCadence)
 
         do {
             let runData = RunDataForAI(
@@ -331,16 +336,29 @@ actor RunAnalyzerActor {
             var drillRecs: [DrillRecommendation] = []
             for (index, suggestedDrill) in payload.drills.enumerated() {
                 let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
-                let preRunDrill = PreRunDrill(id: preRunId, previousCadence: Int(run.workingAvgCadence))
+                let template = DrillTemplate.template(for: preRunId)
+                let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
+                let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
                 
                 let targetCadenceStr = preRunDrill.computedCadence != nil ? "\(preRunDrill.computedCadence!) SPM" : nil
+                
+                // Update Interpolation: instructional text interpolates the computed target output, not the raw baseline
+                let templateCue = template.generateInstructionalCue(computedTarget)
+                let drillCueText: String
+                if suggestedDrill.drillCues.lowercased().contains("spm") {
+                    drillCueText = templateCue
+                } else if !suggestedDrill.drillCues.isEmpty {
+                    drillCueText = "\(suggestedDrill.drillCues) \(templateCue)"
+                } else {
+                    drillCueText = templateCue
+                }
                 
                 let drill = DrillRecommendation(
                     drillTitle: suggestedDrill.drillTitle,
                     preRunDrillId: preRunId.rawValue,
-                    drillPurpose: suggestedDrill.drillPurpose,
+                    drillPurpose: suggestedDrill.drillPurpose.isEmpty ? template.defaultPurpose : suggestedDrill.drillPurpose,
                     drillWork: preRunDrill.defaultWorkString,
-                    drillCues: suggestedDrill.drillCues,
+                    drillCues: drillCueText,
                     drillEffort: preRunDrill.defaultEffortString,
                     drillRecovery: preRunDrill.defaultRecoveryString,
                     targetCadence: targetCadenceStr,

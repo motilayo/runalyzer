@@ -46,8 +46,8 @@ actor FramboiseEngine {
     // MARK: - Working Averages
     
     /// Calculates true working average pace from total trimmed time and distance, avoiding ratio averaging skew.
-    func calculateWorkingAverages(trimmed: [BucketData]) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double) {
-        guard !trimmed.isEmpty else { return (0, 0, 0, 0) }
+    func calculateWorkingAverages(trimmed: [BucketData]) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double, workingDistance: Double, workingDuration: Double) {
+        guard !trimmed.isEmpty else { return (0, 0, 0, 0, 0, 0) }
         
         var totalDistance: Double = 0
         var totalCadence: Double = 0
@@ -66,13 +66,13 @@ actor FramboiseEngine {
         }
         
         let totalTimeSeconds = Double(trimmed.count * 60)
-        
-        let workingPace = totalDistance > 0 ? (totalTimeSeconds / (totalDistance / 1000.0)) : 0
+        let workingDistanceKm = totalDistance / 1000.0
+        let workingPace = workingDistanceKm > 0 ? (totalTimeSeconds / workingDistanceKm) : 0
         let workingCadence = totalCadence / Double(trimmed.count)
         let workingHR = totalHR / Double(trimmed.count)
         let workingOscillation = oscillationBucketCount > 0 ? (totalOscillation / Double(oscillationBucketCount)) : 0.0
         
-        return (workingPace, workingCadence, workingHR, workingOscillation)
+        return (workingPace, workingCadence, workingHR, workingOscillation, totalDistance, totalTimeSeconds)
     }
     
     // MARK: - Mathematical Features
@@ -132,8 +132,20 @@ actor FramboiseEngine {
     
     // MARK: - Classification (Rule-based Stub)
     
-    /// Rule-based fallback classifier used until a CoreML model is available.
-    func classifyRun(cv: Double, slope: Double, zone4: Double, durationMinutes: Double) -> String {
+    /// Rule-based fallback classifier used until a CoreML model is available or as fallback.
+    /// Enforces strict cardiac guardrails (runs with high HR or high Zone 4 are never easy/recovery).
+    func classifyRun(cv: Double, slope: Double, zone4: Double, durationMinutes: Double, averageHR: Double? = nil) -> String {
+        // Strict cardiac guardrail
+        if let hr = averageHR, hr >= 165 || zone4 >= 0.25 {
+            if zone4 > 0.40 || cv > 0.15 {
+                return "Intervals"
+            } else if slope < -0.3 {
+                return "Progression Run"
+            } else {
+                return "Tempo Run"
+            }
+        }
+        
         if cv > 0.20 && slope > -1.0 && slope < 1.0 {
             if zone4 < 0.10 {
                 return "urbanTraffic"

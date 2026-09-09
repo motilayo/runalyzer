@@ -224,3 +224,198 @@ struct PreRunDrill: Sendable {
         return WorkoutPlan(.custom(workout))
     }
 }
+
+/// Defines a standardized pre-run corrective drill template with target closures
+/// that enforce thirty-day user baselines over transient local run metrics.
+struct DrillTemplate: Sendable {
+    let id: PreRunDrillId
+    let title: String
+    let defaultPurpose: String
+    let defaultWork: String
+    let defaultRecovery: String
+    let defaultEffort: String
+    
+    /// Target calculation closures enforcing 30-day user baselines
+    let calculateTargetCadence: @Sendable (_ thirtyDayCadence: Int) -> Int
+    let calculateTargetPace: @Sendable (_ thirtyDayPace: Double) -> Double
+    
+    /// Instructional text interpolating the computed target output from the closure
+    let generateInstructionalCue: @Sendable (_ computedTargetCadence: Int) -> String
+
+    init(
+        id: PreRunDrillId,
+        title: String,
+        defaultPurpose: String,
+        defaultWork: String,
+        defaultRecovery: String,
+        defaultEffort: String,
+        calculateTargetCadence: @escaping @Sendable (Int) -> Int,
+        calculateTargetPace: @escaping @Sendable (Double) -> Double = { $0 },
+        generateInstructionalCue: @escaping @Sendable (Int) -> String
+    ) {
+        self.id = id
+        self.title = title
+        self.defaultPurpose = defaultPurpose
+        self.defaultWork = defaultWork
+        self.defaultRecovery = defaultRecovery
+        self.defaultEffort = defaultEffort
+        self.calculateTargetCadence = calculateTargetCadence
+        self.calculateTargetPace = calculateTargetPace
+        self.generateInstructionalCue = generateInstructionalCue
+    }
+    
+    static func template(for id: PreRunDrillId) -> DrillTemplate {
+        switch id {
+        case .cadencePyramids:
+            return DrillTemplate(
+                id: .cadencePyramids,
+                title: "Cadence Pyramids",
+                defaultPurpose: "Improve running economy and quicken turnover to reduce braking forces.",
+                defaultWork: "4 x 1 min work",
+                defaultRecovery: "2 min walk recovery",
+                defaultEffort: "Moderate / Zone 3",
+                calculateTargetCadence: { baseline in
+                    min(185, max(150, Int(Double(baseline) * 1.05)))
+                },
+                generateInstructionalCue: { target in
+                    "Maintain a steady \(target) SPM with a slight forward lean and relaxed shoulders."
+                }
+            )
+        case .rhythmIntervals:
+            return DrillTemplate(
+                id: .rhythmIntervals,
+                title: "Rhythm Intervals",
+                defaultPurpose: "Develop metronomic rhythm and aerobic pacing stability.",
+                defaultWork: "5 x 45 sec work",
+                defaultRecovery: "90 sec easy jog recovery",
+                defaultEffort: "Moderate / Zone 3",
+                calculateTargetCadence: { baseline in
+                    min(185, max(152, Int(Double(baseline) * 1.06)))
+                },
+                generateInstructionalCue: { target in
+                    "Lock into a consistent \(target) SPM rhythm, focusing on quick ground turnover."
+                }
+            )
+        case .tempoSurges:
+            return DrillTemplate(
+                id: .tempoSurges,
+                title: "Tempo Surges",
+                defaultPurpose: "Prime lactate clearance and dynamic turnover under higher effort.",
+                defaultWork: "3 x 2 min work",
+                defaultRecovery: "4 min walk recovery",
+                defaultEffort: "Hard / Zone 4",
+                calculateTargetCadence: { baseline in
+                    min(185, max(155, Int(Double(baseline) * 1.08)))
+                },
+                generateInstructionalCue: { target in
+                    "Accelerate smoothly to reach \(target) SPM while staying relaxed through your upper body."
+                }
+            )
+        case .strides:
+            return DrillTemplate(
+                id: .strides,
+                title: "Strides",
+                defaultPurpose: "Neuromuscular priming and rapid motor unit recruitment.",
+                defaultWork: "6 x 20 sec strides",
+                defaultRecovery: "60 sec walk recovery",
+                defaultEffort: "Sprint / Zone 5",
+                calculateTargetCadence: { baseline in
+                    min(190, max(170, Int(Double(baseline) * 1.10)))
+                },
+                generateInstructionalCue: { target in
+                    "Build turnover up to \(target) SPM over 20 seconds with tall posture and powerful arm drive."
+                }
+            )
+        case .neuromuscularPrimer:
+            return DrillTemplate(
+                id: .neuromuscularPrimer,
+                title: "Neuromuscular Primer",
+                defaultPurpose: "Wake up running mechanics and shorten ground contact time.",
+                defaultWork: "4 x 30 sec work",
+                defaultRecovery: "90 sec walk recovery",
+                defaultEffort: "Sprint / Zone 5",
+                calculateTargetCadence: { baseline in
+                    min(185, max(160, Int(Double(baseline) * 1.07)))
+                },
+                generateInstructionalCue: { target in
+                    "Focus on rapid foot strike turnover targeting \(target) SPM with minimal vertical bounce."
+                }
+            )
+        case .aerobicFlush:
+            return DrillTemplate(
+                id: .aerobicFlush,
+                title: "Aerobic Flush",
+                defaultPurpose: "Gentle low-impact movement to promote blood flow and recovery.",
+                defaultWork: "10 min steady",
+                defaultRecovery: "No intervals",
+                defaultEffort: "Easy / Zone 1-2",
+                calculateTargetCadence: { baseline in
+                    max(140, baseline)
+                },
+                generateInstructionalCue: { _ in
+                    "Keep the effort conversational in Zone 1-2, letting your legs flush fatigue."
+                }
+            )
+        case .fartlekPrimer:
+            return DrillTemplate(
+                id: .fartlekPrimer,
+                title: "Fartlek Primer",
+                defaultPurpose: "Play with rhythm transitions without high cardiovascular strain.",
+                defaultWork: "5 x 1 min work",
+                defaultRecovery: "2 min walk recovery",
+                defaultEffort: "Hard / Zone 4",
+                calculateTargetCadence: { baseline in
+                    min(185, max(155, Int(Double(baseline) * 1.06)))
+                },
+                generateInstructionalCue: { target in
+                    "Alternate between easy rhythm and surging to \(target) SPM."
+                }
+            )
+        case .hillBounds:
+            return DrillTemplate(
+                id: .hillBounds,
+                title: "Hill Bounds",
+                defaultPurpose: "Develop propulsive leg drive and posterior chain strength.",
+                defaultWork: "5 x 30 sec work",
+                defaultRecovery: "90 sec walk recovery",
+                defaultEffort: "Sprint / Zone 5",
+                calculateTargetCadence: { baseline in
+                    max(145, baseline)
+                },
+                generateInstructionalCue: { target in
+                    "Drive through your hips on each stride, sustaining \(target) SPM up the gradient."
+                }
+            )
+        case .recoveryJog:
+            return DrillTemplate(
+                id: .recoveryJog,
+                title: "Recovery Jog",
+                defaultPurpose: "Active recovery to stimulate circulation without muscular stress.",
+                defaultWork: "15 min easy",
+                defaultRecovery: "No intervals",
+                defaultEffort: "Easy / Zone 1-2",
+                calculateTargetCadence: { baseline in
+                    max(140, baseline)
+                },
+                generateInstructionalCue: { _ in
+                    "Maintain an effortless, relaxed jog prioritizing low heart rate."
+                }
+            )
+        case .aerobicBaseBuilder:
+            return DrillTemplate(
+                id: .aerobicBaseBuilder,
+                title: "Aerobic Base Builder",
+                defaultPurpose: "Zone 2 aerobic conditioning to build mitochondrial density.",
+                defaultWork: "35 min Zone 2 steady",
+                defaultRecovery: "No intervals",
+                defaultEffort: "Zone 2 Aerobic",
+                calculateTargetCadence: { baseline in
+                    max(150, baseline)
+                },
+                generateInstructionalCue: { target in
+                    "Sustain a rhythmic \(target) SPM turnover while keeping heart rate strictly within Zone 2."
+                }
+            )
+        }
+    }
+}

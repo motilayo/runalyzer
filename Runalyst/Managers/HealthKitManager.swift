@@ -32,6 +32,8 @@ struct RunRecordDTO: Sendable {
     let workingAvgHeartRate: Double
     let rawAvgVerticalOscillation: Double?
     let workingAvgVerticalOscillation: Double?
+    let workingDistanceMeters: Double?
+    let workingDurationSeconds: Double?
     let paceCV: Double
     let paceSlope: Double
     let percentZone4: Double
@@ -295,7 +297,7 @@ class HealthKitManager: ObservableObject {
         
         let buckets = try await fetchBucketedSamples(for: workout)
         let trimmed = await engine.trimDeadStops(buckets: buckets)
-        let (workingPace, workingCadence, workingHR, workingOscillation) = await engine.calculateWorkingAverages(trimmed: trimmed)
+        let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration) = await engine.calculateWorkingAverages(trimmed: trimmed)
         
         let paces = trimmed.map { $0.meanPaceSecPerKm }
         let hrs = trimmed.map { $0.meanHR }
@@ -306,12 +308,23 @@ class HealthKitManager: ObservableObject {
         // or we could use the classic 220 - age if we had DOB.
         let zone4 = await engine.calculatePercentZone4(bucketHRs: hrs, maxHR: 190)
         
-        let classification = await engine.classifyRun(cv: cv, slope: slope, zone4: zone4, durationMinutes: duration / 60.0)
-        let tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
-        
         let validRawOsc = (rawAvgOscillation ?? 0) > 0 ? rawAvgOscillation : nil
         let validWorkingOsc = workingOscillation > 0 ? workingOscillation : validRawOsc
         let finalRawOsc = validRawOsc ?? validWorkingOsc
+
+        let modelManager = ModelManager()
+        let classification = await modelManager.predictRunType(
+            averagePace: workingPace > 0 ? workingPace : rawAvgPace,
+            averageHeartRate: workingHR > 0 ? workingHR : rawAvgHeartRate,
+            percentZone4: zone4,
+            averageCadence: workingCadence > 0 ? workingCadence : rawAvgCadence,
+            verticalOscillation: validWorkingOsc ?? 9.5,
+            runnerStage: 1,
+            cv: cv,
+            slope: slope,
+            durationMinutes: duration / 60.0
+        )
+        let tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
 
         return RunRecordDTO(
             hkWorkoutID: workout.uuid,
@@ -326,6 +339,8 @@ class HealthKitManager: ObservableObject {
             workingAvgHeartRate: workingHR,
             rawAvgVerticalOscillation: finalRawOsc,
             workingAvgVerticalOscillation: validWorkingOsc,
+            workingDistanceMeters: workingDistance,
+            workingDurationSeconds: workingDuration,
             paceCV: cv,
             paceSlope: slope,
             percentZone4: zone4,
@@ -583,6 +598,8 @@ class HealthKitSeeder {
                 workingAvgHeartRate: avgHR,
                 workingAvgVerticalOscillation: vertOsc,
                 rawAvgVerticalOscillation: vertOsc + 0.3,
+                workingDistanceMeters: distanceMeters,
+                workingDurationSeconds: durationSec,
                 paceCV: paceCV,
                 paceSlope: paceSlope,
                 percentZone4: percentZone4,
