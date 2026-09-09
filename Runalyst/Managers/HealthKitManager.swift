@@ -392,10 +392,10 @@ class HealthKitManager: ObservableObject {
 }
 //
 //  seeder.swift
-//  Runalyzer
+//  Runalyst
 //
 //  Created by Joshua Agboola on 2026-08-22.
-//  Updated for Runest V2: 1-Minute Chunking & Variance Profiles
+//  Updated for Runalyst V2: 1-Minute Chunking & Variance Profiles
 //
 
 import Foundation

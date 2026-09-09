@@ -2,6 +2,7 @@
 DeveloperSettings.xcconfig
 *.xcodeproj/project.xcworkspace/
 *.xcodeproj/xcuserdata/
+Runalyzer.xcodeproj/
 Build/
 DerivedData/
 *.xcuserstate
