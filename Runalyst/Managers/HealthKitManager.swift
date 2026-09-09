@@ -2,7 +2,8 @@ import Foundation
 import HealthKit
 import SwiftData
 
-protocol HKHealthStoreProtocol {
+@MainActor
+protocol HKHealthStoreProtocol: AnyObject, Sendable {
     func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
     func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws
@@ -45,7 +46,7 @@ class HealthKitManager: ObservableObject {
     var isHealthDataAvailable: () -> Bool
 
     @Published var isAuthorized: Bool = false
-    var onWorkoutsUpdated: (() async -> Void)?
+    var onWorkoutsUpdated: (@Sendable () async -> Void)?
     private var observerQuery: HKObserverQuery?
 
     init(
@@ -93,13 +94,14 @@ class HealthKitManager: ObservableObject {
     func startObservingWorkouts() {
         guard observerQuery == nil else { return }
         let query = HKObserverQuery(sampleType: .workoutType(), predicate: nil) { [weak self] _, completionHandler, error in
-            if error == nil {
-                Task {
-                    await self?.onWorkoutsUpdated?()
-                    completionHandler()
-                }
-            } else {
+            guard error == nil else {
                 completionHandler()
+                return
+            }
+            nonisolated(unsafe) let handler = completionHandler
+            Task { @MainActor in
+                await self?.onWorkoutsUpdated?()
+                handler()
             }
         }
         observerQuery = query
@@ -341,9 +343,10 @@ class HealthKitManager: ObservableObject {
         }
         
         // 2. Query HealthStore with object predicate, fallback to date predicate
+        let store = healthStore
         return try await withCheckedThrowingContinuation { continuation in
             let predicate = HKQuery.predicateForObjects(from: workout)
-            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { [weak self] _, result, error in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, result, error in
                 if let avg = result?.averageQuantity()?.doubleValue(for: unit), avg > 0 {
                     continuation.resume(returning: avg)
                 } else {
@@ -352,10 +355,10 @@ class HealthKitManager: ObservableObject {
                         let fallbackAvg = fallbackResult?.averageQuantity()?.doubleValue(for: unit) ?? 0.0
                         continuation.resume(returning: fallbackAvg)
                     }
-                    self?.healthStore?.execute(fallbackQuery)
+                    store?.execute(fallbackQuery)
                 }
             }
-            healthStore?.execute(query)
+            store?.execute(query)
         }
     }
 
@@ -368,9 +371,10 @@ class HealthKitManager: ObservableObject {
         }
         
         // 2. Query HealthStore
+        let store = healthStore
         return try await withCheckedThrowingContinuation { continuation in
             let predicate = HKQuery.predicateForObjects(from: workout)
-            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { [weak self] _, result, error in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
                 if let sum = result?.sumQuantity()?.doubleValue(for: unit), sum > 0 {
                     continuation.resume(returning: sum)
                 } else {
@@ -379,19 +383,19 @@ class HealthKitManager: ObservableObject {
                         let fallbackSum = fallbackResult?.sumQuantity()?.doubleValue(for: unit) ?? 0.0
                         continuation.resume(returning: fallbackSum)
                     }
-                    self?.healthStore?.execute(fallbackQuery)
+                    store?.execute(fallbackQuery)
                 }
             }
-            healthStore?.execute(query)
+            store?.execute(query)
         }
     }
 }
 //
 //  seeder.swift
-//  Runalyzer
+//  Runalyst
 //
 //  Created by Joshua Agboola on 2026-08-22.
-//  Updated for Runest V2: 1-Minute Chunking & Variance Profiles
+//  Updated for Runalyst V2: 1-Minute Chunking & Variance Profiles
 //
 
 import Foundation
@@ -447,7 +451,7 @@ class HealthKitSeeder {
         ]
         
         do {
-            try await HealthKitManager.shared.healthStore?.requestAuthorization(toShare: typesToWrite, read: [])
+            try await healthStore.requestAuthorization(toShare: typesToWrite, read: [])
         } catch {
             print("Failed to authorize HealthKit Seeder: \(error)")
             return

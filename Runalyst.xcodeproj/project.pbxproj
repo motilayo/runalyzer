@@ -14,13 +14,10 @@
 		438FD31B3051C867003DEDA5 /* LiveCoachDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438FD3173051C866003DEDA5 /* LiveCoachDTOs.swift */; };
 		438FD31C3051C867003DEDA5 /* LiveCoachEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438FD3183051C866003DEDA5 /* LiveCoachEngine.swift */; };
 		438FD31D3051C867003DEDA5 /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438FD3193051C866003DEDA5 /* WatchConnectivityManager.swift */; };
-		4C06461A8F50D2CE86B4D117 /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11742538A05B00142AABD16 /* FramboiseEngine.swift */; };
 		554433221100FFEEDDCCBBAA /* Runalyst/Views/AnimatedLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334455 /* Runalyst/Views/AnimatedLoadingView.swift */; };
 		5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */; };
-		652148E0B037472732D0D2E7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35724688B362914BC9EAC058 /* ModelManager.swift */; };
 		8A134F81873E70E012F97522 /* TrainingCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C44838A872210F6909E642 /* TrainingCorrection.swift */; };
 		8EE242FF8F81F965BDC748CC /* WorkoutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8446C093FADDF41149B361 /* WorkoutBridge.swift */; };
-		91CA4168B9A9033F44D87AFA /* PaceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */; };
 		98DB7AE1F0FD4D5A9E2AED7E /* Runalyst/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyst/Views/SettingsView.swift */; };
 		9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */; };
 		9DEC99887D72772D3AB524D1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
@@ -28,14 +25,10 @@
 		A42C7740988216A73236241C /* RunalystTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF95A44AF1613AFBF9ED4688 /* RunalystTests.swift */; };
 		A9994594B624150A24D868E9 /* DrillsLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */; };
 		CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
-		CF8D403082D7F1D487D5525D /* TrainingCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C44838A872210F6909E642 /* TrainingCorrection.swift */; };
-		D2514E299BEA66708F63832E /* PersonalizedRunClassifier.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */; };
 		DEE345D7801E107E3983DDDE /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11742538A05B00142AABD16 /* FramboiseEngine.swift */; };
 		E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */; };
 		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
 		E3784833987D299F1E0A3301 /* PaceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */; };
-		EA9042A09B4AA14D3BE31976 /* WorkoutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8446C093FADDF41149B361 /* WorkoutBridge.swift */; };
-		ED2D4996B1581CFEEB4983A8 /* DrillsLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */; };
 		F20E4C048AB2389BBF14327D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35724688B362914BC9EAC058 /* ModelManager.swift */; };
 		M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */; };
 		P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Runalyst/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyst/Assets.xcassets */; };
@@ -131,7 +124,7 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		438FD31A3051C866003DEDA5 /* LiveCoach */ = {
+		438FD31A3051C866003DEDA5 /* Runalyst/LiveCoach */ = {
 			isa = PBXGroup;
 			children = (
 				438FD3173051C866003DEDA5 /* LiveCoachDTOs.swift */,
@@ -186,7 +179,7 @@
 				10AA26382422973E1F322C8D /* RunalystTests */,
 				CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */,
 				E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */,
-				438FD31A3051C866003DEDA5 /* LiveCoach */,
+				438FD31A3051C866003DEDA5 /* Runalyst/LiveCoach */,
 			);
 			sourceTree = "<group>";
 		};
@@ -345,9 +338,10 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyst;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyzer;
+				PRODUCT_NAME = Runalyst;
 				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -511,9 +505,10 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyst;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyzer;
+				PRODUCT_NAME = Runalyst;
 				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
