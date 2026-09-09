@@ -1,5 +1,5 @@
 import Foundation
-import WorkoutKit
+@preconcurrency import WorkoutKit
 import HealthKit
 
 
@@ -33,7 +33,8 @@ enum SafeTargetCalculator {
 /// The bridge between Runalyst's CoreML/AI outputs and Apple's WorkoutKit.
 /// Translates `DrillPrescriptionDTO` into a native `WorkoutPlan`.
 @available(iOS 17.0, *)
-actor WorkoutBridge {
+@MainActor
+final class WorkoutBridge {
     
     /// Translates a DTO into a scheduled WorkoutKit plan for Apple Watch.
     func scheduleDrill(dto: DrillPrescriptionDTO) async throws {
