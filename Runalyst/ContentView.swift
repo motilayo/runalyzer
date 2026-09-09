@@ -87,16 +87,20 @@ struct ContentView: View {
 
             let engine = FramboiseEngine()
 
-            // Repair any existing runs in SwiftData that have missing/zero vertical oscillation
+            // Repair any existing runs in SwiftData that have missing/zero vertical oscillation or working distance/duration
             let runsNeedingRepair = currentExistingRuns.filter {
                 ($0.rawAvgVerticalOscillation == nil || $0.rawAvgVerticalOscillation == 0) ||
-                ($0.workingAvgVerticalOscillation == nil || $0.workingAvgVerticalOscillation == 0)
+                ($0.workingAvgVerticalOscillation == nil || $0.workingAvgVerticalOscillation == 0) ||
+                ($0.workingDistanceMeters == nil || $0.workingDurationSeconds == nil)
             }
             for existingRun in runsNeedingRepair {
                 if let workout = workouts.first(where: { $0.uuid == existingRun.hkWorkoutID }) {
                     if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine) {
                         existingRun.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
                         existingRun.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+                        existingRun.workingDistanceMeters = dto.workingDistanceMeters
+                        existingRun.workingDurationSeconds = dto.workingDurationSeconds
+                        existingRun.workingAvgPace = dto.workingAvgPace
                     }
                 }
             }
@@ -135,6 +139,8 @@ struct ContentView: View {
                     workingAvgHeartRate: dto.workingAvgHeartRate,
                     workingAvgVerticalOscillation: dto.workingAvgVerticalOscillation,
                     rawAvgVerticalOscillation: dto.rawAvgVerticalOscillation,
+                    workingDistanceMeters: dto.workingDistanceMeters,
+                    workingDurationSeconds: dto.workingDurationSeconds,
                     paceCV: dto.paceCV,
                     paceSlope: dto.paceSlope,
                     percentZone4: dto.percentZone4,

@@ -63,7 +63,7 @@ struct SettingsView: View {
                     Text("Apple Health Data")
                         .font(.body)
                     Spacer()
-                    Text("[ Synced ]")
+                    Text("Synced")
                         .font(.subheadline.bold())
                         .foregroundColor(Color(red: 0.1, green: 0.6, blue: 0.6))
                 }
@@ -75,7 +75,7 @@ struct SettingsView: View {
                     Text("WorkoutKit Handoff")
                         .font(.body)
                     Spacer()
-                    Text("[ Granted ]")
+                    Text("Granted")
                         .font(.subheadline.bold())
                         .foregroundColor(Color(red: 0.1, green: 0.6, blue: 0.6))
                 }
@@ -239,7 +239,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationTitle("SettingsView")
+        .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

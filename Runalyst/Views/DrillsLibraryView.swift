@@ -65,12 +65,13 @@ struct DrillsLibraryView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal)
                         
-                        let targetCadence = min(185, baselineCadence + 8)
+                        let cadenceTemplate = DrillTemplate.template(for: .cadencePyramids)
+                        let targetCadence = cadenceTemplate.calculateTargetCadence(baselineCadence)
                         DrillPrimerCardView(
                             icon: "stopwatch",
                             iconColor: .orange,
-                            title: "Cadence Correction Drill",
-                            description: "12 min turnover focus to fix over-striding.",
+                            title: cadenceTemplate.title,
+                            description: cadenceTemplate.defaultPurpose,
                             target: "Target: \(targetCadence) SPM (Current Baseline: \(baselineCadence) SPM)",
                             drillId: "cadence_pyramids",
                             targetCadence: targetCadence,
@@ -82,14 +83,16 @@ struct DrillsLibraryView: View {
                         )
                         .padding(.horizontal)
                         
+                        let stridesTemplate = DrillTemplate.template(for: .strides)
+                        let stridesTarget = stridesTemplate.calculateTargetCadence(baselineCadence)
                         DrillPrimerCardView(
                             icon: "bolt.fill",
                             iconColor: .yellow,
                             title: "Neuromuscular Strides",
-                            description: "10 min pre-race explosive activation.",
-                            target: "Target: 175 - 185 SPM",
+                            description: stridesTemplate.defaultPurpose,
+                            target: "Target: \(stridesTarget) SPM (Baseline: \(baselineCadence) SPM)",
                             drillId: "strides",
-                            targetCadence: 180,
+                            targetCadence: stridesTarget,
                             baselineCadence: baselineCadence,
                             onStart: { plan in
                                 activeWorkoutPlan = plan
@@ -108,14 +111,16 @@ struct DrillsLibraryView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal)
                         
+                        let rhythmTemplate = DrillTemplate.template(for: .rhythmIntervals)
+                        let rhythmTarget = rhythmTemplate.calculateTargetCadence(baselineCadence)
                         DrillPrimerCardView(
                             icon: "waveform.path.ecg",
                             iconColor: .purple,
-                            title: "Rhythm Intervals (Tempo Primer)",
-                            description: "12 min progressive cadence ramp.",
-                            target: "Target: 168 - 174 SPM",
+                            title: rhythmTemplate.title,
+                            description: rhythmTemplate.defaultPurpose,
+                            target: "Target: \(rhythmTarget) SPM (Baseline: \(baselineCadence) SPM)",
                             drillId: "rhythm_intervals",
-                            targetCadence: 170,
+                            targetCadence: rhythmTarget,
                             baselineCadence: baselineCadence,
                             onStart: { plan in
                                 activeWorkoutPlan = plan

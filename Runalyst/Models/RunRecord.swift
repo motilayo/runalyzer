@@ -29,6 +29,10 @@ final class RunRecord {
     var rawAvgCadence: Double
 
     // MARK: - Framboise Working Metrics
+    /// True working distance excluding dead stops (meters)
+    var workingDistanceMeters: Double?
+    /// True working duration excluding dead stops (seconds)
+    var workingDurationSeconds: Double?
     /// True working average pace, excluding dead stops (seconds/km)
     var workingAvgPace: Double
     /// True working average cadence (SPM)
@@ -39,6 +43,14 @@ final class RunRecord {
     var workingAvgVerticalOscillation: Double?
     /// Raw average vertical oscillation (cm)
     var rawAvgVerticalOscillation: Double?
+
+    var effectiveWorkingDistanceMeters: Double {
+        workingDistanceMeters ?? totalDistanceMeters
+    }
+
+    var effectiveWorkingDurationSeconds: Double {
+        workingDurationSeconds ?? duration
+    }
 
     // MARK: - Framboise Mathematical Features
     /// Coefficient of variation for pace (sigma / mu)
@@ -74,6 +86,8 @@ final class RunRecord {
         workingAvgHeartRate: Double,
         workingAvgVerticalOscillation: Double? = nil,
         rawAvgVerticalOscillation: Double? = nil,
+        workingDistanceMeters: Double? = nil,
+        workingDurationSeconds: Double? = nil,
         paceCV: Double,
         paceSlope: Double,
         percentZone4: Double,
@@ -94,6 +108,8 @@ final class RunRecord {
         self.workingAvgHeartRate = workingAvgHeartRate
         self.workingAvgVerticalOscillation = workingAvgVerticalOscillation
         self.rawAvgVerticalOscillation = rawAvgVerticalOscillation
+        self.workingDistanceMeters = workingDistanceMeters
+        self.workingDurationSeconds = workingDurationSeconds
         self.paceCV = paceCV
         self.paceSlope = paceSlope
         self.percentZone4 = percentZone4

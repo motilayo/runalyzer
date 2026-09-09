@@ -52,7 +52,7 @@ struct SuggestedDrill {
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "A specific biomechanical form cue. Keep it short and actionable.")
+    @Guide(description: "A specific biomechanical form cue. If cueing cadence, reference INTERVAL_CADENCE. Keep it short and actionable.")
     var drillCues: String
 }
 
@@ -102,6 +102,7 @@ class CoachingEngine {
         - for faster pace with lower heart rate, prefer tempo_surges
         - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
         - prefer one excellent drill over multiple generic drills
+        - when providing drill cues for cadence drills, reference the target INTERVAL_CADENCE; never instruct the runner to maintain their current or lower cadence
         - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
         - respond_entirely_in_\(language)
         """
@@ -304,8 +305,13 @@ actor RunAnalyzerActor {
             hrContext = "\(Int(run.workingAvgHeartRate)) BPM (No baseline available)."
         }
 
-        let intervalTarget = min(180, max(150, Int(run.workingAvgCadence * 1.05)))
-        let recoveryTarget = max(140, Int(run.workingAvgCadence))
+        // Enforce 30-day baselines in target calculation
+        let thirtyDayCadence = Int(baseline?.avgCadence ?? (run.workingAvgCadence > 0 ? run.workingAvgCadence : 155))
+        let thirtyDayPace = baseline?.avgPace ?? (run.workingAvgPace > 0 ? run.workingAvgPace : 380.0)
+
+        let defaultTemplate = DrillTemplate.template(for: .cadencePyramids)
+        let intervalTarget = defaultTemplate.calculateTargetCadence(thirtyDayCadence)
+        let recoveryTarget = max(140, thirtyDayCadence)
 
         do {
             let runData = RunDataForAI(
@@ -330,16 +336,29 @@ actor RunAnalyzerActor {
             var drillRecs: [DrillRecommendation] = []
             for (index, suggestedDrill) in payload.drills.enumerated() {
                 let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
-                let preRunDrill = PreRunDrill(id: preRunId, previousCadence: Int(run.workingAvgCadence))
+                let template = DrillTemplate.template(for: preRunId)
+                let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
+                let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
                 
                 let targetCadenceStr = preRunDrill.computedCadence != nil ? "\(preRunDrill.computedCadence!) SPM" : nil
+                
+                // Update Interpolation: instructional text interpolates the computed target output, not the raw baseline
+                let templateCue = template.generateInstructionalCue(computedTarget)
+                let drillCueText: String
+                if suggestedDrill.drillCues.lowercased().contains("spm") {
+                    drillCueText = templateCue
+                } else if !suggestedDrill.drillCues.isEmpty {
+                    drillCueText = "\(suggestedDrill.drillCues) \(templateCue)"
+                } else {
+                    drillCueText = templateCue
+                }
                 
                 let drill = DrillRecommendation(
                     drillTitle: suggestedDrill.drillTitle,
                     preRunDrillId: preRunId.rawValue,
-                    drillPurpose: suggestedDrill.drillPurpose,
+                    drillPurpose: suggestedDrill.drillPurpose.isEmpty ? template.defaultPurpose : suggestedDrill.drillPurpose,
                     drillWork: preRunDrill.defaultWorkString,
-                    drillCues: suggestedDrill.drillCues,
+                    drillCues: drillCueText,
                     drillEffort: preRunDrill.defaultEffortString,
                     drillRecovery: preRunDrill.defaultRecoveryString,
                     targetCadence: targetCadenceStr,

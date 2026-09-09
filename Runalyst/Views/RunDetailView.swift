@@ -108,8 +108,11 @@ struct RunDetailView: View {
                             }
                         } label: {
                             HStack(spacing: 4) {
-                                Text("[ \(runRecord.detectedTypeRaw) ▾ ]")
+                                Text(runRecord.detectedTypeRaw)
                                     .font(.subheadline.bold())
+                                    .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
+                                Image(systemName: "chevron.down")
+                                    .font(.caption2.bold())
                                     .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
                             }
                         }
@@ -168,15 +171,24 @@ struct RunDetailView: View {
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-                    let distanceConverted = useMetricSystem ? (runRecord.totalDistanceMeters / 1000.0) : (runRecord.totalDistanceMeters / 1609.344)
+                    let activeDistanceMeters = showRawMetrics ? runRecord.totalDistanceMeters : runRecord.effectiveWorkingDistanceMeters
+                    let distanceConverted = useMetricSystem ? (activeDistanceMeters / 1000.0) : (activeDistanceMeters / 1609.344)
                     let distanceUnit = useMetricSystem ? "km" : "mi"
                     StatBox(title: "Distance", value: String(format: "%.2f", distanceConverted), unit: distanceUnit)
 
-                    let minutes = Int(runRecord.duration) / 60
-                    let seconds = Int(runRecord.duration) % 60
+                    let activeDuration = showRawMetrics ? runRecord.duration : runRecord.effectiveWorkingDurationSeconds
+                    let minutes = Int(activeDuration) / 60
+                    let seconds = Int(activeDuration) % 60
                     StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
 
-                    let currentPace = showRawMetrics ? runRecord.rawAvgPace : runRecord.workingAvgPace
+                    let currentPace: Double = {
+                        if showRawMetrics {
+                            return runRecord.rawAvgPace
+                        } else {
+                            let workingKm = runRecord.effectiveWorkingDistanceMeters / 1000.0
+                            return workingKm > 0 ? (runRecord.effectiveWorkingDurationSeconds / workingKm) : runRecord.workingAvgPace
+                        }
+                    }()
                     let currentHR = showRawMetrics ? runRecord.rawAvgHeartRate : runRecord.workingAvgHeartRate
                     let currentCadence = showRawMetrics ? runRecord.rawAvgCadence : runRecord.workingAvgCadence
 
@@ -255,13 +267,18 @@ struct RunDetailView: View {
                         .frame(minHeight: 1)
                         .padding(32)
                         .task(id: runRecord.id) {
-                            if (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
-                               (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0) {
+                            let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
+                               (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
+                            let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
+                            if needsOscRepair || needsWorkingRepair {
                                 if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
                                     let engine = FramboiseEngine()
                                     if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
                                         runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
                                         runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+                                        runRecord.workingDistanceMeters = dto.workingDistanceMeters
+                                        runRecord.workingDurationSeconds = dto.workingDurationSeconds
+                                        runRecord.workingAvgPace = dto.workingAvgPace
                                         try? modelContext.save()
                                     }
                                 }

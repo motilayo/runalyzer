@@ -29,9 +29,9 @@ struct DashboardView: View {
 
     @State private var isFetchingInsight = false
     
-    @State private var isSchedulingSuggestedRun = false
-    @State private var scheduledSuggestedRunSuccess = false
-    @State private var suggestedRunErrorMessage: String? = nil
+    @State private var isSchedulingPrimer = false
+    @State private var scheduledPrimerSuccess = false
+    @State private var primerErrorMessage: String? = nil
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .aerobicBaseBuilder).buildWorkoutPlan()
     @State private var isShowingWorkoutPreview = false
 
@@ -245,63 +245,85 @@ struct DashboardView: View {
         }
     }
     
+    private var activePrimerId: PreRunDrillId {
+        if let cadence = baselineCadence, cadence < 155 {
+            return .cadencePyramids
+        } else if currentHeadline().localizedCaseInsensitiveContains("fatigue") {
+            return .aerobicFlush
+        } else {
+            return .neuromuscularPrimer
+        }
+    }
+
     @ViewBuilder
     private var proactiveCoachCard: some View {
+        let primerId = activePrimerId
+        let template = DrillTemplate.template(for: primerId)
+        let baseCadence = baselineCadence ?? 155
+        let computedTarget = template.calculateTargetCadence(baseCadence)
+        
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "calendar")
+            HStack(spacing: 8) {
+                Image(systemName: "stopwatch.fill")
                     .foregroundColor(.orange)
-                Text("Suggested Next Run: Aerobic Base Builder")
                     .font(.headline)
-                    .foregroundColor(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pre-Run Primer: \(template.title)")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("10–15 min neuromuscular primer")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
-            Text("Keep your heart rate strictly in Zone 2 to promote capillary growth while flushing acute fatigue.")
+
+            Text(template.defaultPurpose)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                
-            HStack(spacing: 12) {
-                Button(action: {
-                    startSuggestedRun()
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.fill")
-                            .foregroundColor(.white)
-                        Text("Start Run")
-                            .foregroundColor(.white)
-                    }
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.green)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
 
-                Button(action: {
-                    scheduleSuggestedRun()
-                }) {
-                    HStack(spacing: 6) {
-                        if isSchedulingSuggestedRun {
-                            ProgressView()
-                                .tint(.orange)
-                        } else if scheduledSuggestedRunSuccess {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Loaded")
-                        } else {
-                            Image(systemName: "applewatch")
-                            Text("Load to Watch")
-                        }
-                    }
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(scheduledSuggestedRunSuccess ? Color.blue.opacity(0.15) : Color.orange.opacity(0.15))
-                    .foregroundColor(scheduledSuggestedRunSuccess ? .blue : .orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(isSchedulingSuggestedRun || scheduledSuggestedRunSuccess)
+            HStack(spacing: 16) {
+                Label(template.defaultWork, systemImage: "repeat")
+                    .font(.caption.bold())
+                    .foregroundColor(.primary)
+                Label(template.defaultRecovery, systemImage: "moon.zzz")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            
-            if let err = suggestedRunErrorMessage {
+
+            if primerId != .aerobicFlush && primerId != .recoveryJog {
+                Text("Target: \(computedTarget) SPM (30-Day Baseline: \(baseCadence) SPM)")
+                    .font(.caption.bold())
+                    .foregroundColor(.primary)
+            }
+
+            Button(action: {
+                schedulePrimerToWatch(primerId: primerId, template: template, targetCadence: computedTarget, baseCadence: baseCadence)
+            }) {
+                HStack(spacing: 8) {
+                    if isSchedulingPrimer {
+                        ProgressView()
+                            .tint(.white)
+                    } else if scheduledPrimerSuccess {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.white)
+                        Text("Sent to Watch")
+                            .foregroundColor(.white)
+                    } else {
+                        Image(systemName: "applewatch")
+                            .foregroundColor(.white)
+                        Text("Send to Watch")
+                            .foregroundColor(.white)
+                    }
+                }
+                .font(.subheadline.bold())
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(scheduledPrimerSuccess ? Color.blue : Color.orange)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .disabled(isSchedulingPrimer || scheduledPrimerSuccess)
+
+            if let err = primerErrorMessage {
                 HStack(spacing: 4) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
@@ -317,37 +339,31 @@ struct DashboardView: View {
         .cornerRadius(16)
         .padding(.horizontal)
     }
-    
-    private func startSuggestedRun() {
-        let drill = PreRunDrill(id: .aerobicBaseBuilder, previousCadence: baselineCadence)
-        activeWorkoutPlan = drill.buildWorkoutPlan()
-        isShowingWorkoutPreview = true
-    }
-    
-    private func scheduleSuggestedRun() {
-        isSchedulingSuggestedRun = true
-        suggestedRunErrorMessage = nil
-        
+
+    private func schedulePrimerToWatch(primerId: PreRunDrillId, template: DrillTemplate, targetCadence: Int, baseCadence: Int) {
+        isSchedulingPrimer = true
+        primerErrorMessage = nil
+
         Task {
             let dto = DrillPrescriptionDTO(
-                title: "Aerobic Base Builder",
-                preRunDrillId: "aerobic_base_builder",
-                purpose: "Keep your heart rate strictly in Zone 2 to promote capillary growth while flushing acute fatigue.",
-                targetCadence: nil,
-                previousCadence: baselineCadence
+                title: template.title,
+                preRunDrillId: primerId.rawValue,
+                purpose: template.defaultPurpose,
+                targetCadence: (primerId == .aerobicFlush || primerId == .recoveryJog) ? nil : targetCadence,
+                previousCadence: baseCadence
             )
             do {
                 let bridge = WorkoutBridge()
                 try await bridge.scheduleDrill(dto: dto)
                 await MainActor.run {
-                    self.isSchedulingSuggestedRun = false
-                    self.scheduledSuggestedRunSuccess = true
+                    self.isSchedulingPrimer = false
+                    self.scheduledPrimerSuccess = true
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
             } catch {
                 await MainActor.run {
-                    self.isSchedulingSuggestedRun = false
-                    self.suggestedRunErrorMessage = error.localizedDescription
+                    self.isSchedulingPrimer = false
+                    self.primerErrorMessage = error.localizedDescription
                 }
             }
         }
@@ -356,11 +372,6 @@ struct DashboardView: View {
     @ViewBuilder
     private var fitnessBaselineCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("V1 Hero Card")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal)
-
             VStack(spacing: 16) {
                 // Top Row: VO2 Max + Trend Badge
                 HStack(alignment: .top) {
@@ -865,7 +876,7 @@ struct RunListRowView: View {
 
                 Spacer()
 
-                Text("[ \(runRecord.detectedTypeRaw) ]")
+                Text(runRecord.detectedTypeRaw)
                     .font(.caption2.bold())
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
