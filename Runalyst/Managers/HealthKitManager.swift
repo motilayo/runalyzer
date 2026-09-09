@@ -297,7 +297,7 @@ class HealthKitManager: ObservableObject {
         
         let buckets = try await fetchBucketedSamples(for: workout)
         let trimmed = await engine.trimDeadStops(buckets: buckets)
-        let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration) = await engine.calculateWorkingAverages(trimmed: trimmed)
+        let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration) = await engine.calculateWorkingAverages(trimmed: trimmed, rawWorkoutDuration: duration)
         
         let paces = trimmed.map { $0.meanPaceSecPerKm }
         let hrs = trimmed.map { $0.meanHR }
