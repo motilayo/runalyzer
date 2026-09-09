@@ -338,7 +338,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyst;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyzer;
 				PRODUCT_NAME = Runalyst;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -505,7 +505,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyst;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyzer;
 				PRODUCT_NAME = Runalyst;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
