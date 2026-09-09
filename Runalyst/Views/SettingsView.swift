@@ -94,9 +94,6 @@ struct SettingsView: View {
                         Text("Resync Health Data")
                             .foregroundColor(.primary)
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundColor(.secondary.opacity(0.6))
                     }
                 }
                 .alert("Force Re-Sync", isPresented: $showSyncAlert) {
@@ -167,9 +164,6 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundColor(.secondary.opacity(0.6))
                     }
                 }
                 .alert("Reset Personalization Model", isPresented: $showResetModelAlert) {
@@ -201,9 +195,6 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundColor(.secondary.opacity(0.6))
                     }
                 }
                 .alert("Clear AI Cache", isPresented: $showClearCacheAlert) {
