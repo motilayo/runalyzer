@@ -1,0 +1,555 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
+		1D2A9B92689E9EC659EE4030 /* RunalystApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF9D9245C901D4BDBA1FFB /* RunalystApp.swift */; };
+		30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B51607F39154844B5E46210 /* CoachingInsight.swift */; };
+		31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */; };
+		438FD31B3051C867003DEDA5 /* LiveCoachDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438FD3173051C866003DEDA5 /* LiveCoachDTOs.swift */; };
+		438FD31C3051C867003DEDA5 /* LiveCoachEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438FD3183051C866003DEDA5 /* LiveCoachEngine.swift */; };
+		438FD31D3051C867003DEDA5 /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438FD3193051C866003DEDA5 /* WatchConnectivityManager.swift */; };
+		4C06461A8F50D2CE86B4D117 /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11742538A05B00142AABD16 /* FramboiseEngine.swift */; };
+		554433221100FFEEDDCCBBAA /* Runalyst/Views/AnimatedLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334455 /* Runalyst/Views/AnimatedLoadingView.swift */; };
+		5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */; };
+		652148E0B037472732D0D2E7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35724688B362914BC9EAC058 /* ModelManager.swift */; };
+		8A134F81873E70E012F97522 /* TrainingCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C44838A872210F6909E642 /* TrainingCorrection.swift */; };
+		8EE242FF8F81F965BDC748CC /* WorkoutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8446C093FADDF41149B361 /* WorkoutBridge.swift */; };
+		91CA4168B9A9033F44D87AFA /* PaceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */; };
+		98DB7AE1F0FD4D5A9E2AED7E /* Runalyst/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyst/Views/SettingsView.swift */; };
+		9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */; };
+		9DEC99887D72772D3AB524D1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
+		A2B3C4D5E6F7G8H9I0J1K2L3 /* Runalyst/Views/DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7G8H9I0J1K2 /* Runalyst/Views/DashboardView.swift */; };
+		A42C7740988216A73236241C /* RunalystTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF95A44AF1613AFBF9ED4688 /* RunalystTests.swift */; };
+		A9994594B624150A24D868E9 /* DrillsLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */; };
+		CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
+		CF8D403082D7F1D487D5525D /* TrainingCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C44838A872210F6909E642 /* TrainingCorrection.swift */; };
+		D2514E299BEA66708F63832E /* PersonalizedRunClassifier.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */; };
+		DEE345D7801E107E3983DDDE /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11742538A05B00142AABD16 /* FramboiseEngine.swift */; };
+		E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */; };
+		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
+		E3784833987D299F1E0A3301 /* PaceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */; };
+		EA9042A09B4AA14D3BE31976 /* WorkoutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8446C093FADDF41149B361 /* WorkoutBridge.swift */; };
+		ED2D4996B1581CFEEB4983A8 /* DrillsLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */; };
+		F20E4C048AB2389BBF14327D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35724688B362914BC9EAC058 /* ModelManager.swift */; };
+		M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */; };
+		P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Runalyst/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyst/Assets.xcassets */; };
+		Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyst/Views/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyst/Views/OnboardingView.swift */; };
+		Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyst/Views/RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyst/Views/RunDetailView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4392F17E3030C57100B7BA8F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF32A70DD7FC6FB6AB476E75 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8116EBABCB75011FBB77F3DF;
+			remoteInfo = Runalyst;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyst/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
+		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyst/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
+		35724688B362914BC9EAC058 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ModelManager.swift; path = Runalyst/Engine/ModelManager.swift; sourceTree = SOURCE_ROOT; };
+		376830066BD295E24C449FB2 /* RunRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunRecord.swift; path = Runalyst/Models/RunRecord.swift; sourceTree = "<group>"; };
+		3EF4AE46EBF2F38F6B44624C /* RunalystTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunalystTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		438FD3173051C866003DEDA5 /* LiveCoachDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoachDTOs.swift; sourceTree = "<group>"; };
+		438FD3183051C866003DEDA5 /* LiveCoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoachEngine.swift; sourceTree = "<group>"; };
+		438FD3193051C866003DEDA5 /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityManager.swift; sourceTree = "<group>"; };
+		52FF9D9245C901D4BDBA1FFB /* RunalystApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunalystApp.swift; path = Runalyst/RunalystApp.swift; sourceTree = "<group>"; };
+		580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		768372D4E377479C83BEA700 /* Runalyst/Views/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		8B51607F39154844B5E46210 /* CoachingInsight.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CoachingInsight.swift; path = Runalyst/Models/CoachingInsight.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyst/Views/OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/OnboardingView.swift; sourceTree = SOURCE_ROOT; };
+		A1C44838A872210F6909E642 /* TrainingCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingCorrection.swift; path = Runalyst/Models/TrainingCorrection.swift; sourceTree = SOURCE_ROOT; };
+		AABBCCDDEEFF001122334455 /* Runalyst/Views/AnimatedLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/AnimatedLoadingView.swift; sourceTree = SOURCE_ROOT; };
+		B11742538A05B00142AABD16 /* FramboiseEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FramboiseEngine.swift; path = Runalyst/Engine/FramboiseEngine.swift; sourceTree = SOURCE_ROOT; };
+		B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyst/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Runalyst/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		B29A62CEEC0D478BA7CAB794 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		BF8446C093FADDF41149B361 /* WorkoutBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WorkoutBridge.swift; path = Runalyst/Engine/WorkoutBridge.swift; sourceTree = SOURCE_ROOT; };
+		C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Runalyst/ContentView.swift; sourceTree = "<group>"; };
+		CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillsLibraryView.swift; path = Runalyst/Views/DrillsLibraryView.swift; sourceTree = SOURCE_ROOT; };
+		D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildSettings.xcconfig; sourceTree = SOURCE_ROOT; };
+		DD66FA54810DAEAB1B57337A /* Runalyst.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runalyst.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDA2195BBF9ED0F85905F31B /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = XCTest.framework; sourceTree = "<group>"; };
+		E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; name = PersonalizedRunClassifier.mlmodel; path = Runalyst/PersonalizedRunClassifier.mlmodel; sourceTree = SOURCE_ROOT; };
+		EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PaceFormatter.swift; path = Runalyst/Utilities/PaceFormatter.swift; sourceTree = SOURCE_ROOT; };
+		F1A2B3C4D5E6F7G8H9I0J1K2 /* Runalyst/Views/DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/DashboardView.swift; sourceTree = SOURCE_ROOT; };
+		FF95A44AF1613AFBF9ED4688 /* RunalystTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunalystTests.swift; sourceTree = "<group>"; };
+		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyst/Views/RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
+		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		059DF1D89F96B18AEFE606CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE739F8BEC86FD28A3B81019 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2D36AE3348032F85981F45B2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9DEC99887D72772D3AB524D1 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		00729FC10D7EDD63EB546527 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				B29A62CEEC0D478BA7CAB794 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		10AA26382422973E1F322C8D /* RunalystTests */ = {
+			isa = PBXGroup;
+			children = (
+				FF95A44AF1613AFBF9ED4688 /* RunalystTests.swift */,
+			);
+			path = RunalystTests;
+			sourceTree = "<group>";
+		};
+		1C9E876BBB1092C707E7856D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				00729FC10D7EDD63EB546527 /* iOS */,
+				DDA2195BBF9ED0F85905F31B /* XCTest.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		438FD31A3051C866003DEDA5 /* LiveCoach */ = {
+			isa = PBXGroup;
+			children = (
+				438FD3173051C866003DEDA5 /* LiveCoachDTOs.swift */,
+				438FD3183051C866003DEDA5 /* LiveCoachEngine.swift */,
+				438FD3193051C866003DEDA5 /* WatchConnectivityManager.swift */,
+			);
+			path = Runalyst/LiveCoach;
+			sourceTree = "<group>";
+		};
+		54B19B6DFF797ACC20446E48 /* Runalyst */ = {
+			isa = PBXGroup;
+			children = (
+				D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */,
+				580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */,
+				A1C44838A872210F6909E642 /* TrainingCorrection.swift */,
+				EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */,
+				B11742538A05B00142AABD16 /* FramboiseEngine.swift */,
+				35724688B362914BC9EAC058 /* ModelManager.swift */,
+				BF8446C093FADDF41149B361 /* WorkoutBridge.swift */,
+			);
+			name = Runalyst;
+			sourceTree = SOURCE_ROOT;
+		};
+		86C3E3CDC03F671C6EE600C2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DD66FA54810DAEAB1B57337A /* Runalyst.app */,
+				3EF4AE46EBF2F38F6B44624C /* RunalystTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AECDF6AF529E503EF8331ED7 = {
+			isa = PBXGroup;
+			children = (
+				86C3E3CDC03F671C6EE600C2 /* Products */,
+				1C9E876BBB1092C707E7856D /* Frameworks */,
+				54B19B6DFF797ACC20446E48 /* Runalyst */,
+				8B51607F39154844B5E46210 /* CoachingInsight.swift */,
+				0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */,
+				376830066BD295E24C449FB2 /* RunRecord.swift */,
+				2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */,
+				52FF9D9245C901D4BDBA1FFB /* RunalystApp.swift */,
+				C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */,
+				F1A2B3C4D5E6F7G8H9I0J1K2 /* Runalyst/Views/DashboardView.swift */,
+				768372D4E377479C83BEA700 /* Runalyst/Views/SettingsView.swift */,
+				A1B2C3D4E5F6G7H8I9J0K1L2 /* Runalyst/Views/OnboardingView.swift */,
+				Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyst/Views/RunDetailView.swift */,
+				AABBCCDDEEFF001122334455 /* Runalyst/Views/AnimatedLoadingView.swift */,
+				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */,
+				B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyst/Assets.xcassets */,
+				10AA26382422973E1F322C8D /* RunalystTests */,
+				CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */,
+				E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */,
+				438FD31A3051C866003DEDA5 /* LiveCoach */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8116EBABCB75011FBB77F3DF /* Runalyst */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D917FB98BDBD7AA83692F7CC /* Build configuration list for PBXNativeTarget "Runalyst" */;
+			buildPhases = (
+				60924B213CE12D34FBC58D03 /* Sources */,
+				059DF1D89F96B18AEFE606CE /* Frameworks */,
+				29EADEA10D75A19A80AD8181 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Runalyst;
+			productName = Runalyst;
+			productReference = DD66FA54810DAEAB1B57337A /* Runalyst.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F8945871DD242B1F3C041378 /* RunalystTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CF80848869A78F551497607B /* Build configuration list for PBXNativeTarget "RunalystTests" */;
+			buildPhases = (
+				913E5F14D322A8B0572A3D92 /* Sources */,
+				2D36AE3348032F85981F45B2 /* Frameworks */,
+				A6DCF436D5C326BA17944D99 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7564C1715440F9D6ED11D05A /* PBXTargetDependency */,
+			);
+			name = RunalystTests;
+			productName = RunalystTests;
+			productReference = 3EF4AE46EBF2F38F6B44624C /* RunalystTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EF32A70DD7FC6FB6AB476E75 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					8116EBABCB75011FBB77F3DF = {
+						DevelopmentTeam = GFC8G9A3MX;
+					};
+					F8945871DD242B1F3C041378 = {
+						DevelopmentTeam = GFC8G9A3MX;
+					};
+				};
+			};
+			buildConfigurationList = 095CFD5C876655FA9BB51339 /* Build configuration list for PBXProject "Runalyst" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AECDF6AF529E503EF8331ED7;
+			productRefGroup = 86C3E3CDC03F671C6EE600C2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8116EBABCB75011FBB77F3DF /* Runalyst */,
+				F8945871DD242B1F3C041378 /* RunalystTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		29EADEA10D75A19A80AD8181 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				P0O9I8U7Y6T5R4E3W2Q1Z0X9 /* Runalyst/Assets.xcassets in Resources */,
+				E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6DCF436D5C326BA17944D99 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		60924B213CE12D34FBC58D03 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				30D56F4F440461C12AD5223E /* CoachingInsight.swift in Sources */,
+				31740D413B821056F85765AC /* DrillRecommendation.swift in Sources */,
+				E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */,
+				9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */,
+				1D2A9B92689E9EC659EE4030 /* RunalystApp.swift in Sources */,
+				075FD91D330B77E5867419C9 /* ContentView.swift in Sources */,
+				A2B3C4D5E6F7G8H9I0J1K2L3 /* Runalyst/Views/DashboardView.swift in Sources */,
+				98DB7AE1F0FD4D5A9E2AED7E /* Runalyst/Views/SettingsView.swift in Sources */,
+				Q2W3E4R5T6Y7U8I9O0P1A2S3 /* Runalyst/Views/OnboardingView.swift in Sources */,
+				Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyst/Views/RunDetailView.swift in Sources */,
+				554433221100FFEEDDCCBBAA /* Runalyst/Views/AnimatedLoadingView.swift in Sources */,
+				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift in Sources */,
+				438FD31B3051C867003DEDA5 /* LiveCoachDTOs.swift in Sources */,
+				438FD31C3051C867003DEDA5 /* LiveCoachEngine.swift in Sources */,
+				438FD31D3051C867003DEDA5 /* WatchConnectivityManager.swift in Sources */,
+				8A134F81873E70E012F97522 /* TrainingCorrection.swift in Sources */,
+				E3784833987D299F1E0A3301 /* PaceFormatter.swift in Sources */,
+				DEE345D7801E107E3983DDDE /* FramboiseEngine.swift in Sources */,
+				F20E4C048AB2389BBF14327D /* ModelManager.swift in Sources */,
+				8EE242FF8F81F965BDC748CC /* WorkoutBridge.swift in Sources */,
+				A9994594B624150A24D868E9 /* DrillsLibraryView.swift in Sources */,
+				5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		913E5F14D322A8B0572A3D92 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A42C7740988216A73236241C /* RunalystTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7564C1715440F9D6ED11D05A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8116EBABCB75011FBB77F3DF /* Runalyst */;
+			targetProxy = 4392F17E3030C57100B7BA8F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4C7F5C7F7E16C92FC2B82B12 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Runalyst/Runalyst.entitlements;
+				INFOPLIST_FILE = Runalyst/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Runalyst;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyst;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4E82C97C86136D9FD88EBE8F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		872937956E3B1EF4BFA5F513 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B365700798A206FD36799107 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalystTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runalyst.app/Runalyst";
+			};
+			name = Debug;
+		};
+		C86468A6FB9816D89E64C94F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalystTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runalyst.app/Runalyst";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FA660FB7A9C265CDDCB41CB1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Runalyst/Runalyst.entitlements;
+				INFOPLIST_FILE = Runalyst/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Runalyst;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.Runalyst;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		095CFD5C876655FA9BB51339 /* Build configuration list for PBXProject "Runalyst" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4E82C97C86136D9FD88EBE8F /* Debug */,
+				872937956E3B1EF4BFA5F513 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CF80848869A78F551497607B /* Build configuration list for PBXNativeTarget "RunalystTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C86468A6FB9816D89E64C94F /* Release */,
+				B365700798A206FD36799107 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D917FB98BDBD7AA83692F7CC /* Build configuration list for PBXNativeTarget "Runalyst" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4C7F5C7F7E16C92FC2B82B12 /* Release */,
+				FA660FB7A9C265CDDCB41CB1 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = EF32A70DD7FC6FB6AB476E75 /* Project object */;
+}

@@ -36,7 +36,7 @@ struct ContentView: View {
                 } message: {
                     Text(syncError ?? "An unknown error occurred while syncing.")
                 }
-                .safeAreaInset(edge: .bottom, spacing: 80) {
+                .safeAreaInset(edge: VerticalEdge.bottom, spacing: 80) {
                     if isSyncing {
                         AnimatedLoadingView(
                             text: "Syncing Health Data & AI...",
@@ -77,84 +77,99 @@ struct ContentView: View {
             }
 
             // 1. Fetch recent workouts from HealthKit
-            let workouts = try await healthKitManager.fetchRecentRunningWorkouts()
+            let workouts = try await healthKitManager.fetchRunningWorkouts(filter: .allTime)
 
             // 2. Cross-reference with SwiftData to find new workouts
-            // Re-fetch existing runs from DB to ensure we have the latest state (especially after force delete)
             let currentExistingRuns = try modelContext.fetch(FetchDescriptor<RunRecord>())
             let newWorkouts = workouts.filter { workout in
-                !currentExistingRuns.contains(where: { $0.id == workout.uuid })
+                !currentExistingRuns.contains(where: { $0.hkWorkoutID == workout.uuid })
+            }
+
+            let engine = FramboiseEngine()
+
+            // Repair any existing runs in SwiftData that have missing/zero vertical oscillation
+            let runsNeedingRepair = currentExistingRuns.filter {
+                ($0.rawAvgVerticalOscillation == nil || $0.rawAvgVerticalOscillation == 0) ||
+                ($0.workingAvgVerticalOscillation == nil || $0.workingAvgVerticalOscillation == 0)
+            }
+            for existingRun in runsNeedingRepair {
+                if let workout = workouts.first(where: { $0.uuid == existingRun.hkWorkoutID }) {
+                    if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine) {
+                        existingRun.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
+                        existingRun.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+                    }
+                }
             }
 
             // 3. Extract and insert new runs
-            // Sort new workouts ascending (oldest first) so we can insert them in order and calculate correct rolling baselines.
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
 
             // Extract all records concurrently using TaskGroup
-            let extractedRunsUnsorted = try await withThrowingTaskGroup(of: RunRecord.self) { group in
+            let extractedRunsUnsorted = try await withThrowingTaskGroup(of: RunRecordDTO.self) { group in
                 for workout in sortedNewWorkouts {
                     group.addTask {
-                        try await healthKitManager.extractRunRecord(from: workout)
+                        try await healthKitManager.extractRunRecord(from: workout, engine: engine)
                     }
                 }
 
-                var results: [RunRecord] = []
+                var results: [RunRecordDTO] = []
                 for try await result in group {
                     results.append(result)
                 }
                 return results
             }
-            // Sort again since task group results are unordered
+            
             let extractedRuns = extractedRunsUnsorted.sorted { $0.date < $1.date }
 
-            // 4. Query the global standalone VO2 Max sample independently
-            let globalVO2 = try? await healthKitManager.fetchLatestGlobalVO2Max()
-
-            // Assign to the latest workout before saving to persistent storage
-            if let mostRecentRun = extractedRuns.last {
-                if let globalVO2 = globalVO2 {
-                    mostRecentRun.vo2Max = globalVO2
-                }
-            } else if let latestDbRun = currentExistingRuns.sorted(by: { $0.date > $1.date }).first {
-                // If there are no new workouts, update the latest existing one
-                if let globalVO2 = globalVO2 {
-                    latestDbRun.vo2Max = globalVO2
-                    try modelContext.save()
-                }
-            }
-
-            for newRun in extractedRuns {
-                // Insert into SwiftData context
+            for dto in extractedRuns {
+                let newRun = RunRecord(
+                    hkWorkoutID: dto.hkWorkoutID,
+                    date: dto.date,
+                    totalDistanceMeters: dto.totalDistanceMeters,
+                    duration: dto.duration,
+                    rawAvgPace: dto.rawAvgPace,
+                    rawAvgHeartRate: dto.rawAvgHeartRate,
+                    rawAvgCadence: dto.rawAvgCadence,
+                    workingAvgPace: dto.workingAvgPace,
+                    workingAvgCadence: dto.workingAvgCadence,
+                    workingAvgHeartRate: dto.workingAvgHeartRate,
+                    workingAvgVerticalOscillation: dto.workingAvgVerticalOscillation,
+                    rawAvgVerticalOscillation: dto.rawAvgVerticalOscillation,
+                    paceCV: dto.paceCV,
+                    paceSlope: dto.paceSlope,
+                    percentZone4: dto.percentZone4,
+                    detectedTypeRaw: dto.detectedTypeRaw,
+                    framboiseTags: dto.framboiseTags
+                )
                 modelContext.insert(newRun)
-                // Save context so history is updated for subsequent runs
-                try modelContext.save()
             }
+            try modelContext.save()
 
-            // Lazy load AI analysis for ONLY the 4 most recent runs (Hero card + Top 3)
-            if #available(iOS 26.0, *) {
-                let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
-                if let allRuns = try? modelContext.fetch(descriptor) {
-                    let topRuns = allRuns.prefix(4)
-                    let container = modelContext.container
+            // Lazy load AI analysis ONLY for runs within the last 7 days
+            let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+            let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+            
+            if let allRuns = try? modelContext.fetch(descriptor) {
+                let recentRuns = allRuns.filter { $0.date >= sevenDaysAgo }
+                let container = modelContext.container
 
-                    for run in topRuns {
-                        if run.insight == nil {
-                            let runId = run.persistentModelID
-                            await Task.detached {
+                for run in recentRuns {
+                    if run.insight == nil {
+                        let runId = run.persistentModelID
+                        if #available(iOS 26.0, *) {
+                            Task.detached {
                                 let analyzer = RunAnalyzerActor(modelContainer: container)
                                 await analyzer.generateAnalysis(for: runId)
-                            }.value
-
-                            // Delay slightly to avoid overloading device resources
-                            try await Task.sleep(nanoseconds: 2_500_000_000)
+                            }
                         }
+
+                        // Delay slightly to avoid overloading device resources
+                        try await Task.sleep(nanoseconds: 2_500_000_000)
                     }
                 }
             }
 
         } catch is CancellationError {
-            // Task was cancelled, likely due to a view refresh or termination.
-            // We can safely ignore this and let the next sync handle the rest.
             print("Sync data task cancelled.")
         } catch {
             print("Failed to sync data: \(error.localizedDescription)")
@@ -169,7 +184,7 @@ struct ContentView: View {
 #Preview {
     let previewContainer: ModelContainer = {
         do {
-            let schema = Schema([RunRecord.self, CoachingInsight.self, DrillRecommendation.self])
+            let schema = Schema([RunRecord.self, CoachingInsight.self, DrillRecommendation.self, TrainingCorrection.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             return try ModelContainer(for: schema, configurations: [config])
         } catch {

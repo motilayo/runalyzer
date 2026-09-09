@@ -1,6 +1,6 @@
-# AI Coding Guidelines for Runalyzer
+# AI Coding Guidelines for Runalyst
 
-This `AGENTS.md` file acts as the primary repository of architectural context, technical rules, and best practices for developing and maintaining the Runalyzer iOS application. It is primarily intended for AI assistants, but serves as useful documentation for human developers.
+This `AGENTS.md` file acts as the primary repository of architectural context, technical rules, and best practices for developing and maintaining the Runalyst iOS application. It is primarily intended for AI assistants, but serves as useful documentation for human developers.
 
 ## 1. SwiftData & Concurrency Architecture
 
@@ -37,7 +37,7 @@ This `AGENTS.md` file acts as the primary repository of architectural context, t
 - **Data Ingestion Sync**: The primary HealthKit data synchronization logic is centralized in `ContentView.swift` via `syncData()`. Child views (like `DashboardView`) should trigger syncs by accepting an async closure (e.g., `onSync`) rather than implementing direct manager calls.
 - **Run Iteration**: During HealthKit syncs, iterate through unsynced workouts sequentially from oldest to newest. Generate their AI insights by invoking a `@ModelActor` for each run and introducing deliberate delays (e.g., 5s normally, 10s every 5 runs) to minimize device overhead and prevent memory overload or model timeouts.
 - **Filters & Units**: When fetching HealthKit data, apply user preference filters (like `minimumRunDistance`) directly to the sync operation in `HealthKitManager`. Ensure unit conversions are handled during comparison.
-- **Extracted Metrics**: Runalyzer extracts advanced biomechanical and fitness metrics from HealthKit, including `HKQuantityTypeIdentifier.runningVerticalOscillation`, `.runningGroundContactTime`, `.runningStrideLength`, and `.vo2Max`. Vertical Oscillation is tracked in cm as a Double.
+- **Extracted Metrics**: Runalyst extracts advanced biomechanical and fitness metrics from HealthKit, including `HKQuantityTypeIdentifier.runningVerticalOscillation`, `.runningGroundContactTime`, `.runningStrideLength`, and `.vo2Max`. Vertical Oscillation is tracked in cm as a Double.
 - **VO2 Max Logic**: VO2 Max is decoupled from individual run cards and treated as a global profile stat. To fetch the absolute latest global value, use a predicate-free `HKSampleQuery` sorted by `HKSampleSortIdentifierEndDate` descending. Then map it to the latest `RunRecord` in SwiftData.
 - **Baselines**: When calculating longitudinal baseline metrics (e.g., 30-day averages), use a strict rolling baseline time-locked to the specific run being analyzed. Filter historical workouts using a strict less-than comparison (`$0.date < targetDate`).
 - **Background Delivery**: When configuring HealthKit background delivery and `HKObserverQuery`, always store a reference to the active query to prevent duplicate registrations, and ensure the `completionHandler` is called only after fully awaiting asynchronous updates.

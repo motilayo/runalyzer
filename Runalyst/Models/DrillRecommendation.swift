@@ -6,6 +6,7 @@ import SwiftData
 @Model
 final class DrillRecommendation {
     var drillTitle: String
+    var preRunDrillId: String?
     var drillWork: String?
     var drillCues: String?
     var drillEffort: String?
@@ -23,6 +24,7 @@ final class DrillRecommendation {
 
     init(
         drillTitle: String,
+        preRunDrillId: String? = nil,
         drillPurpose: String? = nil,
         drillWork: String? = nil,
         drillCues: String? = nil,
@@ -34,6 +36,7 @@ final class DrillRecommendation {
         orderIndex: Int? = nil
     ) {
         self.drillTitle = drillTitle
+        self.preRunDrillId = preRunDrillId
         self.drillWork = drillWork
         self.drillCues = drillCues
         self.drillEffort = drillEffort
