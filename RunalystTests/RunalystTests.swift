@@ -1,8 +1,7 @@
 import XCTest
 import HealthKit
-
+import SwiftData
 @testable import Runalyst
-
 import WorkoutKit
 
 final class RunalystTests: XCTestCase {
@@ -328,4 +327,247 @@ final class CardiacGuardrailTests: XCTestCase {
         XCTAssertEqual(lowHRClass, "Easy Run")
     }
 }
+
+@MainActor
+final class LiveCoachEngineTests: XCTestCase {
+    var engine: LiveCoachEngine!
+
+    override func setUp() {
+        super.setUp()
+        engine = LiveCoachEngine()
+    }
+
+    override func tearDown() {
+        engine = nil
+        super.tearDown()
+    }
+
+    func testTranslatePrescription_ValidPattern() {
+        let workout = engine.translate(prescription: "4x400m intervals", targetSPM: 165)
+        XCTAssertNotNil(workout)
+        XCTAssertEqual(workout?.displayName, "AI Prescribed Workout")
+        XCTAssertEqual(workout?.activity, .running)
+        XCTAssertEqual(workout?.location, .outdoor)
+        XCTAssertEqual(workout?.blocks.count, 1)
+        XCTAssertEqual(workout?.blocks.first?.iterations, 4)
+        XCTAssertEqual(workout?.blocks.first?.steps.count, 2)
+    }
+
+    func testTranslatePrescription_InvalidPattern_ReturnsNil() {
+        let workout = engine.translate(prescription: "steady recovery jog", targetSPM: 150)
+        XCTAssertNil(workout)
+    }
+
+    func testMetronome_StateAndSilentMode() {
+        engine.silentModeEnabled = true
+        engine.startMetronome(targetSPM: 160)
+        engine.stopMetronome()
+        XCTAssertTrue(engine.silentModeEnabled)
+
+        engine.silentModeEnabled = false
+        engine.startMetronome(targetSPM: 0)
+        engine.stopMetronome()
+    }
+}
+
+@MainActor
+final class RunRecordModelAndSchemaTests: XCTestCase {
+    func testRunRecordEffectiveWorkingMetricsFallback() {
+        let run = RunRecord(
+            hkWorkoutID: UUID(),
+            date: Date(),
+            totalDistanceMeters: 5000,
+            duration: 1500,
+            rawAvgPace: 300,
+            rawAvgHeartRate: 150,
+            rawAvgCadence: 165,
+            workingAvgPace: 295,
+            workingAvgCadence: 168,
+            workingAvgHeartRate: 152,
+            workingDistanceMeters: nil,
+            workingDurationSeconds: nil,
+            paceCV: 0.05,
+            paceSlope: 0.1,
+            percentZone4: 0.2,
+            detectedTypeRaw: "Tempo Run"
+        )
+
+        // Must fallback cleanly
+        XCTAssertEqual(run.effectiveWorkingDistanceMeters, 5000)
+        XCTAssertEqual(run.effectiveWorkingDurationSeconds, 1500)
+
+        // When non-nil, use working values
+        run.workingDistanceMeters = 4800
+        run.workingDurationSeconds = 1420
+        XCTAssertEqual(run.effectiveWorkingDistanceMeters, 4800)
+        XCTAssertEqual(run.effectiveWorkingDurationSeconds, 1420)
+    }
+
+    func testCoachingInsightAndDrillRelationships() {
+        let insight = CoachingInsight(
+            headline: "Strong Cadence Consistency",
+            longitudinalObservation: "Your cadence is trending positively compared to your 30-day average."
+        )
+
+        let drill1 = DrillRecommendation(
+            drillTitle: "Cadence Pyramids",
+            preRunDrillId: "cadence_pyramids",
+            drillPurpose: "Turnover improvement",
+            drillWork: "4 x 30s accelerations",
+            drillCues: "Quick light steps",
+            targetCadence: "168 SPM",
+            previousCadence: 160,
+            orderIndex: 0
+        )
+
+        insight.drillRecommendations = [drill1]
+        XCTAssertEqual(insight.drillRecommendations?.count, 1)
+        XCTAssertEqual(insight.drillRecommendations?.first?.drillTitle, "Cadence Pyramids")
+        XCTAssertEqual(insight.drillRecommendations?.first?.targetCadence, "168 SPM")
+    }
+
+    func testRunalystSchemaV1Integrity() {
+        XCTAssertEqual(RunalystSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
+        let modelTypes = RunalystSchemaV1.models
+        XCTAssertEqual(modelTypes.count, 4)
+        XCTAssertTrue(modelTypes.contains(where: { $0 == RunRecord.self }))
+        XCTAssertTrue(modelTypes.contains(where: { $0 == CoachingInsight.self }))
+        XCTAssertTrue(modelTypes.contains(where: { $0 == DrillRecommendation.self }))
+        XCTAssertTrue(modelTypes.contains(where: { $0 == TrainingCorrection.self }))
+
+        XCTAssertEqual(RunalystMigrationPlan.schemas.count, 1)
+        XCTAssertTrue(RunalystMigrationPlan.stages.isEmpty)
+    }
+}
+
+final class CoachingEngineDataTests: XCTestCase {
+    func testRunDataForAIInitialization() {
+        let runData = RunDataForAI(
+            directiveContext: "The runner is overstriding (low cadence).",
+            paceContext: "Current: 5:00/km, Baseline: 5:15/km",
+            hrContext: "Current: 155 BPM, Baseline: 150 BPM",
+            cadenceContext: "Current: 148 SPM, Baseline: 156 SPM",
+            zone4Context: "20% in Zone 4",
+            cvContext: "0.045",
+            slopeContext: "0.012",
+            intervalCadence: "162",
+            recoveryCadence: "150"
+        )
+
+        XCTAssertEqual(runData.intervalCadence, "162")
+        XCTAssertEqual(runData.recoveryCadence, "150")
+        XCTAssertTrue(runData.directiveContext.contains("overstriding"))
+    }
+
+    func testAggregateRunDataForAIInitialization() {
+        let aggData = AggregateRunDataForAI(
+            paceContext: "5:10/km",
+            hrContext: "148 BPM",
+            cadenceContext: "162 SPM",
+            zone4Context: "15%",
+            cvContext: "0.035",
+            slopeContext: "-0.010",
+            stageContext: "Stage 2: Aerobic Expansion"
+        )
+
+        XCTAssertEqual(aggData.stageContext, "Stage 2: Aerobic Expansion")
+    }
+
+    func testBaselineStats() {
+        let stats = BaselineStats(avgPace: 300, avgCadence: 165, avgHR: 145)
+        XCTAssertEqual(stats.avgPace, 300)
+        XCTAssertEqual(stats.avgCadence, 165)
+        XCTAssertEqual(stats.avgHR, 145)
+    }
+}
+
+@MainActor
+final class HealthKitManagerSeedingTests: XCTestCase {
+    func testSeedDirectToSwiftData() throws {
+        let schema = Schema([RunRecord.self, CoachingInsight.self, DrillRecommendation.self, TrainingCorrection.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = container.mainContext
+
+        let seeder = HealthKitSeeder.shared
+        seeder.seedDirectToSwiftData(context: context)
+
+        let descriptor = FetchDescriptor<RunRecord>()
+        let records = try context.fetch(descriptor)
+
+        XCTAssertFalse(records.isEmpty, "Seeded runs should not be empty")
+        XCTAssertEqual(records.count, MockRunProfile.allCases.count)
+
+        for record in records {
+            XCTAssertGreaterThan(record.totalDistanceMeters, 0)
+            XCTAssertGreaterThan(record.duration, 0)
+            XCTAssertFalse(record.detectedTypeRaw.isEmpty)
+        }
+    }
+}
+
+final class TrainingCorrectionModelTests: XCTestCase {
+    func testTrainingCorrectionInitialization() {
+        let correction = TrainingCorrection(
+            runRecordID: UUID(),
+            originalLabel: "Tempo Run",
+            correctedLabel: "Intervals",
+            featureVector: [0.18, -0.05, 0.45],
+            createdAt: Date(),
+            isProcessed: false
+        )
+        XCTAssertEqual(correction.originalLabel, "Tempo Run")
+        XCTAssertEqual(correction.correctedLabel, "Intervals")
+        XCTAssertEqual(correction.featureVector.count, 3)
+        XCTAssertFalse(correction.isProcessed)
+    }
+}
+
+final class LiveCoachDTOCodableTests: XCTestCase {
+    func testWatchRunRecordDTOEncodingDecoding() throws {
+        let original = WatchRunRecordDTO(
+            id: UUID(),
+            date: Date(),
+            distance: 5200.0,
+            duration: 1600.0,
+            avgPace: 307.7,
+            avgHeartRate: 154,
+            avgCadence: 168,
+            verticalOscillation: 8.4,
+            groundContactTime: 235.0,
+            strideLength: 1.15
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WatchRunRecordDTO.self, from: data)
+
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.distance, 5200.0)
+        XCTAssertEqual(decoded.avgHeartRate, 154)
+        XCTAssertEqual(decoded.avgCadence, 168)
+        XCTAssertEqual(decoded.verticalOscillation, 8.4)
+    }
+
+    func testDrillRecommendationDTOEncodingDecoding() throws {
+        let original = DrillRecommendationDTO(
+            drillTitle: "Cadence Pyramids",
+            drillPurpose: "Turnover improvement",
+            drillWork: "4 x 30s accelerations",
+            drillCues: "Quick steps",
+            drillEffort: "Controlled surge",
+            drillRecovery: "60s easy jog",
+            targetCadence: "168 SPM"
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(DrillRecommendationDTO.self, from: data)
+
+        XCTAssertEqual(decoded.drillTitle, "Cadence Pyramids")
+        XCTAssertEqual(decoded.drillPurpose, "Turnover improvement")
+        XCTAssertEqual(decoded.drillRecovery, "60s easy jog")
+        XCTAssertEqual(decoded.targetCadence, "168 SPM")
+    }
+}
+
+
 

@@ -5,22 +5,24 @@ import SwiftData
 struct RunalystApp: App {
 
     let container: ModelContainer = {
-        print("DEBUG: Starting ModelContainer initialization")
-        let schema = Schema([
-            RunRecord.self,
-            CoachingInsight.self,
-            DrillRecommendation.self,
-            TrainingCorrection.self
-        ])
+        print("DEBUG: Starting ModelContainer initialization with RunalystMigrationPlan")
+        let schema = Schema(versionedSchema: RunalystSchemaV1.self)
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         
         do {
-            print("DEBUG: Attempting to create container")
-            let c = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            print("DEBUG: Created container successfully")
+            print("DEBUG: Attempting to create container with migration plan")
+            let c = try ModelContainer(
+                for: schema,
+                migrationPlan: RunalystMigrationPlan.self,
+                configurations: [modelConfiguration]
+            )
+            print("DEBUG: Created container successfully with migration plan")
             return c
         } catch {
-            print("DEBUG: Failed to load ModelContainer, attempting to delete old store: \(error)")
+            print("ERROR: Failed to load persistent ModelContainer with migration plan: \(error)")
+            
+            #if DEBUG
+            print("DEBUG: Development mode fallback - recreating store: \(error)")
             let storeURL = modelConfiguration.url
             let storePath = storeURL.path
             let shmPath = storePath + "-shm"
@@ -30,14 +32,23 @@ struct RunalystApp: App {
             try? FileManager.default.removeItem(atPath: shmPath)
             try? FileManager.default.removeItem(atPath: walPath)
             
-            do {
-                print("DEBUG: Retrying container creation")
-                let c = try ModelContainer(for: schema, configurations: [modelConfiguration])
-                print("DEBUG: Re-created container successfully")
-                return c
-            } catch {
-                fatalError("Could not create ModelContainer even after wiping store: \(error)")
+            if let fallbackContainer = try? ModelContainer(
+                for: schema,
+                migrationPlan: RunalystMigrationPlan.self,
+                configurations: [modelConfiguration]
+            ) {
+                print("DEBUG: Re-created container successfully after recovery")
+                return fallbackContainer
             }
+            #endif
+            
+            print("WARNING: Falling back to in-memory ModelContainer to prevent user data crash")
+            let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            if let inMemoryContainer = try? ModelContainer(for: schema, configurations: [inMemoryConfig]) {
+                return inMemoryContainer
+            }
+            
+            fatalError("Unrecoverable SwiftData initialization failure: \(error)")
         }
     }()
 

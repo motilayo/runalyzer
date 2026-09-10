@@ -1,0 +1,71 @@
+# SwiftLint Configuration for Runalyst
+
+included:
+  - Runalyst
+  - RunalystTests
+
+excluded:
+  - DerivedData
+  - Build
+  - .build
+  - "**/*.generated.swift"
+
+# Enabled rules focused on safety and code hygiene
+opt_in_rules:
+  - empty_count
+  - force_unwrapping
+  - fatal_error_message
+  - multiline_parameters
+  - redundant_nil_coalescing
+  - strict_fileprivate
+  - unused_import
+  - contains_over_filter_count
+  - first_where
+  - modifier_order
+  - closure_spacing
+  - weak_delegate
+
+disabled_rules:
+  - line_length # Screen layouts and AI prompts can exceed standard line lengths
+  - todo # Tracked via GitHub issues/tickets
+
+# Rule configurations
+force_unwrapping:
+  severity: error
+
+force_cast:
+  severity: error
+
+force_try:
+  severity: error
+
+cyclomatic_complexity:
+  warning: 12
+  error: 20
+
+function_body_length:
+  warning: 80
+  error: 120
+
+type_body_length:
+  warning: 400
+  error: 700
+
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+# Custom rules for Runalyst-specific best practices
+custom_rules:
+  no_direct_nslog:
+    name: "Avoid NSLog"
+    regex: "NSLog\\("
+    message: "Use os.Logger or print for debugging instead of NSLog."
+    severity: warning
+
+  swiftdata_optional_migration_guard:
+    name: "SwiftData Attribute Safety"
+    regex: "@Model[\\s\\S]*?var\\s+\\w+:\\s*(String|Double|Int|Date|Bool)\\s*(?!=|\\?)"
+    message: "New SwiftData properties should be marked Optional (?) or provided defaults to avoid migration validation errors."
+    severity: warning
