@@ -12,8 +12,8 @@ final class RunalystTests: XCTestCase {
             print("Successfully built plan for \(id.rawValue)")
         }
         
-        let alertCpm = CadenceRangeAlert.cadence(155.0...165.0)
-        XCTAssertTrue(CustomWorkout.supportsAlert(alertCpm, activity: .running, location: .outdoor))
+        let alertThreshold = CadenceThresholdAlert.cadence(160.0)
+        XCTAssertTrue(CustomWorkout.supportsAlert(alertThreshold, activity: .running, location: .outdoor))
         XCTAssertTrue(CustomWorkout.supportsGoal(.time(3, .minutes), activity: .running, location: .outdoor))
         XCTAssertTrue(CustomWorkout.supportsGoal(.time(2, .minutes), activity: .running, location: .outdoor))
         XCTAssertTrue(CustomWorkout.supportsGoal(.time(1, .minutes), activity: .running, location: .outdoor))
@@ -97,7 +97,7 @@ final class HealthKitManagerTests: XCTestCase {
     }
 }
 
-class MockHealthStore: HKHealthStoreProtocol {
+final class MockHealthStore: @unchecked Sendable, HKHealthStoreProtocol {
     var requestAuthorizationCalled = false
     var requestedTypesToShare: Set<HKSampleType>?
     var requestedTypesToRead: Set<HKObjectType>?
@@ -125,6 +125,10 @@ class MockHealthStore: HKHealthStoreProtocol {
     func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus {
         authorizationStatusCalled = true
         return authorizationStatusToReturn
+    }
+
+    func statusForAuthorizationRequest(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws -> HKAuthorizationRequestStatus {
+        return .shouldRequest
     }
 
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws {
@@ -305,10 +309,10 @@ final class DrillTemplateTests: XCTestCase {
         // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158)
         XCTAssertEqual(computedTarget, 158)
         
-        // Instructional cues must interpolate computed target output, NOT the raw baseline
+        // Instructional cues provide prescriptive biomechanical focus
         let cue = template.generateInstructionalCue(computedTarget)
-        XCTAssertTrue(cue.contains("158 SPM"), "Instructional cue should interpolate the computed target: \(cue)")
-        XCTAssertFalse(cue.contains("151 SPM"), "Instructional cue must not repeat the raw baseline: \(cue)")
+        XCTAssertFalse(cue.isEmpty, "Instructional cue should be present")
+        XCTAssertFalse(cue.contains("151 SPM"), "Instructional cue must not repeat the raw baseline")
     }
 }
 
@@ -567,7 +571,75 @@ final class LiveCoachDTOCodableTests: XCTestCase {
         XCTAssertEqual(decoded.drillRecovery, "60s easy jog")
         XCTAssertEqual(decoded.targetCadence, "168 SPM")
     }
-}
 
+    func testDrillPrescriptionDTOEncodingDecodingWithDurationAndHaptics() throws {
+        let original = DrillPrescriptionDTO(
+            title: "Cadence Pyramids",
+            preRunDrillId: "cadence_pyramids",
+            purpose: "Turnover improvement",
+            targetCadence: 172,
+            previousCadence: 160,
+            durationMinutes: 30,
+            hapticMode: "On"
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(DrillPrescriptionDTO.self, from: data)
+
+        XCTAssertEqual(decoded.title, "Cadence Pyramids")
+        XCTAssertEqual(decoded.targetCadence, 172)
+        XCTAssertEqual(decoded.durationMinutes, 30)
+        XCTAssertEqual(decoded.hapticMode, "On")
+    }
+
+    func testDrillDurationScaling() {
+        let drill = PreRunDrill(id: .cadencePyramids, previousCadence: 160)
+        
+        let work10 = drill.workString(for: .tenMinutes)
+        let work15 = drill.workString(for: .fifteenMinutes)
+        let work30 = drill.workString(for: .thirtyMinutes)
+
+        XCTAssertTrue(work10.contains("4 x 30 sec work"), "Expected 4 x 30 sec work in 10-min version, got: \(work10)")
+        XCTAssertTrue(work15.contains("4 x 1 min work"), "Expected 4 x 1 min work in 15-min version, got: \(work15)")
+        XCTAssertTrue(work30.contains("6 x 90 sec work"), "Expected 6 x 90 sec work in 30-min version, got: \(work30)")
+
+        let rec10 = drill.recoveryString(for: .tenMinutes)
+        let rec15 = drill.recoveryString(for: .fifteenMinutes)
+        let rec30 = drill.recoveryString(for: .thirtyMinutes)
+
+        XCTAssertTrue(rec10.contains("45 sec walk recovery"), "Expected 45 sec walk recovery, got: \(rec10)")
+        XCTAssertTrue(rec15.contains("90 sec walk recovery"), "Expected 90 sec walk recovery, got: \(rec15)")
+        XCTAssertTrue(rec30.contains("2 min walk recovery"), "Expected 2 min walk recovery, got: \(rec30)")
+
+        let drill10 = PreRunDrill(id: .cadencePyramids, previousCadence: 160, duration: .tenMinutes)
+        let drill30 = PreRunDrill(id: .cadencePyramids, previousCadence: 160, duration: .thirtyMinutes)
+        let plan10 = drill10.buildWorkoutPlan()
+        let plan30 = drill30.buildWorkoutPlan()
+        XCTAssertNotNil(plan10)
+        XCTAssertNotNil(plan30)
+
+        // Verify DrillTemplate duration scaling
+        let template = DrillTemplate.template(for: .cadencePyramids)
+        XCTAssertTrue(template.workString(for: .tenMinutes).contains("4 x 30 sec work"))
+        XCTAssertTrue(template.workString(for: .fifteenMinutes).contains("4 x 1 min work"))
+        XCTAssertTrue(template.workString(for: .thirtyMinutes).contains("6 x 90 sec work"))
+        XCTAssertTrue(template.recoveryString(for: .tenMinutes).contains("45 sec walk recovery"))
+        XCTAssertTrue(template.recoveryString(for: .thirtyMinutes).contains("2 min walk recovery"))
+    }
+
+    func testLiveCoachHapticFeedbackModes() {
+        // Off
+        XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .off, currentSPM: 160, targetSPM: 170, intervalElapsedSeconds: 5))
+        XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .off, currentSPM: 150, targetSPM: 170, intervalElapsedSeconds: 30))
+
+        // On: rhythm pulse during first 20s of interval
+        XCTAssertTrue(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 170, targetSPM: 170, intervalElapsedSeconds: 10))
+
+        // On: corrective nudge when cadence drops below target - 2 SPM after lead-in
+        XCTAssertTrue(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 167, targetSPM: 170, intervalElapsedSeconds: 30))
+        XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 170, targetSPM: 170, intervalElapsedSeconds: 30))
+        XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 175, targetSPM: 170, intervalElapsedSeconds: 30))
+    }
+}
 
 

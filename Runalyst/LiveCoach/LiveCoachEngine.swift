@@ -110,6 +110,36 @@ public class LiveCoachEngine {
         return currentSPM < targetSPM
     }
 
+    /// Evaluates if haptic feedback should be delivered according to the selected HapticFeedbackMode.
+    public nonisolated static func shouldTriggerHaptic(
+        mode: HapticFeedbackMode,
+        currentSPM: Int,
+        targetSPM: Int,
+        intervalElapsedSeconds: TimeInterval
+    ) -> Bool {
+        switch mode {
+        case .off:
+            return false
+        case .on:
+            // Pulses rhythm during the first 20 seconds of each work interval or when cadence drops below target threshold
+            return intervalElapsedSeconds <= 20.0 || currentSPM < (targetSPM - 2)
+        }
+    }
+
+    public func shouldTriggerHaptic(
+        mode: HapticFeedbackMode,
+        currentSPM: Int,
+        targetSPM: Int,
+        intervalElapsedSeconds: TimeInterval
+    ) -> Bool {
+        Self.shouldTriggerHaptic(
+            mode: mode,
+            currentSPM: currentSPM,
+            targetSPM: targetSPM,
+            intervalElapsedSeconds: intervalElapsedSeconds
+        )
+    }
+
     /// Triggers audio and/or haptic cues based on current performance and silent mode.
     /// Returns a tuple indicating if (audioWasPlayed, hapticWasTriggered) for testing purposes.
     @discardableResult

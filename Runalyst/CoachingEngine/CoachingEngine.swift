@@ -52,7 +52,7 @@ struct SuggestedDrill {
     @Guide(description: "Why this drill fixes their specific physiological flaws based on the coaching directive. Keep it short and direct.")
     var drillPurpose: String
 
-    @Guide(description: "A specific biomechanical form cue. If cueing cadence, reference INTERVAL_CADENCE. Keep it short and actionable.")
+    @Guide(description: "A prescriptive running form or breathing cue (e.g. 'Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you', 'Toes wide and quick ground contact', 'Focus on your breathing'). Never include SPM numbers, reps, or workout intervals.")
     var drillCues: String
 }
 
@@ -102,7 +102,7 @@ class CoachingEngine {
         - for faster pace with lower heart rate, prefer tempo_surges
         - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
         - prefer one excellent drill over multiple generic drills
-        - when providing drill cues for cadence drills, reference the target INTERVAL_CADENCE; never instruct the runner to maintain their current or lower cadence
+        - drill cues must be prescriptive biomechanical or somatic cues focusing strictly on physical execution, breathing, posture, or arm/foot positioning (e.g., "Focus on your breathing", "Toes wide and quick ground contact", "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you"). Do NOT repeat cadence numbers, minutes, reps, or workout plan stats in the cue.
         - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
         - respond_entirely_in_\(language)
         """
@@ -160,7 +160,7 @@ class CoachingEngine {
                     drillTitle: String(localized: "Strides"),
                     preRunDrillId: "strides",
                     drillPurpose: String(localized: "Builds turnover and neural recruitment."),
-                    drillCues: String(localized: "Focus on relaxed shoulders and quick turnover.")
+                    drillCues: String(localized: "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you.")
                 )]
             )
         }
@@ -342,13 +342,11 @@ actor RunAnalyzerActor {
                 
                 let targetCadenceStr = preRunDrill.computedCadence != nil ? "\(preRunDrill.computedCadence!) SPM" : nil
                 
-                // Update Interpolation: instructional text interpolates the computed target output, not the raw baseline
+                // Prescriptive somatic cue (form, breathing, posture) without conflicting workout plan stats
                 let templateCue = template.generateInstructionalCue(computedTarget)
                 let drillCueText: String
-                if suggestedDrill.drillCues.lowercased().contains("spm") {
-                    drillCueText = templateCue
-                } else if !suggestedDrill.drillCues.isEmpty {
-                    drillCueText = "\(suggestedDrill.drillCues) \(templateCue)"
+                if !suggestedDrill.drillCues.isEmpty && !suggestedDrill.drillCues.localizedCaseInsensitiveContains("spm") {
+                    drillCueText = suggestedDrill.drillCues
                 } else {
                     drillCueText = templateCue
                 }

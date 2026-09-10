@@ -2,12 +2,12 @@ import Foundation
 import HealthKit
 import SwiftData
 
-@MainActor
 protocol HKHealthStoreProtocol: AnyObject, Sendable {
     func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
     func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus
+    func statusForAuthorizationRequest(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws -> HKAuthorizationRequestStatus
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws
-    func execute(_ query: HKQuery)
+    nonisolated func execute(_ query: HKQuery)
 }
 
 extension HKHealthStore: HKHealthStoreProtocol {}
@@ -63,12 +63,8 @@ class HealthKitManager: ObservableObject {
         }
     }
 
-    func requestAuthorization() async throws {
-        guard isHealthDataAvailable() else {
-            throw HKError(.errorHealthDataUnavailable)
-        }
-
-        let typesToRead: Set<HKObjectType> = [
+    var allTypesToRead: Set<HKObjectType> {
+        [
             HKObjectType.workoutType(),
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
             HKObjectType.quantityType(forIdentifier: .runningSpeed)!,
@@ -79,8 +75,14 @@ class HealthKitManager: ObservableObject {
             HKObjectType.quantityType(forIdentifier: .runningGroundContactTime)!,
             HKObjectType.quantityType(forIdentifier: .runningStrideLength)!
         ]
+    }
 
-        try await healthStore?.requestAuthorization(toShare: [], read: typesToRead)
+    func requestAuthorization() async throws {
+        guard isHealthDataAvailable() else {
+            throw HKError(.errorHealthDataUnavailable)
+        }
+
+        try await healthStore?.requestAuthorization(toShare: [], read: allTypesToRead)
 
         let workoutStatus = healthStore?.authorizationStatus(for: HKObjectType.workoutType())
         self.isAuthorized = (workoutStatus == .sharingAuthorized) || (workoutStatus == .notDetermined)
@@ -91,6 +93,13 @@ class HealthKitManager: ObservableObject {
 
     func enableBackgroundDelivery() async throws {
         try await healthStore?.enableBackgroundDelivery(for: .workoutType(), frequency: .immediate)
+    }
+
+    func getRequestStatusForAuthorization() async throws -> HKAuthorizationRequestStatus {
+        guard isHealthDataAvailable(), let store = healthStore else {
+            return .unknown
+        }
+        return try await store.statusForAuthorizationRequest(toShare: [], read: allTypesToRead)
     }
 
     func startObservingWorkouts() {
@@ -195,6 +204,35 @@ class HealthKitManager: ObservableObject {
                 }
                 let vo2s = samples.map { $0.quantity.doubleValue(for: HKUnit(from: "ml/kg*min")) }
                 continuation.resume(returning: vo2s)
+            }
+            healthStore?.execute(query)
+        }
+    }
+
+    func fetchVO2MaxClosestTo(date: Date) async throws -> Double? {
+        guard let quantityType = HKObjectType.quantityType(forIdentifier: .vo2Max) else {
+            return nil
+        }
+        let predicate = HKQuery.predicateForSamples(withStart: nil, end: date, options: .strictEndDate)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: quantityType,
+                predicate: predicate,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let samples = samples as? [HKQuantitySample], let first = samples.first else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let vo2 = first.quantity.doubleValue(for: HKUnit(from: "ml/kg*min"))
+                continuation.resume(returning: vo2)
             }
             healthStore?.execute(query)
         }
