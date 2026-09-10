@@ -89,6 +89,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
     case hillBounds = "hill_bounds"
     case recoveryJog = "recovery_jog"
     case aerobicBaseBuilder = "aerobic_base_builder"
+    case zone2Run = "zone_2_run"
 
     var title: String {
         switch self {
@@ -101,7 +102,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         case .fartlekPrimer: return "Fartlek Primer"
         case .hillBounds: return "Hill Bounds"
         case .recoveryJog: return "Recovery Jog"
-        case .aerobicBaseBuilder: return "Aerobic Base Builder"
+        case .aerobicBaseBuilder, .zone2Run: return "Zone 2 Run"
         }
     }
 
@@ -125,7 +126,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
             return "mountain.2.fill"
         case .recoveryJog:
             return "figure.walk"
-        case .aerobicBaseBuilder:
+        case .aerobicBaseBuilder, .zone2Run:
             return "heart.fill"
         }
     }
@@ -150,7 +151,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
             return .brown
         case .recoveryJog:
             return .mint
-        case .aerobicBaseBuilder:
+        case .aerobicBaseBuilder, .zone2Run:
             return .red
         }
     }
@@ -174,6 +175,8 @@ extension PreRunDrill {
             return "mountain.2.fill"
         } else if lower.contains("flush") || lower.contains("aerobic") {
             return "lungs.fill"
+        } else if lower.contains("zone 2") || lower.contains("zone2") || lower.contains("base builder") {
+            return "heart.fill"
         } else if lower.contains("recovery") || lower.contains("jog") || lower.contains("shakeout") {
             return "figure.walk"
         } else if lower.contains("fartlek") {
@@ -201,6 +204,8 @@ extension PreRunDrill {
             return .brown
         } else if lower.contains("flush") {
             return .teal
+        } else if lower.contains("zone 2") || lower.contains("zone2") || lower.contains("base builder") {
+            return .red
         } else if lower.contains("recovery") || lower.contains("jog") || lower.contains("shakeout") {
             return .mint
         } else if lower.contains("fartlek") {
@@ -240,7 +245,7 @@ struct PreRunDrill: Sendable {
     var effectiveTargetCadence: Int? {
         // Recovery / flush / base builder drills do not use cadence turnover alerts
         switch id {
-        case .aerobicFlush, .recoveryJog, .aerobicBaseBuilder:
+        case .aerobicFlush, .recoveryJog, .aerobicBaseBuilder, .zone2Run:
             return nil
         default:
             break
@@ -308,7 +313,7 @@ struct PreRunDrill: Sendable {
             }
         case .recoveryJog:
             return "\(customDuration.rawValue) min easy"
-        case .aerobicBaseBuilder:
+        case .aerobicBaseBuilder, .zone2Run:
             return "\(customDuration.rawValue) min Zone 2 steady"
         }
     }
@@ -361,7 +366,7 @@ struct PreRunDrill: Sendable {
             }
         case .recoveryJog:
             return "No intervals"
-        case .aerobicBaseBuilder:
+        case .aerobicBaseBuilder, .zone2Run:
             return "No intervals"
         }
     }
@@ -376,8 +381,8 @@ struct PreRunDrill: Sendable {
 
     var defaultEffortString: String {
         switch id {
-        case .recoveryJog, .aerobicFlush: return "Easy / Zone 1-2"
-        case .aerobicBaseBuilder: return "Zone 2 Aerobic"
+        case .recoveryJog, .aerobicFlush: return "Zone 1 Active Recovery"
+        case .aerobicBaseBuilder, .zone2Run: return "Zone 2 Aerobic"
         case .cadencePyramids, .rhythmIntervals: return "Moderate / Zone 3"
         case .tempoSurges, .fartlekPrimer: return "Hard / Zone 4"
         case .strides, .neuromuscularPrimer, .hillBounds: return "Sprint / Zone 5"
@@ -391,7 +396,7 @@ struct PreRunDrill: Sendable {
         let warmUpDuration: Double
         let coolDownDuration: Double
 
-        if id == .aerobicBaseBuilder {
+        if id == .aerobicBaseBuilder || id == .zone2Run {
             warmUpDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0)
             coolDownDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
         } else if id == .aerobicFlush || id == .recoveryJog {
@@ -409,7 +414,9 @@ struct PreRunDrill: Sendable {
         if let target = effectiveTargetCadence {
             let cadenceValue = Double(target)
             alert = CadenceThresholdAlert.cadence(cadenceValue)
-        } else if id == .aerobicBaseBuilder {
+        } else if id == .aerobicFlush || id == .recoveryJog {
+            alert = HeartRateZoneAlert(zone: 1)
+        } else if id == .aerobicBaseBuilder || id == .zone2Run {
             alert = HeartRateZoneAlert(zone: 2)
         }
 
@@ -531,7 +538,7 @@ struct PreRunDrill: Sendable {
             iterations = 1
             workGoal = .time(Double(duration.rawValue), .minutes)
             recoveryGoal = nil
-        case .aerobicBaseBuilder:
+        case .aerobicBaseBuilder, .zone2Run:
             iterations = 1
             workGoal = .time(Double(duration.rawValue), .minutes)
             recoveryGoal = nil
@@ -684,7 +691,7 @@ struct DrillTemplate: Sendable {
                 defaultPurpose: "An easy, gentle shakeout to loosen up tired legs.",
                 defaultWork: "10 min steady",
                 defaultRecovery: "No intervals",
-                defaultEffort: "Easy / Zone 1-2",
+                defaultEffort: "Zone 1 Active Recovery",
                 calculateTargetCadence: { baseline in
                     max(140, baseline)
                 },
@@ -729,7 +736,7 @@ struct DrillTemplate: Sendable {
                 defaultPurpose: "A very easy jog to get blood moving and help your legs bounce back.",
                 defaultWork: "15 min easy",
                 defaultRecovery: "No intervals",
-                defaultEffort: "Easy / Zone 1-2",
+                defaultEffort: "Zone 1 Active Recovery",
                 calculateTargetCadence: { baseline in
                     max(140, baseline)
                 },
@@ -737,19 +744,19 @@ struct DrillTemplate: Sendable {
                     "Focus on your breathing and shake out your hands. Keep your steps small, soft, and effortless."
                 }
             )
-        case .aerobicBaseBuilder:
+        case .aerobicBaseBuilder, .zone2Run:
             return DrillTemplate(
-                id: .aerobicBaseBuilder,
-                title: "Aerobic Base Builder",
-                defaultPurpose: "Build your stamina engine with comfortable, conversational running.",
-                defaultWork: "35 min Zone 2 steady",
+                id: id,
+                title: "Zone 2 Run",
+                defaultPurpose: "Build your stamina and aerobic engine with comfortable, conversational Zone 2 effort.",
+                defaultWork: "Steady Zone 2 pace",
                 defaultRecovery: "No intervals",
                 defaultEffort: "Zone 2 Aerobic",
                 calculateTargetCadence: { baseline in
                     max(150, baseline)
                 },
                 generateInstructionalCue: { _ in
-                    "Focus on calm, steady breathing so you could easily speak in full sentences throughout the run."
+                    "Focus on calm nasal breathing and a conversational pace, keeping your heart rate steadily locked in Zone 2."
                 }
             )
         }

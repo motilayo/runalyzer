@@ -524,9 +524,8 @@ private struct DrillCardView: View {
     @Binding var activeCardIndex: Int
     @State private var isShowingWorkoutPreview = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var showingTargetExplainer = false
-    @State private var isSchedulingWatch = false
-    @State private var scheduledWatchSuccess = false
     @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
@@ -620,22 +619,35 @@ private struct DrillCardView: View {
                 .cornerRadius(10)
             }
 
-            if let target = drill.targetCadence, !target.isEmpty {
-                let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+            let isZone1 = preRunId == .aerobicFlush || preRunId == .recoveryJog
+            let isZone2 = preRunId == .aerobicBaseBuilder || preRunId == .zone2Run
+            let targetText: String? = {
+                if isZone1 {
+                    return "Target: Zone 1 HR"
+                }
+                if isZone2 {
+                    return "Target: Zone 2 HR"
+                }
+                if let target = drill.targetCadence, !target.isEmpty {
+                    let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+                    if let prev = drill.previousCadence {
+                        return "Target: \(formattedTarget) (Previous: \(prev) SPM)"
+                    } else {
+                        return "Target: \(formattedTarget)"
+                    }
+                }
+                return nil
+            }()
+
+            if let targetString = targetText {
                 HStack(spacing: 4) {
                     Image(systemName: "target")
                         .foregroundColor(.orange)
                         .font(.caption.bold())
 
-                    if let prev = drill.previousCadence {
-                        Text("Target: \(formattedTarget) (Previous: \(prev) SPM)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Target: \(formattedTarget)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(targetString)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
                     Image(systemName: "info.circle")
                         .font(.caption2)
@@ -646,7 +658,12 @@ private struct DrillCardView: View {
                     showingTargetExplainer = true
                 }
                 .sheet(isPresented: $showingTargetExplainer) {
-                    let explainer = MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false)
+                    let explainerTitle: String = {
+                        if isZone1 { return "Zone 1 Heart Rate" }
+                        if isZone2 { return "Zone 2 Heart Rate" }
+                        return "Target Cadence"
+                    }()
+                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }
             }
@@ -657,11 +674,18 @@ private struct DrillCardView: View {
                 Button(action: {
                     let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
                     activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
+                    pendingWatchDrillDTO = DrillPrescriptionDTO(
+                        title: drill.drillTitle,
+                        preRunDrillId: preRunId.rawValue,
+                        purpose: drill.drillPurpose ?? "",
+                        targetCadence: targetInt,
+                        previousCadence: drill.previousCadence
+                    )
                     isShowingWorkoutPreview = true
                 }) {
                     HStack(spacing: 6) {
-                        Image(systemName: "eye.fill")
-                        Text("View")
+                        Image(systemName: "play.fill")
+                        Text("Start")
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
@@ -677,7 +701,7 @@ private struct DrillCardView: View {
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: drill.isCompleted ? "checkmark.circle.fill" : "circle")
-                        Text(drill.isCompleted ? "Completed ✓" : "Mark as completed")
+                        Text(drill.isCompleted ? "Completed ✓" : "Mark completed")
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
@@ -694,39 +718,29 @@ private struct DrillCardView: View {
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(20)
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
+        .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
+            if oldValue && !newValue, let dto = pendingWatchDrillDTO {
+                pendingWatchDrillDTO = nil
+                scheduleToWatch(dto: dto)
+            }
+        }
     }
 
-    private func scheduleToWatch(title: String, drillId: PreRunDrillId, purpose: String, targetCadence: Int?, baseCadence: Int?) {
-        isSchedulingWatch = true
+    private func scheduleToWatch(dto: DrillPrescriptionDTO) {
         Task {
             if #available(iOS 17.0, *) {
-                let dto = DrillPrescriptionDTO(
-                    title: title,
-                    preRunDrillId: drillId.rawValue,
-                    purpose: purpose,
-                    targetCadence: targetCadence,
-                    previousCadence: baseCadence
-                )
                 do {
                     let bridge = WorkoutBridge()
                     try await bridge.scheduleDrill(dto: dto)
                     await MainActor.run {
-                        self.isSchedulingWatch = false
-                        self.scheduledWatchSuccess = true
                         self.lastWatchExportTimestamp = Date().timeIntervalSince1970
-                        self.lastExportedDrillId = drillId.rawValue
+                        self.lastExportedDrillId = dto.preRunDrillId ?? ""
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 } catch {
-                    await MainActor.run {
-                        self.isSchedulingWatch = false
-                    }
+                    print("[RunDetailView] Failed to schedule drill: \(error.localizedDescription)")
                 }
-            } else {
-                await MainActor.run {
-                    self.isSchedulingWatch = false
-                }
+            }
         }
     }
-}
 }

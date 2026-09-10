@@ -14,6 +14,7 @@ struct DrillsLibraryView: View {
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var isShowingWorkoutPreview: Bool = false
     @State private var isAutoSyncing: Bool = false
     @State private var autoSyncSuccess: Bool = false
@@ -116,7 +117,7 @@ struct DrillsLibraryView: View {
                 // Section 1: Foundation & Recovery Primers
                 if selectedCategory == "All" || selectedCategory == "Foundation" {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Foundation & Recovery Primers (10-15 Min)")
+                        Text("Foundation & Recovery Primers")
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
@@ -124,12 +125,27 @@ struct DrillsLibraryView: View {
                         DrillPrimerCardView(
                             drillId: .aerobicFlush,
                             customTitle: "Recovery Run Prep (Shakeout)",
-                            customTarget: "Target HR: 100 - 118 BPM",
+                            customTarget: "Target: Zone 1 HR",
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .recoveryJog,
+                            customTitle: "Recovery Jog",
+                            customTarget: "Target: Zone 1 HR",
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .zone2Run,
+                            customTitle: "Zone 2 Run",
+                            customTarget: "Target: Zone 2 HR",
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
                     }
@@ -138,7 +154,7 @@ struct DrillsLibraryView: View {
                 // Section 2: Speed & Efficiency Primers
                 if selectedCategory == "All" || selectedCategory == "Speed" {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Speed & Efficiency Primers (10-15 Min)")
+                        Text("Speed & Efficiency Primers")
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
@@ -146,20 +162,28 @@ struct DrillsLibraryView: View {
                         DrillPrimerCardView(
                             drillId: .cadencePyramids,
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
 
                         DrillPrimerCardView(
                             drillId: .strides,
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .neuromuscularPrimer,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .hillBounds,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
                     }
@@ -168,7 +192,7 @@ struct DrillsLibraryView: View {
                 // Section 3: Threshold & Form Primers
                 if selectedCategory == "All" || selectedCategory == "Threshold" {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Threshold & Form Primers (10-15 Min)")
+                        Text("Threshold & Form Primers")
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
@@ -176,10 +200,21 @@ struct DrillsLibraryView: View {
                         DrillPrimerCardView(
                             drillId: .rhythmIntervals,
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .tempoSurges,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .fartlekPrimer,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
                     }
@@ -188,6 +223,12 @@ struct DrillsLibraryView: View {
             .padding(.vertical)
         }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
+        .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
+            if oldValue && !newValue, let dto = pendingWatchDrillDTO {
+                pendingWatchDrillDTO = nil
+                scheduleDrillToWatch(dto: dto)
+            }
+        }
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("🏃 Pre-Run Library")
         .navigationBarTitleDisplayMode(.inline)
@@ -200,6 +241,30 @@ struct DrillsLibraryView: View {
             if lastWatchExportTimestamp > 0 {
                 Task {
                     await autoSyncStaleExportIfNeeded()
+                }
+            }
+        }
+    }
+
+    private func handleStartDrill(plan: WorkoutPlan, dto: DrillPrescriptionDTO) {
+        activeWorkoutPlan = plan
+        pendingWatchDrillDTO = dto
+        isShowingWorkoutPreview = true
+    }
+
+    private func scheduleDrillToWatch(dto: DrillPrescriptionDTO) {
+        Task {
+            if #available(iOS 17.0, *) {
+                do {
+                    let bridge = WorkoutBridge()
+                    try await bridge.scheduleDrill(dto: dto)
+                    await MainActor.run {
+                        self.lastExportedDrillId = dto.preRunDrillId ?? ""
+                        self.lastWatchExportTimestamp = Date().timeIntervalSince1970
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                } catch {
+                    print("[DrillsLibraryView] Error scheduling drill: \(error.localizedDescription)")
                 }
             }
         }
@@ -248,7 +313,7 @@ struct DrillPrimerCardView: View {
     var customPurpose: String?
     var customTarget: String?
     let baselineCadence: Int
-    var onStart: ((WorkoutPlan) -> Void)?
+    var onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
     @State private var selectedDuration: DrillDuration = .fifteenMinutes
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
@@ -271,8 +336,23 @@ struct DrillPrimerCardView: View {
         let icon = drillId.iconName
         let iconColor = drillId.iconColor
 
-        let hasCadenceTarget = drillId != .aerobicFlush && drillId != .recoveryJog && drillId != .aerobicBaseBuilder
-        let displayTargetText = customTarget ?? (hasCadenceTarget ? targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" } : nil)
+        let isZone1 = drillId == .aerobicFlush || drillId == .recoveryJog
+        let isZone2 = drillId == .aerobicBaseBuilder || drillId == .zone2Run
+        let hasCadenceTarget = !isZone1 && !isZone2
+
+        let displayTargetText: String? = {
+            if let customTarget = customTarget { return customTarget }
+            if isZone1 {
+                return "Target: Zone 1 HR"
+            }
+            if isZone2 {
+                return "Target: Zone 2 HR"
+            }
+            if hasCadenceTarget {
+                return targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" }
+            }
+            return nil
+        }()
 
         VStack(alignment: .leading, spacing: 14) {
             // Header
@@ -343,7 +423,7 @@ struct DrillPrimerCardView: View {
                     Text(targetText)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    if hasCadenceTarget {
+                    if hasCadenceTarget || isZone1 || isZone2 {
                         Image(systemName: "info.circle")
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
@@ -351,12 +431,17 @@ struct DrillPrimerCardView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    if hasCadenceTarget {
+                    if hasCadenceTarget || isZone1 || isZone2 {
                         showingTargetExplainer = true
                     }
                 }
                 .sheet(isPresented: $showingTargetExplainer) {
-                    let explainer = MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false)
+                    let explainerTitle: String = {
+                        if isZone1 { return "Zone 1 Heart Rate" }
+                        if isZone2 { return "Zone 2 Heart Rate" }
+                        return "Target Cadence"
+                    }()
+                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }
             }
@@ -407,7 +492,7 @@ struct DrillPrimerCardView: View {
 
             // Single Action Button: Start Drill
             Button(action: {
-                startDrill(preRunId: drillId, targetCadence: targetCadence, duration: selectedDuration, hapticMode: selectedHapticMode)
+                startDrill(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "play.fill")
@@ -429,15 +514,24 @@ struct DrillPrimerCardView: View {
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
-    private func startDrill(preRunId: PreRunDrillId, targetCadence: Int?, duration: DrillDuration, hapticMode: HapticFeedbackMode) {
+    private func startDrill(title: String, purpose: String, targetCadence: Int?) {
         let drill = PreRunDrill(
-            id: preRunId,
+            id: drillId,
             previousCadence: baselineCadence,
             targetCadence: targetCadence,
-            duration: duration,
-            hapticMode: hapticMode
+            duration: selectedDuration,
+            hapticMode: selectedHapticMode
         )
         let plan = drill.buildWorkoutPlan()
-        onStart?(plan)
+        let dto = DrillPrescriptionDTO(
+            title: title,
+            preRunDrillId: drillId.rawValue,
+            purpose: purpose,
+            targetCadence: targetCadence,
+            previousCadence: baselineCadence,
+            durationMinutes: selectedDuration.rawValue,
+            hapticMode: selectedHapticMode.rawValue
+        )
+        onStart?(plan, dto)
     }
 }

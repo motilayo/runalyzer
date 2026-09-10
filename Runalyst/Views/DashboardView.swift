@@ -34,9 +34,8 @@ struct DashboardView: View {
     @State private var isFetchingInsight = false
     @State private var isShowingWorkoutPreview: Bool = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
-    @State private var isSchedulingWatch: Bool = false
-    @State private var scheduledWatchSuccess: Bool = false
 
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
@@ -408,7 +407,45 @@ struct DashboardView: View {
                 .cornerRadius(10)
             }
 
-            if primerId != .aerobicFlush && primerId != .recoveryJog {
+            if primerId == .aerobicFlush || primerId == .recoveryJog {
+                HStack(spacing: 4) {
+                    Image(systemName: "target")
+                        .foregroundColor(.orange)
+                        .font(.caption.bold())
+                    Text("Target: Zone 1 HR")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Image(systemName: "info.circle")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    activeExplainer = MetricExplainerInfo(
+                        explainer: MetricDetailExplainer.explainer(for: "Zone 1 Heart Rate", isWorkoutStats: false),
+                        mode: "Working Stats"
+                    )
+                }
+            } else if primerId == .aerobicBaseBuilder || primerId == .zone2Run {
+                HStack(spacing: 4) {
+                    Image(systemName: "target")
+                        .foregroundColor(.orange)
+                        .font(.caption.bold())
+                    Text("Target: Zone 2 HR")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Image(systemName: "info.circle")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    activeExplainer = MetricExplainerInfo(
+                        explainer: MetricDetailExplainer.explainer(for: "Zone 2 Heart Rate", isWorkoutStats: false),
+                        mode: "Working Stats"
+                    )
+                }
+            } else {
                 HStack(spacing: 4) {
                     Image(systemName: "target")
                         .foregroundColor(.orange)
@@ -432,6 +469,13 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 Button(action: {
                     activeWorkoutPlan = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget).buildWorkoutPlan()
+                    pendingWatchDrillDTO = DrillPrescriptionDTO(
+                        title: template.title,
+                        preRunDrillId: primerId.rawValue,
+                        purpose: template.defaultPurpose,
+                        targetCadence: computedTarget,
+                        previousCadence: baseCadence
+                    )
                     isShowingWorkoutPreview = true
                 }) {
                     HStack(spacing: 6) {
@@ -468,37 +512,27 @@ struct DashboardView: View {
         .cornerRadius(16)
         .padding(.horizontal)
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
+        .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
+            if oldValue && !newValue, let dto = pendingWatchDrillDTO {
+                pendingWatchDrillDTO = nil
+                scheduleDashboardDrillToWatch(dto: dto)
+            }
+        }
     }
 
-    private func scheduleDashboardDrillToWatch(title: String, drillId: PreRunDrillId, purpose: String, targetCadence: Int?, baseCadence: Int) {
-        isSchedulingWatch = true
+    private func scheduleDashboardDrillToWatch(dto: DrillPrescriptionDTO) {
         Task {
             if #available(iOS 17.0, *) {
-                let dto = DrillPrescriptionDTO(
-                    title: title,
-                    preRunDrillId: drillId.rawValue,
-                    purpose: purpose,
-                    targetCadence: targetCadence,
-                    previousCadence: baseCadence
-                )
                 do {
                     let bridge = WorkoutBridge()
                     try await bridge.scheduleDrill(dto: dto)
                     await MainActor.run {
-                        self.isSchedulingWatch = false
-                        self.scheduledWatchSuccess = true
                         self.lastWatchExportTimestamp = Date().timeIntervalSince1970
-                        self.lastExportedDrillId = drillId.rawValue
+                        self.lastExportedDrillId = dto.preRunDrillId ?? ""
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 } catch {
-                    await MainActor.run {
-                        self.isSchedulingWatch = false
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    self.isSchedulingWatch = false
+                    print("[DashboardView] Failed to schedule drill: \(error.localizedDescription)")
                 }
             }
         }
