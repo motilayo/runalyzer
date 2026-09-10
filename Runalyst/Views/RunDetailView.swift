@@ -524,9 +524,8 @@ private struct DrillCardView: View {
     @Binding var activeCardIndex: Int
     @State private var isShowingWorkoutPreview = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var showingTargetExplainer = false
-    @State private var isSchedulingWatch = false
-    @State private var scheduledWatchSuccess = false
     @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
@@ -657,11 +656,18 @@ private struct DrillCardView: View {
                 Button(action: {
                     let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
                     activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
+                    pendingWatchDrillDTO = DrillPrescriptionDTO(
+                        title: drill.drillTitle,
+                        preRunDrillId: preRunId.rawValue,
+                        purpose: drill.drillPurpose ?? "",
+                        targetCadence: targetInt,
+                        previousCadence: drill.previousCadence
+                    )
                     isShowingWorkoutPreview = true
                 }) {
                     HStack(spacing: 6) {
-                        Image(systemName: "eye.fill")
-                        Text("View")
+                        Image(systemName: "play.fill")
+                        Text("Start")
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
@@ -672,45 +678,19 @@ private struct DrillCardView: View {
                 }
 
                 Button(action: {
-                    scheduleToWatch(
-                        title: drill.drillTitle,
-                        drillId: preRunId,
-                        purpose: drill.drillPurpose ?? "",
-                        targetCadence: targetInt,
-                        baseCadence: drill.previousCadence
-                    )
+                    drill.isCompleted.toggle()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }) {
                     HStack(spacing: 6) {
-                        if isSchedulingWatch {
-                            ProgressView()
-                                .tint(.white)
-                        } else if scheduledWatchSuccess {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Sent")
-                        } else {
-                            Image(systemName: "applewatch")
-                            Text("Send to Watch")
-                        }
+                        Image(systemName: drill.isCompleted ? "checkmark.circle.fill" : "circle")
+                        Text(drill.isCompleted ? "Completed ✓" : "Mark completed")
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(scheduledWatchSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5))
-                    .foregroundColor(.white)
+                    .background(drill.isCompleted ? Color.green.opacity(0.15) : Color.orange)
+                    .foregroundColor(drill.isCompleted ? .green : .white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(isSchedulingWatch)
-
-                Button(action: {
-                    drill.isCompleted.toggle()
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }) {
-                    Image(systemName: drill.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.title3.bold())
-                        .frame(width: 48, height: 48)
-                        .background(drill.isCompleted ? Color.green.opacity(0.15) : Color(UIColor.tertiarySystemFill))
-                        .foregroundColor(drill.isCompleted ? .green : .secondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding(.top, 4)
@@ -720,37 +700,27 @@ private struct DrillCardView: View {
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(20)
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
+        .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
+            if oldValue && !newValue, let dto = pendingWatchDrillDTO {
+                pendingWatchDrillDTO = nil
+                scheduleToWatch(dto: dto)
+            }
+        }
     }
 
-    private func scheduleToWatch(title: String, drillId: PreRunDrillId, purpose: String, targetCadence: Int?, baseCadence: Int?) {
-        isSchedulingWatch = true
+    private func scheduleToWatch(dto: DrillPrescriptionDTO) {
         Task {
             if #available(iOS 17.0, *) {
-                let dto = DrillPrescriptionDTO(
-                    title: title,
-                    preRunDrillId: drillId.rawValue,
-                    purpose: purpose,
-                    targetCadence: targetCadence,
-                    previousCadence: baseCadence
-                )
                 do {
                     let bridge = WorkoutBridge()
                     try await bridge.scheduleDrill(dto: dto)
                     await MainActor.run {
-                        self.isSchedulingWatch = false
-                        self.scheduledWatchSuccess = true
                         self.lastWatchExportTimestamp = Date().timeIntervalSince1970
-                        self.lastExportedDrillId = drillId.rawValue
+                        self.lastExportedDrillId = dto.preRunDrillId ?? ""
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 } catch {
-                    await MainActor.run {
-                        self.isSchedulingWatch = false
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    self.isSchedulingWatch = false
+                    print("[RunDetailView] Failed to schedule drill: \(error.localizedDescription)")
                 }
             }
         }

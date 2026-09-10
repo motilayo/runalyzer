@@ -14,6 +14,7 @@ struct DrillsLibraryView: View {
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var isShowingWorkoutPreview: Bool = false
     @State private var isAutoSyncing: Bool = false
     @State private var autoSyncSuccess: Bool = false
@@ -126,10 +127,7 @@ struct DrillsLibraryView: View {
                             customTitle: "Recovery Run Prep (Shakeout)",
                             customTarget: "Target HR: 100 - 118 BPM",
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
                     }
@@ -146,20 +144,14 @@ struct DrillsLibraryView: View {
                         DrillPrimerCardView(
                             drillId: .cadencePyramids,
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
 
                         DrillPrimerCardView(
                             drillId: .strides,
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
                     }
@@ -176,10 +168,7 @@ struct DrillsLibraryView: View {
                         DrillPrimerCardView(
                             drillId: .rhythmIntervals,
                             baselineCadence: baselineCadence,
-                            onStart: { plan in
-                                activeWorkoutPlan = plan
-                                isShowingWorkoutPreview = true
-                            }
+                            onStart: handleStartDrill
                         )
                         .padding(.horizontal)
                     }
@@ -188,6 +177,12 @@ struct DrillsLibraryView: View {
             .padding(.vertical)
         }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
+        .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
+            if oldValue && !newValue, let dto = pendingWatchDrillDTO {
+                pendingWatchDrillDTO = nil
+                scheduleDrillToWatch(dto: dto)
+            }
+        }
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("🏃 Pre-Run Library")
         .navigationBarTitleDisplayMode(.inline)
@@ -200,6 +195,30 @@ struct DrillsLibraryView: View {
             if lastWatchExportTimestamp > 0 {
                 Task {
                     await autoSyncStaleExportIfNeeded()
+                }
+            }
+        }
+    }
+
+    private func handleStartDrill(plan: WorkoutPlan, dto: DrillPrescriptionDTO) {
+        activeWorkoutPlan = plan
+        pendingWatchDrillDTO = dto
+        isShowingWorkoutPreview = true
+    }
+
+    private func scheduleDrillToWatch(dto: DrillPrescriptionDTO) {
+        Task {
+            if #available(iOS 17.0, *) {
+                do {
+                    let bridge = WorkoutBridge()
+                    try await bridge.scheduleDrill(dto: dto)
+                    await MainActor.run {
+                        self.lastExportedDrillId = dto.preRunDrillId ?? ""
+                        self.lastWatchExportTimestamp = Date().timeIntervalSince1970
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                } catch {
+                    print("[DrillsLibraryView] Error scheduling drill: \(error.localizedDescription)")
                 }
             }
         }
@@ -248,16 +267,11 @@ struct DrillPrimerCardView: View {
     var customPurpose: String?
     var customTarget: String?
     let baselineCadence: Int
-    var onStart: ((WorkoutPlan) -> Void)?
+    var onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
     @State private var selectedDuration: DrillDuration = .fifteenMinutes
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
-    @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
-    @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @State private var showingTargetExplainer = false
-    @State private var isScheduling = false
-    @State private var scheduledSuccess = false
-    @State private var errorMessage: String?
 
     private var selectedHapticMode: HapticFeedbackMode {
         get { HapticFeedbackMode(rawValue: selectedHapticModeRaw) ?? .on }
@@ -410,60 +424,23 @@ struct DrillPrimerCardView: View {
                 }
             }
 
-            // Action Buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    startPreview(targetCadence: targetCadence)
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.fill")
-                        Text("Start")
-                    }
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.green)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+            // Single Action Button: Start Drill
+            Button(action: {
+                startDrill(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill")
+                        .foregroundColor(.white)
+                    Text("Start Drill")
+                        .foregroundColor(.white)
                 }
-
-                Button(action: {
-                    scheduleToWatch(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
-                }) {
-                    HStack(spacing: 6) {
-                        if isScheduling {
-                            ProgressView()
-                                .tint(.white)
-                        } else if scheduledSuccess {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Loaded")
-                        } else {
-                            Image(systemName: "applewatch")
-                            Text("Load to Watch")
-                        }
-                    }
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        scheduledSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5)
-                    )
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .disabled(isScheduling)
+                .font(.subheadline.bold())
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.green)
+                .cornerRadius(12)
             }
             .padding(.top, 2)
-
-            if let err = errorMessage {
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                    Text(err)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-            }
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
@@ -471,7 +448,7 @@ struct DrillPrimerCardView: View {
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
-    private func startPreview(targetCadence: Int?) {
+    private func startDrill(title: String, purpose: String, targetCadence: Int?) {
         let drill = PreRunDrill(
             id: drillId,
             previousCadence: baselineCadence,
@@ -480,46 +457,15 @@ struct DrillPrimerCardView: View {
             hapticMode: selectedHapticMode
         )
         let plan = drill.buildWorkoutPlan()
-        onStart?(plan)
-    }
-
-    private func scheduleToWatch(title: String, purpose: String, targetCadence: Int?) {
-        isScheduling = true
-        errorMessage = nil
-
-        Task {
-            if #available(iOS 17.0, *) {
-                let dto = DrillPrescriptionDTO(
-                    title: title,
-                    preRunDrillId: drillId.rawValue,
-                    purpose: purpose,
-                    targetCadence: targetCadence,
-                    previousCadence: baselineCadence,
-                    durationMinutes: selectedDuration.rawValue,
-                    hapticMode: selectedHapticMode.rawValue
-                )
-                do {
-                    let bridge = WorkoutBridge()
-                    try await bridge.scheduleDrill(dto: dto)
-                    await MainActor.run {
-                        self.isScheduling = false
-                        self.scheduledSuccess = true
-                        self.lastExportedDrillId = self.drillId.rawValue
-                        self.lastWatchExportTimestamp = Date().timeIntervalSince1970
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    }
-                } catch {
-                    await MainActor.run {
-                        self.isScheduling = false
-                        self.errorMessage = error.localizedDescription
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    self.isScheduling = false
-                    self.errorMessage = "WorkoutKit requires iOS 17.0 or newer."
-                }
-            }
-        }
+        let dto = DrillPrescriptionDTO(
+            title: title,
+            preRunDrillId: drillId.rawValue,
+            purpose: purpose,
+            targetCadence: targetCadence,
+            previousCadence: baselineCadence,
+            durationMinutes: selectedDuration.rawValue,
+            hapticMode: selectedHapticMode.rawValue
+        )
+        onStart?(plan, dto)
     }
 }

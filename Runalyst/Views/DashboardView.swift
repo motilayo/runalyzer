@@ -34,9 +34,8 @@ struct DashboardView: View {
     @State private var isFetchingInsight = false
     @State private var isShowingWorkoutPreview: Bool = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
-    @State private var isSchedulingWatch: Bool = false
-    @State private var scheduledWatchSuccess: Bool = false
 
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
@@ -432,6 +431,13 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 Button(action: {
                     activeWorkoutPlan = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget).buildWorkoutPlan()
+                    pendingWatchDrillDTO = DrillPrescriptionDTO(
+                        title: template.title,
+                        preRunDrillId: primerId.rawValue,
+                        purpose: template.defaultPurpose,
+                        targetCadence: computedTarget,
+                        previousCadence: baseCadence
+                    )
                     isShowingWorkoutPreview = true
                 }) {
                     HStack(spacing: 6) {
@@ -447,44 +453,18 @@ struct DashboardView: View {
                 }
 
                 Button(action: {
-                    scheduleDashboardDrillToWatch(
-                        title: template.title,
-                        drillId: primerId,
-                        purpose: template.defaultPurpose,
-                        targetCadence: computedTarget,
-                        baseCadence: baseCadence
-                    )
+                    togglePrimerCompletedToday()
                 }) {
                     HStack(spacing: 6) {
-                        if isSchedulingWatch {
-                            ProgressView()
-                                .tint(.white)
-                        } else if scheduledWatchSuccess {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Sent")
-                        } else {
-                            Image(systemName: "applewatch")
-                            Text("Send to Watch")
-                        }
+                        Image(systemName: isPrimerCompletedToday ? "checkmark.circle.fill" : "circle")
+                        Text(isPrimerCompletedToday ? "Completed ✓" : "Mark completed")
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(scheduledWatchSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5))
-                    .foregroundColor(.white)
+                    .background(isPrimerCompletedToday ? Color.green.opacity(0.15) : Color.orange)
+                    .foregroundColor(isPrimerCompletedToday ? .green : .white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(isSchedulingWatch)
-
-                Button(action: {
-                    togglePrimerCompletedToday()
-                }) {
-                    Image(systemName: isPrimerCompletedToday ? "checkmark.circle.fill" : "circle")
-                        .font(.title3.bold())
-                        .frame(width: 48, height: 48)
-                        .background(isPrimerCompletedToday ? Color.green.opacity(0.15) : Color(UIColor.tertiarySystemFill))
-                        .foregroundColor(isPrimerCompletedToday ? .green : .secondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
@@ -494,37 +474,27 @@ struct DashboardView: View {
         .cornerRadius(16)
         .padding(.horizontal)
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
+        .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
+            if oldValue && !newValue, let dto = pendingWatchDrillDTO {
+                pendingWatchDrillDTO = nil
+                scheduleDashboardDrillToWatch(dto: dto)
+            }
+        }
     }
 
-    private func scheduleDashboardDrillToWatch(title: String, drillId: PreRunDrillId, purpose: String, targetCadence: Int?, baseCadence: Int) {
-        isSchedulingWatch = true
+    private func scheduleDashboardDrillToWatch(dto: DrillPrescriptionDTO) {
         Task {
             if #available(iOS 17.0, *) {
-                let dto = DrillPrescriptionDTO(
-                    title: title,
-                    preRunDrillId: drillId.rawValue,
-                    purpose: purpose,
-                    targetCadence: targetCadence,
-                    previousCadence: baseCadence
-                )
                 do {
                     let bridge = WorkoutBridge()
                     try await bridge.scheduleDrill(dto: dto)
                     await MainActor.run {
-                        self.isSchedulingWatch = false
-                        self.scheduledWatchSuccess = true
                         self.lastWatchExportTimestamp = Date().timeIntervalSince1970
-                        self.lastExportedDrillId = drillId.rawValue
+                        self.lastExportedDrillId = dto.preRunDrillId ?? ""
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 } catch {
-                    await MainActor.run {
-                        self.isSchedulingWatch = false
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    self.isSchedulingWatch = false
+                    print("[DashboardView] Failed to schedule drill: \(error.localizedDescription)")
                 }
             }
         }
