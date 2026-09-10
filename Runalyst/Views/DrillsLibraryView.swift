@@ -132,6 +132,15 @@ struct DrillsLibraryView: View {
                         .padding(.horizontal)
 
                         DrillPrimerCardView(
+                            drillId: .recoveryJog,
+                            customTitle: "Recovery Jog",
+                            customTarget: "Target: Zone 1 HR",
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
                             drillId: .zone2Run,
                             customTitle: "Zone 2 Run",
                             customTarget: "Target: Zone 2 HR",
@@ -163,6 +172,20 @@ struct DrillsLibraryView: View {
                             onStart: handleStartDrill
                         )
                         .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .neuromuscularPrimer,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .hillBounds,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
                     }
                 }
 
@@ -176,6 +199,20 @@ struct DrillsLibraryView: View {
 
                         DrillPrimerCardView(
                             drillId: .rhythmIntervals,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .tempoSurges,
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .fartlekPrimer,
                             baselineCadence: baselineCadence,
                             onStart: handleStartDrill
                         )
