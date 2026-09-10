@@ -3,7 +3,9 @@ import SwiftData
 
 /// Schema Version 1.0.0 definition for Runalyst SwiftData persistence.
 enum RunalystSchemaV1: VersionedSchema {
-    static let versionIdentifier = Schema.Version(1, 0, 0)
+    static var versionIdentifier: Schema.Version {
+        Schema.Version(1, 0, 0)
+    }
 
     static var models: [any PersistentModel.Type] {
         [
