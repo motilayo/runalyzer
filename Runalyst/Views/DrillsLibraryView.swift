@@ -255,6 +255,9 @@ struct DrillPrimerCardView: View {
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
     @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @State private var showingTargetExplainer = false
+    @State private var isScheduling = false
+    @State private var scheduledSuccess = false
+    @State private var errorMessage: String?
 
     private var selectedHapticMode: HapticFeedbackMode {
         get { HapticFeedbackMode(rawValue: selectedHapticModeRaw) ?? .on }
@@ -407,29 +410,60 @@ struct DrillPrimerCardView: View {
                 }
             }
 
-            // Single Action Button: Start Drill
-            Button(action: {
-                startDrill(
-                    title: displayTitle,
-                    purpose: purpose,
-                    targetCadence: targetCadence,
-                    duration: selectedDuration,
-                    hapticMode: selectedHapticMode
-                )
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "play.fill")
-                        .foregroundColor(.white)
-                    Text("Start Drill")
-                        .foregroundColor(.white)
+            // Action Buttons
+            HStack(spacing: 12) {
+                Button(action: {
+                    startPreview(targetCadence: targetCadence)
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.fill")
+                        Text("Start")
+                    }
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
                 }
-                .font(.subheadline.bold())
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.green)
-                .cornerRadius(12)
+
+                Button(action: {
+                    scheduleToWatch(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
+                }) {
+                    HStack(spacing: 6) {
+                        if isScheduling {
+                            ProgressView()
+                                .tint(.white)
+                        } else if scheduledSuccess {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Loaded")
+                        } else {
+                            Image(systemName: "applewatch")
+                            Text("Load to Watch")
+                        }
+                    }
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        scheduledSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5)
+                    )
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(isScheduling)
             }
             .padding(.top, 2)
+
+            if let err = errorMessage {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text(err)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
@@ -437,22 +471,21 @@ struct DrillPrimerCardView: View {
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
-    private func startDrill(
-        title: String,
-        purpose: String,
-        targetCadence: Int?,
-        duration: DrillDuration,
-        hapticMode: HapticFeedbackMode
-    ) {
+    private func startPreview(targetCadence: Int?) {
         let drill = PreRunDrill(
             id: drillId,
             previousCadence: baselineCadence,
             targetCadence: targetCadence,
-            duration: duration,
-            hapticMode: hapticMode
+            duration: selectedDuration,
+            hapticMode: selectedHapticMode
         )
         let plan = drill.buildWorkoutPlan()
         onStart?(plan)
+    }
+
+    private func scheduleToWatch(title: String, purpose: String, targetCadence: Int?) {
+        isScheduling = true
+        errorMessage = nil
 
         Task {
             if #available(iOS 17.0, *) {
@@ -462,19 +495,29 @@ struct DrillPrimerCardView: View {
                     purpose: purpose,
                     targetCadence: targetCadence,
                     previousCadence: baselineCadence,
-                    durationMinutes: duration.rawValue,
-                    hapticMode: hapticMode.rawValue
+                    durationMinutes: selectedDuration.rawValue,
+                    hapticMode: selectedHapticMode.rawValue
                 )
                 do {
                     let bridge = WorkoutBridge()
                     try await bridge.scheduleDrill(dto: dto)
                     await MainActor.run {
+                        self.isScheduling = false
+                        self.scheduledSuccess = true
                         self.lastExportedDrillId = self.drillId.rawValue
                         self.lastWatchExportTimestamp = Date().timeIntervalSince1970
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 } catch {
-                    // Preview sheet is displayed; background scheduling error is non-fatal
+                    await MainActor.run {
+                        self.isScheduling = false
+                        self.errorMessage = error.localizedDescription
+                    }
+                }
+            } else {
+                await MainActor.run {
+                    self.isScheduling = false
+                    self.errorMessage = "WorkoutKit requires iOS 17.0 or newer."
                 }
             }
         }

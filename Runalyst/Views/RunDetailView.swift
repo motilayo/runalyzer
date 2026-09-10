@@ -658,13 +658,6 @@ private struct DrillCardView: View {
                     let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
                     activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
                     isShowingWorkoutPreview = true
-                    scheduleToWatch(
-                        title: drill.drillTitle,
-                        drillId: preRunId,
-                        purpose: drill.drillPurpose ?? "",
-                        targetCadence: targetInt,
-                        baseCadence: drill.previousCadence
-                    )
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "eye.fill")
@@ -679,19 +672,45 @@ private struct DrillCardView: View {
                 }
 
                 Button(action: {
-                    drill.isCompleted.toggle()
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    scheduleToWatch(
+                        title: drill.drillTitle,
+                        drillId: preRunId,
+                        purpose: drill.drillPurpose ?? "",
+                        targetCadence: targetInt,
+                        baseCadence: drill.previousCadence
+                    )
                 }) {
                     HStack(spacing: 6) {
-                        Image(systemName: drill.isCompleted ? "checkmark.circle.fill" : "circle")
-                        Text(drill.isCompleted ? "Completed ✓" : "Mark as completed")
+                        if isSchedulingWatch {
+                            ProgressView()
+                                .tint(.white)
+                        } else if scheduledWatchSuccess {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Sent")
+                        } else {
+                            Image(systemName: "applewatch")
+                            Text("Send to Watch")
+                        }
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(drill.isCompleted ? Color.green.opacity(0.15) : Color.orange)
-                    .foregroundColor(drill.isCompleted ? .green : .white)
+                    .background(scheduledWatchSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5))
+                    .foregroundColor(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(isSchedulingWatch)
+
+                Button(action: {
+                    drill.isCompleted.toggle()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }) {
+                    Image(systemName: drill.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.title3.bold())
+                        .frame(width: 48, height: 48)
+                        .background(drill.isCompleted ? Color.green.opacity(0.15) : Color(UIColor.tertiarySystemFill))
+                        .foregroundColor(drill.isCompleted ? .green : .secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding(.top, 4)

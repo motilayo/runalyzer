@@ -433,13 +433,6 @@ struct DashboardView: View {
                 Button(action: {
                     activeWorkoutPlan = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget).buildWorkoutPlan()
                     isShowingWorkoutPreview = true
-                    scheduleDashboardDrillToWatch(
-                        title: template.title,
-                        drillId: primerId,
-                        purpose: template.defaultPurpose,
-                        targetCadence: computedTarget,
-                        baseCadence: baseCadence
-                    )
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")
@@ -454,18 +447,44 @@ struct DashboardView: View {
                 }
 
                 Button(action: {
-                    togglePrimerCompletedToday()
+                    scheduleDashboardDrillToWatch(
+                        title: template.title,
+                        drillId: primerId,
+                        purpose: template.defaultPurpose,
+                        targetCadence: computedTarget,
+                        baseCadence: baseCadence
+                    )
                 }) {
                     HStack(spacing: 6) {
-                        Image(systemName: isPrimerCompletedToday ? "checkmark.circle.fill" : "circle")
-                        Text(isPrimerCompletedToday ? "Completed ✓" : "Mark completed")
+                        if isSchedulingWatch {
+                            ProgressView()
+                                .tint(.white)
+                        } else if scheduledWatchSuccess {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Sent")
+                        } else {
+                            Image(systemName: "applewatch")
+                            Text("Send to Watch")
+                        }
                     }
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(isPrimerCompletedToday ? Color.green.opacity(0.15) : Color.orange)
-                    .foregroundColor(isPrimerCompletedToday ? .green : .white)
+                    .background(scheduledWatchSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5))
+                    .foregroundColor(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(isSchedulingWatch)
+
+                Button(action: {
+                    togglePrimerCompletedToday()
+                }) {
+                    Image(systemName: isPrimerCompletedToday ? "checkmark.circle.fill" : "circle")
+                        .font(.title3.bold())
+                        .frame(width: 48, height: 48)
+                        .background(isPrimerCompletedToday ? Color.green.opacity(0.15) : Color(UIColor.tertiarySystemFill))
+                        .foregroundColor(isPrimerCompletedToday ? .green : .secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
