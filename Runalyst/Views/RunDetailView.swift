@@ -619,8 +619,12 @@ private struct DrillCardView: View {
                 .cornerRadius(10)
             }
 
+            let isZone1 = preRunId == .aerobicFlush || preRunId == .recoveryJog
             let isZone2 = preRunId == .aerobicBaseBuilder || preRunId == .zone2Run
             let targetText: String? = {
+                if isZone1 {
+                    return "Target: Zone 1 HR"
+                }
                 if isZone2 {
                     return "Target: Zone 2 HR"
                 }
@@ -654,7 +658,11 @@ private struct DrillCardView: View {
                     showingTargetExplainer = true
                 }
                 .sheet(isPresented: $showingTargetExplainer) {
-                    let explainerTitle = isZone2 ? "Zone 2 Heart Rate" : "Target Cadence"
+                    let explainerTitle: String = {
+                        if isZone1 { return "Zone 1 Heart Rate" }
+                        if isZone2 { return "Zone 2 Heart Rate" }
+                        return "Target Cadence"
+                    }()
                     let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }

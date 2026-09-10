@@ -117,7 +117,7 @@ struct DrillsLibraryView: View {
                 // Section 1: Foundation & Recovery Primers
                 if selectedCategory == "All" || selectedCategory == "Foundation" {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Foundation & Recovery Primers (10-15 Min)")
+                        Text("Foundation & Recovery Primers")
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
@@ -125,7 +125,7 @@ struct DrillsLibraryView: View {
                         DrillPrimerCardView(
                             drillId: .aerobicFlush,
                             customTitle: "Recovery Run Prep (Shakeout)",
-                            customTarget: "Target HR: 100 - 118 BPM",
+                            customTarget: "Target: Zone 1 HR",
                             baselineCadence: baselineCadence,
                             onStart: handleStartDrill
                         )
@@ -145,7 +145,7 @@ struct DrillsLibraryView: View {
                 // Section 2: Speed & Efficiency Primers
                 if selectedCategory == "All" || selectedCategory == "Speed" {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Speed & Efficiency Primers (10-15 Min)")
+                        Text("Speed & Efficiency Primers")
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
@@ -169,7 +169,7 @@ struct DrillsLibraryView: View {
                 // Section 3: Threshold & Form Primers
                 if selectedCategory == "All" || selectedCategory == "Threshold" {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Threshold & Form Primers (10-15 Min)")
+                        Text("Threshold & Form Primers")
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
@@ -299,11 +299,15 @@ struct DrillPrimerCardView: View {
         let icon = drillId.iconName
         let iconColor = drillId.iconColor
 
-        let hasCadenceTarget = drillId != .aerobicFlush && drillId != .recoveryJog && drillId != .aerobicBaseBuilder && drillId != .zone2Run
+        let isZone1 = drillId == .aerobicFlush || drillId == .recoveryJog
         let isZone2 = drillId == .aerobicBaseBuilder || drillId == .zone2Run
+        let hasCadenceTarget = !isZone1 && !isZone2
 
         let displayTargetText: String? = {
             if let customTarget = customTarget { return customTarget }
+            if isZone1 {
+                return "Target: Zone 1 HR"
+            }
             if isZone2 {
                 return "Target: Zone 2 HR"
             }
@@ -382,7 +386,7 @@ struct DrillPrimerCardView: View {
                     Text(targetText)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    if hasCadenceTarget || isZone2 {
+                    if hasCadenceTarget || isZone1 || isZone2 {
                         Image(systemName: "info.circle")
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
@@ -390,12 +394,16 @@ struct DrillPrimerCardView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    if hasCadenceTarget || isZone2 {
+                    if hasCadenceTarget || isZone1 || isZone2 {
                         showingTargetExplainer = true
                     }
                 }
                 .sheet(isPresented: $showingTargetExplainer) {
-                    let explainerTitle = isZone2 ? "Zone 2 Heart Rate" : "Target Cadence"
+                    let explainerTitle: String = {
+                        if isZone1 { return "Zone 1 Heart Rate" }
+                        if isZone2 { return "Zone 2 Heart Rate" }
+                        return "Target Cadence"
+                    }()
                     let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }

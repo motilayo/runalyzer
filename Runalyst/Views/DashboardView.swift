@@ -407,7 +407,26 @@ struct DashboardView: View {
                 .cornerRadius(10)
             }
 
-            if primerId == .aerobicBaseBuilder || primerId == .zone2Run {
+            if primerId == .aerobicFlush || primerId == .recoveryJog {
+                HStack(spacing: 4) {
+                    Image(systemName: "target")
+                        .foregroundColor(.orange)
+                        .font(.caption.bold())
+                    Text("Target: Zone 1 HR")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Image(systemName: "info.circle")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    activeExplainer = MetricExplainerInfo(
+                        explainer: MetricDetailExplainer.explainer(for: "Zone 1 Heart Rate", isWorkoutStats: false),
+                        mode: "Working Stats"
+                    )
+                }
+            } else if primerId == .aerobicBaseBuilder || primerId == .zone2Run {
                 HStack(spacing: 4) {
                     Image(systemName: "target")
                         .foregroundColor(.orange)
@@ -426,7 +445,7 @@ struct DashboardView: View {
                         mode: "Working Stats"
                     )
                 }
-            } else if primerId != .aerobicFlush && primerId != .recoveryJog {
+            } else {
                 HStack(spacing: 4) {
                     Image(systemName: "target")
                         .foregroundColor(.orange)

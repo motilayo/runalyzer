@@ -30,6 +30,16 @@ final class RunalystTests: XCTestCase {
         XCTAssertEqual(template.title, "Zone 2 Run")
         XCTAssertEqual(template.defaultEffort, "Zone 2 Aerobic")
     }
+
+    func testAerobicFlushWorkoutPlanAndTarget() {
+        let drill = PreRunDrill(id: .aerobicFlush, previousCadence: 160)
+        XCTAssertNil(drill.effectiveTargetCadence)
+        let plan = drill.buildWorkoutPlan()
+        XCTAssertNotNil(plan)
+        let template = DrillTemplate.template(for: .aerobicFlush)
+        XCTAssertEqual(template.title, "Aerobic Flush")
+        XCTAssertEqual(template.defaultEffort, "Zone 1 Active Recovery")
+    }
 }
 
 @MainActor

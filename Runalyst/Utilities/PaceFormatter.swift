@@ -99,6 +99,16 @@ struct MetricDetailExplainer {
                 whyItMatters: "Efficiency: Shows how hard your heart is working so you don't accidentally push too hard on easy days.",
                 targetRange: "Target Range: Zone 2 (easy and conversational) for building base stamina; Zone 4 for fast workouts.\n\n• High HR: Can be a sign of dehydration, heat, fatigue, or starting out too fast.\n• Controlled HR: Confirms you are running at a comfortable, sustainable effort."
             )
+        case "zone 1 hr", "target zone 1 hr", "zone 1 heart rate":
+            return MetricDetailExplainer(
+                title: "Zone 1 Heart Rate",
+                overview: "A very gentle, active-recovery effort (under 60% of maximum heart rate) designed to stimulate blood flow without fatigue.",
+                modeContext: isWorkoutStats
+                    ? "Workout Stats: Averages heart rate across your entire session, including pauses and walking."
+                    : "Working Stats: Measures your heart rate strictly while actively moving.",
+                whyItMatters: "Active Recovery: Gently circulates blood to flush out metabolic byproducts and deliver oxygen and nutrients to tired muscles, accelerating recovery.",
+                targetRange: "Target: Zone 1 HR (effortless recovery).\n\n• Effort: Effortless pace; breathing is relaxed and conversational.\n• Apple Watch: Haptic cues notify you if your heart rate creeps above Zone 1 into higher training zones."
+            )
         case "zone 2 hr", "target zone 2 hr", "zone 2 heart rate":
             return MetricDetailExplainer(
                 title: "Zone 2 Heart Rate",

@@ -381,7 +381,7 @@ struct PreRunDrill: Sendable {
 
     var defaultEffortString: String {
         switch id {
-        case .recoveryJog, .aerobicFlush: return "Easy / Zone 1-2"
+        case .recoveryJog, .aerobicFlush: return "Zone 1 Active Recovery"
         case .aerobicBaseBuilder, .zone2Run: return "Zone 2 Aerobic"
         case .cadencePyramids, .rhythmIntervals: return "Moderate / Zone 3"
         case .tempoSurges, .fartlekPrimer: return "Hard / Zone 4"
@@ -414,6 +414,8 @@ struct PreRunDrill: Sendable {
         if let target = effectiveTargetCadence {
             let cadenceValue = Double(target)
             alert = CadenceThresholdAlert.cadence(cadenceValue)
+        } else if id == .aerobicFlush || id == .recoveryJog {
+            alert = HeartRateZoneAlert(zone: 1)
         } else if id == .aerobicBaseBuilder || id == .zone2Run {
             alert = HeartRateZoneAlert(zone: 2)
         }
@@ -689,7 +691,7 @@ struct DrillTemplate: Sendable {
                 defaultPurpose: "An easy, gentle shakeout to loosen up tired legs.",
                 defaultWork: "10 min steady",
                 defaultRecovery: "No intervals",
-                defaultEffort: "Easy / Zone 1-2",
+                defaultEffort: "Zone 1 Active Recovery",
                 calculateTargetCadence: { baseline in
                     max(140, baseline)
                 },
@@ -734,7 +736,7 @@ struct DrillTemplate: Sendable {
                 defaultPurpose: "A very easy jog to get blood moving and help your legs bounce back.",
                 defaultWork: "15 min easy",
                 defaultRecovery: "No intervals",
-                defaultEffort: "Easy / Zone 1-2",
+                defaultEffort: "Zone 1 Active Recovery",
                 calculateTargetCadence: { baseline in
                     max(140, baseline)
                 },
