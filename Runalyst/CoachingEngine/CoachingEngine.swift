@@ -96,12 +96,12 @@ class CoachingEngine {
         - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided.
         - explain what the grouped trends indicate about their form and efficiency.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
-        - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog
+        - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
         - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
         - generate exactly 1 targeted drill by default; add exactly 1 second drill only when it directly reinforces the primary DIRECTIVE
         - make every returned drill highly targeted to the primary DIRECTIVE; never generate unrelated drills
         - for overstriding or excessive vertical bounce, prefer cadence_pyramids or rhythm_intervals
-        - for aerobic strain or heart-rate control, prefer rhythm_intervals
+        - for aerobic strain or heart-rate control, prefer zone_2_run or rhythm_intervals
         - for faster pace with lower heart rate, prefer tempo_surges
         - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
         - prefer one excellent drill over multiple generic drills

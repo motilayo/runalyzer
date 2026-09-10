@@ -130,6 +130,15 @@ struct DrillsLibraryView: View {
                             onStart: handleStartDrill
                         )
                         .padding(.horizontal)
+
+                        DrillPrimerCardView(
+                            drillId: .zone2Run,
+                            customTitle: "Zone 2 Run",
+                            customTarget: "Target: Zone 2 HR",
+                            baselineCadence: baselineCadence,
+                            onStart: handleStartDrill
+                        )
+                        .padding(.horizontal)
                     }
                 }
 
@@ -290,8 +299,19 @@ struct DrillPrimerCardView: View {
         let icon = drillId.iconName
         let iconColor = drillId.iconColor
 
-        let hasCadenceTarget = drillId != .aerobicFlush && drillId != .recoveryJog && drillId != .aerobicBaseBuilder
-        let displayTargetText = customTarget ?? (hasCadenceTarget ? targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" } : nil)
+        let hasCadenceTarget = drillId != .aerobicFlush && drillId != .recoveryJog && drillId != .aerobicBaseBuilder && drillId != .zone2Run
+        let isZone2 = drillId == .aerobicBaseBuilder || drillId == .zone2Run
+
+        let displayTargetText: String? = {
+            if let customTarget = customTarget { return customTarget }
+            if isZone2 {
+                return "Target: Zone 2 HR"
+            }
+            if hasCadenceTarget {
+                return targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" }
+            }
+            return nil
+        }()
 
         VStack(alignment: .leading, spacing: 14) {
             // Header
@@ -362,7 +382,7 @@ struct DrillPrimerCardView: View {
                     Text(targetText)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    if hasCadenceTarget {
+                    if hasCadenceTarget || isZone2 {
                         Image(systemName: "info.circle")
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
@@ -370,12 +390,13 @@ struct DrillPrimerCardView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    if hasCadenceTarget {
+                    if hasCadenceTarget || isZone2 {
                         showingTargetExplainer = true
                     }
                 }
                 .sheet(isPresented: $showingTargetExplainer) {
-                    let explainer = MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false)
+                    let explainerTitle = isZone2 ? "Zone 2 Heart Rate" : "Target Cadence"
+                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }
             }

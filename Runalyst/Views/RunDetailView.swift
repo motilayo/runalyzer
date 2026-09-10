@@ -619,22 +619,31 @@ private struct DrillCardView: View {
                 .cornerRadius(10)
             }
 
-            if let target = drill.targetCadence, !target.isEmpty {
-                let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+            let isZone2 = preRunId == .aerobicBaseBuilder || preRunId == .zone2Run
+            let targetText: String? = {
+                if isZone2 {
+                    return "Target: Zone 2 HR"
+                }
+                if let target = drill.targetCadence, !target.isEmpty {
+                    let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+                    if let prev = drill.previousCadence {
+                        return "Target: \(formattedTarget) (Previous: \(prev) SPM)"
+                    } else {
+                        return "Target: \(formattedTarget)"
+                    }
+                }
+                return nil
+            }()
+
+            if let targetString = targetText {
                 HStack(spacing: 4) {
                     Image(systemName: "target")
                         .foregroundColor(.orange)
                         .font(.caption.bold())
 
-                    if let prev = drill.previousCadence {
-                        Text("Target: \(formattedTarget) (Previous: \(prev) SPM)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Target: \(formattedTarget)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(targetString)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
                     Image(systemName: "info.circle")
                         .font(.caption2)
@@ -645,7 +654,8 @@ private struct DrillCardView: View {
                     showingTargetExplainer = true
                 }
                 .sheet(isPresented: $showingTargetExplainer) {
-                    let explainer = MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false)
+                    let explainerTitle = isZone2 ? "Zone 2 Heart Rate" : "Target Cadence"
+                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }
             }
