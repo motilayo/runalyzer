@@ -11,6 +11,8 @@ struct RunDetailView: View {
 
     @State private var showRawMetrics: Bool = false
     @State private var isForceAnalyzing: Bool = false
+    @State private var showingToggleInfo: Bool = false
+    @State private var showingClassificationExplainer: Bool = false
 
     private var baselineRuns: [RunRecord] {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
@@ -55,22 +57,7 @@ struct RunDetailView: View {
 
     @ViewBuilder
     private var aiDisclaimerFooter: some View {
-        VStack(spacing: 6) {
-            Divider()
-                .padding(.vertical, 4)
-
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "exclamationmark.shield.fill")
-                    .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.8))
-
-                Text("AI-generated insights are for informational purposes only and do not replace professional medical or coaching advice. Always listen to your body.")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.leading)
-            }
-        }
-        .padding(.top, 4)
+        AIDisclaimerFooter()
     }
 
     var body: some View {
@@ -84,12 +71,22 @@ struct RunDetailView: View {
                     .padding(.horizontal)
                     .padding(.top, 4)
 
-                // MARK: CoreML Override
+                // MARK: Run Classification
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Classification:")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
+                        HStack(spacing: 5) {
+                            Text("Classification:")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.primary)
+
+                            Image(systemName: "info.circle")
+                                .font(.caption)
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showingClassificationExplainer = true
+                        }
 
                         Spacer()
 
@@ -105,11 +102,25 @@ struct RunDetailView: View {
                         }
                     }
 
-                    Text("< CoreML Override")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Text("CoreML & Biometrics")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Button(action: { showingClassificationExplainer = true }) {
+                            Text("How this is calculated")
+                                .font(.caption2)
+                                .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal)
+                .sheet(isPresented: $showingClassificationExplainer) {
+                    RunClassificationExplainerSheet()
+                }
 
                 // MARK: AI Run Analysis
                 if let insight = runRecord.insight {
@@ -144,12 +155,30 @@ struct RunDetailView: View {
                 }
 
                 // MARK: Data Toggle
-                Picker("Metrics Type", selection: $showRawMetrics) {
-                    Text("Working Averages").tag(false)
-                    Text("Raw Totals (HealthKit)").tag(true)
+                HStack(spacing: 8) {
+                    Picker("Metrics Type", selection: $showRawMetrics) {
+                        Text("Working Stats").tag(false)
+                        Text("Workout Stats").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: showRawMetrics) {
+                        showingToggleInfo = true
+                    }
+
+                    Button(action: { showingToggleInfo = true }) {
+                        Image(systemName: "info.circle")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal)
+                .sheet(isPresented: $showingToggleInfo) {
+                    let explainer = MetricDetailExplainer.explainer(for: showRawMetrics ? "Workout Stats" : "Working Stats", isWorkoutStats: showRawMetrics)
+                    MetricExplainerSheet(
+                        explainer: explainer,
+                        mode: showRawMetrics ? "Workout Stats" : "Working Stats"
+                    )
+                }
 
                 // MARK: Metrics Grid
                 let columns = verticalSizeClass == .regular
@@ -161,12 +190,12 @@ struct RunDetailView: View {
                     let activeDistanceMeters = showRawMetrics ? runRecord.totalDistanceMeters : runRecord.effectiveWorkingDistanceMeters
                     let distanceConverted = useMetricSystem ? (activeDistanceMeters / 1000.0) : (activeDistanceMeters / 1609.344)
                     let distanceUnit = useMetricSystem ? "km" : "mi"
-                    StatBox(title: "Distance", value: String(format: "%.2f", distanceConverted), unit: distanceUnit)
+                    StatBox(title: "Distance", value: String(format: "%.2f", distanceConverted), unit: distanceUnit, isWorkoutStats: showRawMetrics)
 
                     let activeDuration = showRawMetrics ? runRecord.duration : runRecord.effectiveWorkingDurationSeconds
                     let minutes = Int(activeDuration) / 60
                     let seconds = Int(activeDuration) % 60
-                    StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min")
+                    StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
 
                     let currentPace: Double = {
                         if showRawMetrics {
@@ -179,113 +208,137 @@ struct RunDetailView: View {
                     let currentHR = showRawMetrics ? runRecord.rawAvgHeartRate : runRecord.workingAvgHeartRate
                     let currentCadence = showRawMetrics ? runRecord.rawAvgCadence : runRecord.workingAvgCadence
 
-                    StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace, baselineValue: showRawMetrics ? nil : baselinePace, polarity: .lowerIsBetter)
-                    StatBox(title: "Avg HR", value: "\(Int(currentHR))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter)
-                    StatBox(title: "Avg Cadence", value: "\(Int(currentCadence))", unit: "SPM", currentValue: currentCadence, baselineValue: showRawMetrics ? nil : baselineCadence, polarity: .higherIsBetter)
+                    StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace, baselineValue: showRawMetrics ? nil : baselinePace, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg HR", value: "\(Int(currentHR))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg Cadence", value: "\(Int(currentCadence))", unit: "SPM", currentValue: currentCadence, baselineValue: showRawMetrics ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
 
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
                     StatBox(
                         title: "Vert. Osc.",
-                        value: currentOscillation != nil ? String(format: "%.1f", currentOscillation!) : "--",
+                        value: currentOscillation.map { String(format: "%.1f", $0) } ?? "--",
                         unit: currentOscillation != nil ? "cm" : "",
                         currentValue: currentOscillation,
                         baselineValue: showRawMetrics ? nil : baselineOscillation,
-                        polarity: .lowerIsBetter
+                        polarity: .lowerIsBetter,
+                        isWorkoutStats: showRawMetrics
                     )
                 }
                 .padding(.horizontal)
 
-                // MARK: Recommended Pre-Run Corrective Drills
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Recommended Pre-Run Corrective Drills")
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                // MARK: Drills Section
+                let isOlderThan7Days = (Calendar.current.dateComponents([.day], from: runRecord.date, to: Date()).day ?? 0) > 7
 
-                    NavigationLink(destination: DrillsLibraryView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "stopwatch")
-                                .foregroundColor(.secondary)
-                                .font(.title3)
+                if isOlderThan7Days {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Pre-Run Drills")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                let drillTitle = runRecord.insight?.drillRecommendation?.drillTitle ?? "Cadence Correction Drill"
-                                Text(drillTitle)
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.primary)
-                                Text("10-12 min targeted neuromuscular primer")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                        VStack(spacing: 12) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "figure.run.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.accentColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Drills Library")
+                                        .font(.subheadline.bold())
+                                    Text("Drill recommendations are tailored for recent runs. Explore all pre-run technique drills in the library.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
                             }
 
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption.bold())
-                                .foregroundColor(.secondary)
+                            NavigationLink(destination: DrillsLibraryView()) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "list.bullet.rectangle.portrait.fill")
+                                    Text("View All Drills")
+                                }
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
                         }
-                        .padding(16)
+                        .padding()
                         .background(Color(UIColor.secondarySystemGroupedBackground))
-                        .cornerRadius(14)
-                        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                        .cornerRadius(20)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                } else if let insight = runRecord.insight {
+                    if let drills = insight.drillRecommendations, !drills.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Recommended Drills")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                NavigationLink(destination: DrillsLibraryView()) {
+                                    HStack(spacing: 2) {
+                                        Text("All Drills")
+                                        Image(systemName: "chevron.right")
+                                    }
+                                    .font(.caption.bold())
+                                    .foregroundColor(.accentColor)
+                                }
+                            }
+                            .padding(.horizontal)
+
+                            DrillDeckView(drills: drills)
+                        }
+                        .padding(.top, 12)
+                    }
+                } else {
+                    AnimatedLoadingView(
+                        text: "Generating Coaching Insight...",
+                        isHorizontal: false,
+                        imageSize: 60,
+                        textFont: .subheadline,
+                        textColor: .secondary,
+                        iconColor: .purple,
+                        spacing: 20
+                    )
+                    .multilineTextAlignment(.center)
+                    .frame(minHeight: 1)
+                    .padding(32)
+                }
+            }
+            .padding(.vertical)
+            .task(id: runRecord.id) {
+                let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
+                   (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
+                let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
+                if needsOscRepair || needsWorkingRepair {
+                    if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
+                        let engine = FramboiseEngine()
+                        if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
+                            runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
+                            runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+                            runRecord.workingDistanceMeters = dto.workingDistanceMeters
+                            runRecord.workingDurationSeconds = dto.workingDurationSeconds
+                            runRecord.workingAvgPace = dto.workingAvgPace
+                            try? modelContext.save()
+                        }
                     }
                 }
-                .padding(.horizontal)
 
-                // MARK: Drill Generator
-                let olderThan7Days = Calendar.current.dateComponents([.day], from: runRecord.date, to: Date()).day ?? 0 > 7
-
-                if !olderThan7Days {
-                    if let insight = runRecord.insight {
-                        if let drills = insight.drillRecommendations, !drills.isEmpty {
-                            DrillDeckView(drills: drills)
-                                .padding(.top, 24)
-                        }
-                    } else {
-                        AnimatedLoadingView(
-                            text: "Generating Coaching Insight...",
-                            isHorizontal: false,
-                            imageSize: 60,
-                            textFont: .subheadline,
-                            textColor: .secondary,
-                            iconColor: .purple,
-                            spacing: 20
-                        )
-                        .multilineTextAlignment(.center)
-                        .frame(minHeight: 1)
-                        .padding(32)
-                        .task(id: runRecord.id) {
-                            let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
-                               (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
-                            let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
-                            if needsOscRepair || needsWorkingRepair {
-                                if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
-                                    let engine = FramboiseEngine()
-                                    if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
-                                        runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
-                                        runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
-                                        runRecord.workingDistanceMeters = dto.workingDistanceMeters
-                                        runRecord.workingDurationSeconds = dto.workingDurationSeconds
-                                        runRecord.workingAvgPace = dto.workingAvgPace
-                                        try? modelContext.save()
-                                    }
-                                }
-                            }
-
-                            if runRecord.insight == nil {
-                                let container = modelContext.container
-                                let runId = runRecord.persistentModelID
-                                if #available(iOS 26.0, *) {
-                                    Task.detached {
-                                        let analyzer = RunAnalyzerActor(modelContainer: container)
-                                        await analyzer.generateAnalysis(for: runId)
-                                    }
-                                }
-                            }
+                if runRecord.insight == nil {
+                    let container = modelContext.container
+                    let runId = runRecord.persistentModelID
+                    if #available(iOS 26.0, *) {
+                        Task.detached {
+                            let analyzer = RunAnalyzerActor(modelContainer: container)
+                            await analyzer.generateAnalysis(for: runId)
                         }
                     }
                 }
             }
-            .padding(.vertical)
         }
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80)
@@ -315,33 +368,26 @@ struct StatBox: View {
     var title: String
     var value: String
     var unit: String
-    var currentValue: Double? = nil
-    var baselineValue: Double? = nil
-    var polarity: MetricPolarity? = nil
+    var currentValue: Double?
+    var baselineValue: Double?
+    var polarity: MetricPolarity?
+    var isWorkoutStats: Bool = false
 
     @State private var showingInfo = false
 
-    private var definition: String {
-        switch title.lowercased() {
-        case "distance": return "The total distance covered during your run."
-        case "total time": return "The total elapsed time of your run."
-        case "avg pace": return "Your working average speed, excluding dead stops."
-        case "raw pace": return "Raw pace including dead stops."
-        case "avg hr": return "Your working average heart rate."
-        case "raw hr": return "Raw heart rate."
-        case "avg cadence": return "Your working average step rate (SPM)."
-        case "raw cadence": return "Raw step rate."
-        case "pace cv": return "Pace Coefficient of Variation."
-        default: return "A running metric."
-        }
-    }
-
     var body: some View {
+        let explainer = MetricDetailExplainer.explainer(for: title, isWorkoutStats: isWorkoutStats)
+
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .textCase(.uppercase)
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.7))
+            }
 
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
@@ -371,13 +417,14 @@ struct StatBox: View {
         .contentShape(Rectangle())
         .onTapGesture { showingInfo = true }
         .sheet(isPresented: $showingInfo) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(title).font(.headline)
-                Text(definition).font(.subheadline).foregroundColor(.secondary)
-            }
-            .padding()
-            .presentationDetents([.height(200)])
-            .presentationDragIndicator(.visible)
+            MetricExplainerSheet(
+                title: explainer.title,
+                mode: isWorkoutStats ? "Workout Stats" : "Working Stats",
+                overview: explainer.overview,
+                modeContext: explainer.modeContext,
+                whyItMatters: explainer.whyItMatters,
+                targetRange: explainer.targetRange
+            )
         }
     }
 }
@@ -405,7 +452,6 @@ struct DrillDeckView: View {
     var drills: [DrillRecommendation]
     @State private var activeCardIndex: Int = 0
     @State private var offset: CGSize = .zero
-    @Environment(\.dismiss) private var dismiss
 
     private func updateDragOffset(_ translation: CGSize, isActive: Bool) {
         guard isActive else { return }
@@ -427,12 +473,8 @@ struct DrillDeckView: View {
             drill: drill,
             drillIndex: index,
             totalDrills: totalDrills,
-            activeCardIndex: $activeCardIndex,
-            dismiss: dismiss
+            activeCardIndex: $activeCardIndex
         )
-        .frame(maxWidth: .infinity, minHeight: 1)
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color(UIColor.secondarySystemGroupedBackground)))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15), lineWidth: 1))
         .overlay(RoundedRectangle(cornerRadius: 20).fill(Color.black.opacity(relativeIndex == 0 ? 0 : 0.3)))
         .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
@@ -443,24 +485,35 @@ struct DrillDeckView: View {
         .padding(.horizontal)
         .padding(.bottom, 20)
         .gesture(
-            DragGesture().onChanged { g in updateDragOffset(g.translation, isActive: relativeIndex == 0) }
+            DragGesture(minimumDistance: 15).onChanged { dragGesture in updateDragOffset(dragGesture.translation, isActive: relativeIndex == 0) }
             .onEnded { _ in finishDrag(isActive: relativeIndex == 0, totalDrills: totalDrills) }
         )
     }
 
     var body: some View {
         let sortedDrills = drills.sorted { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }
-        ZStack(alignment: .top) {
-            ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
-                let relativeIndex = index - activeCardIndex
-                if relativeIndex >= 0 && relativeIndex < 3 {
-                    deckCard(currentDrill, index: index, totalDrills: sortedDrills.count)
+        if sortedDrills.count == 1, let firstDrill = sortedDrills.first {
+            DrillCardView(
+                drill: firstDrill,
+                drillIndex: 0,
+                totalDrills: 1,
+                activeCardIndex: $activeCardIndex
+            )
+            .padding(.horizontal)
+            .padding(.bottom, 20)
+        } else {
+            ZStack(alignment: .top) {
+                ForEach(Array(sortedDrills.enumerated()), id: \.element.id) { index, currentDrill in
+                    let relativeIndex = index - activeCardIndex
+                    if relativeIndex >= 0 && relativeIndex < 3 {
+                        deckCard(currentDrill, index: index, totalDrills: sortedDrills.count)
+                    }
                 }
             }
+            .padding(.bottom, 40)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: offset)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: activeCardIndex)
         }
-        .padding(.bottom, 40)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: offset)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: activeCardIndex)
     }
 }
 
@@ -469,195 +522,211 @@ private struct DrillCardView: View {
     let drillIndex: Int
     let totalDrills: Int
     @Binding var activeCardIndex: Int
-    let dismiss: DismissAction
-    
-    @State private var isSchedulingWorkout = false
-    @State private var workoutHandoffError: String?
-    @State private var workoutHandoffSucceeded = false
-    @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var isShowingWorkoutPreview = false
+    @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
+    @State private var showingTargetExplainer = false
+    @State private var isSchedulingWatch = false
+    @State private var scheduledWatchSuccess = false
+    @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
+    @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center) {
+        let preRunId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
+        let template = DrillTemplate.template(for: preRunId)
+        let displayTitle = drill.drillTitle.isEmpty ? template.title : drill.drillTitle
+        let work = (drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork
+        let recovery = (drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery
+        let effort = (drill.drillEffort?.isEmpty == false ? drill.drillEffort : nil) ?? template.defaultEffort
+        let purpose = (drill.drillPurpose?.isEmpty == false ? drill.drillPurpose : nil) ?? template.defaultPurpose
+
+        VStack(alignment: .leading, spacing: 12) {
+            if totalDrills > 1 {
                 HStack(spacing: 4) {
                     ForEach(0..<totalDrills, id: \.self) { barIndex in
-                        Capsule().fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3)).frame(width: 16, height: 4)
+                        Capsule()
+                            .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
+                            .frame(width: 16, height: 4)
                     }
                 }
-                Spacer()
-                Button(action: { dismiss() }) { Image(systemName: "xmark.circle.fill").font(.title3).foregroundColor(.secondary) }
+                .padding(.bottom, 2)
             }
 
-            Text("DRILL \(String(format: "%02d", drillIndex + 1))")
-                .font(.caption).fontWeight(.bold).textCase(.uppercase).foregroundColor(.secondary)
-            if !drill.drillTitle.isEmpty {
-                Text(drill.drillTitle).font(.title).fontWeight(.bold).foregroundColor(.primary)
-            }
+            let drillIcon = PreRunDrill.iconName(for: drill.preRunDrillId, title: displayTitle)
+            let drillColor = PreRunDrill.iconColor(for: drill.preRunDrillId, title: displayTitle)
 
-            VStack(alignment: .leading, spacing: 12) {
-                DrillRow(icon: "target", text: drill.drillPurpose ?? "")
-                DrillRow(icon: "repeat", text: drill.drillWork ?? "")
-                DrillRow(icon: "moon.zzz", text: drill.drillRecovery ?? "")
-                DrillRow(icon: "brain.head.profile", text: drill.drillCues ?? "")
-                DrillRow(icon: "bolt", text: drill.drillEffort ?? "")
-            }
-
-            if let target = drill.targetCadence, let prev = drill.previousCadence, !target.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Cadence Goal").font(.caption).foregroundColor(.secondary)
-                    Text("Current: \(prev) SPM → Target: \(target)").font(.subheadline.bold()).foregroundColor(.primary)
-                }
-                .padding(.top, 4)
-            }
-            
-            // WorkoutKit Buttons
-            if #available(iOS 17.0, *) {
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            startDrill()
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "play.fill")
-                                    .foregroundColor(.white)
-                                Text("Start Drill")
-                                    .foregroundColor(.white)
-                            }
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        
-                        Button(action: {
-                            scheduleDrill()
-                        }) {
-                            HStack(spacing: 6) {
-                                if isSchedulingWorkout {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else if workoutHandoffSucceeded {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.white)
-                                    Text("Sent")
-                                        .foregroundColor(.white)
-                                } else {
-                                    Image(systemName: "applewatch")
-                                        .foregroundColor(.white)
-                                    Text("Send to Watch")
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(
-                                workoutHandoffSucceeded ? Color.blue :
-                                    (drill.isCompleted ? Color.secondary.opacity(0.3) : Color(red: 0.05, green: 0.45, blue: 0.5))
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .disabled(isSchedulingWorkout || drill.isCompleted || workoutHandoffSucceeded)
-                    }
-
-                    if let error = workoutHandoffError {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                            Text(error)
-                        }
+            HStack(spacing: 8) {
+                Image(systemName: drillIcon)
+                    .foregroundColor(drillColor)
+                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayTitle)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("10–15 min drill")
                         .font(.caption)
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                        .foregroundColor(.secondary)
                 }
-            }
 
-            Spacer(minLength: 16)
-
-            HStack {
-                if activeCardIndex > 0 {
-                    Button("Back") { withAnimation(.spring()) { activeCardIndex -= 1 } }.font(.subheadline.bold()).foregroundColor(.secondary)
-                } else {
-                    Button("Skip") { withAnimation(.spring()) { if activeCardIndex < totalDrills - 1 { activeCardIndex += 1 } } }.font(.subheadline.bold()).foregroundColor(.secondary)
-                }
                 Spacer()
-                if activeCardIndex < totalDrills - 1 {
-                    Button(action: { withAnimation(.spring()) { activeCardIndex += 1 } }) {
-                        Text("Next").font(.subheadline.bold()).foregroundColor(.white).padding(.horizontal, 24).padding(.vertical, 12).background(Color.accentColor).clipShape(Capsule())
-                    }
-                } else {
-                    Button(action: {
-                        drill.isCompleted = true
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
-                    }) {
-                        Text(drill.isCompleted ? "Completed" : "Mark Completed")
-                            .font(.subheadline.bold()).foregroundColor(Color.white).padding(.horizontal, 24).padding(.vertical, 12).background(drill.isCompleted ? Color.green : Color.accentColor).clipShape(Capsule())
-                    }
+            }
+
+            if !purpose.isEmpty {
+                Text(purpose)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 16) {
+                if !work.isEmpty {
+                    Label(work, systemImage: "repeat")
+                        .font(.caption.bold())
+                        .foregroundColor(.primary)
+                }
+                if !recovery.isEmpty {
+                    Label(recovery, systemImage: "moon.zzz")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                if !effort.isEmpty {
+                    Label(effort, systemImage: "bolt.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
+
+            let cue: String? = {
+                if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
+                    return cueText
+                }
+                let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+                let generated = template.generateInstructionalCue(targetInt)
+                return generated.isEmpty ? nil : generated
+            }()
+
+            if let cue = cue, !cue.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text(cue)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(UIColor.tertiarySystemFill))
+                .cornerRadius(10)
+            }
+
+            if let target = drill.targetCadence, !target.isEmpty {
+                let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+                HStack(spacing: 4) {
+                    Image(systemName: "target")
+                        .foregroundColor(.orange)
+                        .font(.caption.bold())
+
+                    if let prev = drill.previousCadence {
+                        Text("Target: \(formattedTarget) (Previous: \(prev) SPM)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Target: \(formattedTarget)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Image(systemName: "info.circle")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    showingTargetExplainer = true
+                }
+                .sheet(isPresented: $showingTargetExplainer) {
+                    let explainer = MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false)
+                    MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
+                }
+            }
+
+            let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+
+            HStack(spacing: 12) {
+                Button(action: {
+                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
+                    activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
+                    isShowingWorkoutPreview = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "eye.fill")
+                        Text("View")
+                    }
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color(UIColor.tertiarySystemFill))
+                    .foregroundColor(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                Button(action: {
+                    drill.isCompleted.toggle()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: drill.isCompleted ? "checkmark.circle.fill" : "circle")
+                        Text(drill.isCompleted ? "Completed ✓" : "Mark as completed")
+                    }
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(drill.isCompleted ? Color.green.opacity(0.15) : Color.orange)
+                    .foregroundColor(drill.isCompleted ? .green : .white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(.top, 4)
         }
-        .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
         .frame(maxWidth: .infinity, minHeight: 1)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(20)
+        .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
     }
-    
-    private func startDrill() {
-        let preRunId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
-        let targetCadence = Int(drill.targetCadence?.components(separatedBy: CharacterSet.decimalDigits.inverted).joined() ?? "") ?? nil
-        let drillObj = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetCadence)
-        activeWorkoutPlan = drillObj.buildWorkoutPlan()
-        isShowingWorkoutPreview = true
-    }
-    
-    private func scheduleDrill() {
-        if drill.isCompleted {
-            return
-        }
 
-        isSchedulingWorkout = true
-        workoutHandoffError = nil
-        workoutHandoffSucceeded = false
-
+    private func scheduleToWatch(title: String, drillId: PreRunDrillId, purpose: String, targetCadence: Int?, baseCadence: Int?) {
+        isSchedulingWatch = true
         Task {
-            guard WorkoutScheduler.isSupported else {
-                workoutHandoffError = "Workout scheduling is unavailable on this device."
-                isSchedulingWorkout = false
-                return
-            }
-
-            let authorizationState = await WorkoutScheduler.shared.requestAuthorization()
-            guard authorizationState == .authorized else {
-                workoutHandoffError = "WorkoutKit authorization is required to send this drill to Apple Watch."
-                isSchedulingWorkout = false
-                return
-            }
-
-            let dto = DrillPrescriptionDTO(
-                title: drill.drillTitle,
-                preRunDrillId: drill.preRunDrillId,
-                purpose: drill.drillPurpose ?? "",
-                targetCadence: Int(drill.targetCadence?.components(separatedBy: CharacterSet.decimalDigits.inverted).joined() ?? "") ?? nil,
-                previousCadence: drill.previousCadence
-            )
-            do {
-                let bridge = WorkoutBridge()
-                try await bridge.scheduleDrill(dto: dto)
-
-                drill.isCompleted = true
-                isSchedulingWorkout = false
-                workoutHandoffSucceeded = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                try? await Task.sleep(for: .seconds(1.2))
-                dismiss()
-            } catch {
-                workoutHandoffError = "Failed to schedule workout: \(error.localizedDescription)"
-                isSchedulingWorkout = false
-            }
+            if #available(iOS 17.0, *) {
+                let dto = DrillPrescriptionDTO(
+                    title: title,
+                    preRunDrillId: drillId.rawValue,
+                    purpose: purpose,
+                    targetCadence: targetCadence,
+                    previousCadence: baseCadence
+                )
+                do {
+                    let bridge = WorkoutBridge()
+                    try await bridge.scheduleDrill(dto: dto)
+                    await MainActor.run {
+                        self.isSchedulingWatch = false
+                        self.scheduledWatchSuccess = true
+                        self.lastWatchExportTimestamp = Date().timeIntervalSince1970
+                        self.lastExportedDrillId = drillId.rawValue
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.isSchedulingWatch = false
+                    }
+                }
+            } else {
+                await MainActor.run {
+                    self.isSchedulingWatch = false
+                }
         }
     }
+}
 }

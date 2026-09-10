@@ -1,4 +1,10 @@
+# OS & IDE
 .DS_Store
+*.swp
+*~
+.idea/
+
+# Xcode & Developer Settings
 DeveloperSettings.xcconfig
 *.xcodeproj/project.xcworkspace/
 *.xcodeproj/xcuserdata/
@@ -6,3 +12,28 @@ Runalyzer.xcodeproj/
 Build/
 DerivedData/
 *.xcuserstate
+*.xcbkptlist
+*.xcscmblueprint
+
+# Security & Secrets
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.key
+*.pem
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+
+# Fastlane (if ever introduced)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Swift Package Manager & Tools
+.build/
+.swiftpm/

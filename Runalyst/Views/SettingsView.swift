@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 import HealthKit
-import WorkoutKit
+@preconcurrency import WorkoutKit
 
 struct SettingsView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
@@ -12,10 +12,16 @@ struct SettingsView: View {
     var onForceSync: ((Bool) async -> Void)?
 
     @State private var showSyncAlert = false
-    @State private var showClearCacheAlert = false
     @State private var showResetModelAlert = false
     @State private var isSeeding = false
     @State private var seedingSuccess = false
+
+    @State private var healthAuthStatus: String = "Checking..."
+    @State private var workoutKitAuthStatus: String = "Checking..."
+    @State private var canRequestHealth: Bool = false
+    @State private var canRequestWorkoutKit: Bool = false
+    @State private var showHealthSettingsAlert = false
+    @State private var showWorkoutKitSettingsAlert = false
 
     var body: some View {
         Form {
@@ -42,9 +48,9 @@ struct SettingsView: View {
                         Text("Unit System")
                             .font(.body)
                     }
-                    
+
                     Spacer()
-                    
+
                     Picker("Unit System", selection: $useMetricSystem) {
                         Text("Metric").tag(true)
                         Text("Imperial").tag(false)
@@ -55,56 +61,114 @@ struct SettingsView: View {
             }
 
             // MARK: - Permissions & Sync
-            Section(header: Text("Permissions & Sync")) {
-                HStack(spacing: 12) {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.title3)
-                    Text("Apple Health Data")
-                        .font(.body)
-                    Spacer()
-                    Text("Synced")
-                        .font(.subheadline.bold())
-                        .foregroundColor(Color(red: 0.1, green: 0.6, blue: 0.6))
+            Section(
+                header: Text("Permissions & Sync"),
+                footer: Text("Tap a permission to request access directly in the app.")
+            ) {
+                Button(action: {
+                    Task {
+                        let prevStatus = try? await HealthKitManager.shared.getRequestStatusForAuthorization()
+                        do {
+                            try await HealthKitManager.shared.requestAuthorization()
+                            await updateHealthKitStatus()
+                            if let onForceSync = onForceSync {
+                                await onForceSync(false)
+                            }
+                        } catch {
+                            print("Health authorization error: \(error.localizedDescription)")
+                        }
+
+                        if prevStatus == .unnecessary {
+                            showHealthSettingsAlert = true
+                        }
+                    }
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                            .font(.title3)
+                        Text("Apple Health Data")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Text(healthAuthStatus)
+                            .font(.subheadline.bold())
+                            .foregroundColor(healthAuthStatus == "Connected" ? Color(red: 0.1, green: 0.6, blue: 0.6) : (healthAuthStatus == "Not Connected" ? .orange : .secondary))
+                    }
+                }
+                .alert("Apple Health Permissions", isPresented: $showHealthSettingsAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("HealthKit permissions are already configured. Runalyst has access to your workouts and running biometrics.")
                 }
 
-                HStack(spacing: 12) {
-                    Image(systemName: "applewatch")
-                        .foregroundColor(.primary)
-                        .font(.title3)
-                    Text("WorkoutKit Handoff")
-                        .font(.body)
-                    Spacer()
-                    Text("Granted")
-                        .font(.subheadline.bold())
-                        .foregroundColor(Color(red: 0.1, green: 0.6, blue: 0.6))
+                Button(action: {
+                    Task {
+                        if #available(iOS 17.0, *) {
+                            let prevState = await WorkoutScheduler.shared.authorizationState
+                            _ = await WorkoutScheduler.shared.requestAuthorization()
+                            await updateWorkoutKitStatus()
+                            if prevState != .notDetermined {
+                                showWorkoutKitSettingsAlert = true
+                            }
+                        } else {
+                            showWorkoutKitSettingsAlert = true
+                        }
+                    }
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "applewatch")
+                            .foregroundColor(.primary)
+                            .font(.title3)
+                        Text("WorkoutKit Handoff")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Text(workoutKitAuthStatus)
+                            .font(.subheadline.bold())
+                            .foregroundColor(workoutKitAuthStatus == "Granted" ? Color(red: 0.1, green: 0.6, blue: 0.6) : (workoutKitAuthStatus == "Denied" ? .red : .secondary))
+                    }
+                }
+                .alert("WorkoutKit Handoff", isPresented: $showWorkoutKitSettingsAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("WorkoutKit permission is already \(workoutKitAuthStatus.lowercased()) on this device.")
                 }
             }
 
             // MARK: - Data Management
             Section(
                 header: Text("Data Management"),
-                footer: Text("(Re-fetches recent workouts and rebuilds macro stats)")
+                footer: Text("Re-fetches recent workouts from Apple Health, wipes local records and cache, and regenerates fresh AI insights.")
             ) {
                 Button(action: { showSyncAlert = true }) {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .foregroundColor(.teal)
                             .font(.title3)
-                        Text("Resync Health Data")
+                        Text("Resync Health Data & Rebuild AI Insights")
                             .foregroundColor(.primary)
                         Spacer()
                     }
                 }
-                .alert("Force Re-Sync", isPresented: $showSyncAlert) {
+                .alert("Resync & Rebuild Insights", isPresented: $showSyncAlert) {
                     Button("Cancel", role: .cancel) {}
-                    Button("Re-Sync", role: .destructive) {
+                    Button("Resync & Rebuild", role: .destructive) {
+                        for run in runRecords {
+                            run.insight = nil
+                        }
+                        try? modelContext.save()
+                        UserDefaults.standard.removeObject(forKey: "cachedHeadline_7Day")
+                        UserDefaults.standard.removeObject(forKey: "cachedBody_7Day")
+                        UserDefaults.standard.removeObject(forKey: "cachedHeadline_30Day")
+                        UserDefaults.standard.removeObject(forKey: "cachedBody_30Day")
+                        UserDefaults.standard.removeObject(forKey: "cachedHeadline_AllTime")
+                        UserDefaults.standard.removeObject(forKey: "cachedBody_AllTime")
                         if let onForceSync = onForceSync {
                             Task { await onForceSync(true) }
                         }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 } message: {
-                    Text("This will delete all locally saved run records and re-fetch them from Apple Health. This cannot be undone.")
+                    Text("This will delete all locally saved run records, clear cached AI insights, and re-fetch them from Apple Health. This cannot be undone.")
                 }
 
                 #if DEBUG
@@ -181,40 +245,6 @@ struct SettingsView: View {
                 } message: {
                     Text("This resets the on-device runner classification queue back to baseline.")
                 }
-
-                Button(action: { showClearCacheAlert = true }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.orange)
-                            .font(.title3)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Clear AI Insights Cache")
-                                .foregroundColor(.primary)
-                            Text("(Forces a fresh AI analysis on your next dashboard load)")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                }
-                .alert("Clear AI Cache", isPresented: $showClearCacheAlert) {
-                    Button("Cancel", role: .cancel) {}
-                    Button("Clear", role: .destructive) {
-                        for run in runRecords {
-                            run.insight = nil
-                        }
-                        try? modelContext.save()
-                        UserDefaults.standard.removeObject(forKey: "cachedHeadline_7Day")
-                        UserDefaults.standard.removeObject(forKey: "cachedBody_7Day")
-                        UserDefaults.standard.removeObject(forKey: "cachedHeadline_30Day")
-                        UserDefaults.standard.removeObject(forKey: "cachedBody_30Day")
-                        UserDefaults.standard.removeObject(forKey: "cachedHeadline_AllTime")
-                        UserDefaults.standard.removeObject(forKey: "cachedBody_AllTime")
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    }
-                } message: {
-                    Text("This clears all cached AI insights for your runs and dashboard. Fresh insights will generate automatically.")
-                }
             }
 
             // MARK: - About
@@ -232,6 +262,81 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await refreshPermissions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await refreshPermissions()
+            }
+        }
+    }
+
+    private func refreshPermissions() async {
+        await updateHealthKitStatus()
+        await updateWorkoutKitStatus()
+    }
+
+    private func updateHealthKitStatus() async {
+        guard HealthKitManager.shared.isHealthDataAvailable() else {
+            await MainActor.run {
+                self.healthAuthStatus = "Unavailable"
+                self.canRequestHealth = false
+            }
+            return
+        }
+
+        do {
+            let status = try await HealthKitManager.shared.getRequestStatusForAuthorization()
+            await MainActor.run {
+                switch status {
+                case .shouldRequest:
+                    self.healthAuthStatus = "Not Connected"
+                    self.canRequestHealth = true
+                case .unnecessary:
+                    self.healthAuthStatus = runRecords.isEmpty ? "Manage" : "Connected"
+                    self.canRequestHealth = false
+                case .unknown:
+                    self.healthAuthStatus = "Manage"
+                    self.canRequestHealth = false
+                @unknown default:
+                    self.healthAuthStatus = "Manage"
+                    self.canRequestHealth = false
+                }
+            }
+        } catch {
+            await MainActor.run {
+                self.healthAuthStatus = runRecords.isEmpty ? "Manage" : "Connected"
+                self.canRequestHealth = false
+            }
+        }
+    }
+
+    private func updateWorkoutKitStatus() async {
+        if #available(iOS 17.0, *) {
+            let state = await WorkoutScheduler.shared.authorizationState
+            await MainActor.run {
+                switch state {
+                case .authorized:
+                    self.workoutKitAuthStatus = "Granted"
+                    self.canRequestWorkoutKit = false
+                case .denied, .restricted:
+                    self.workoutKitAuthStatus = "Denied"
+                    self.canRequestWorkoutKit = false
+                case .notDetermined:
+                    self.workoutKitAuthStatus = "Not Determined"
+                    self.canRequestWorkoutKit = true
+                @unknown default:
+                    self.workoutKitAuthStatus = "Manage"
+                    self.canRequestWorkoutKit = false
+                }
+            }
+        } else {
+            await MainActor.run {
+                self.workoutKitAuthStatus = "Unavailable"
+                self.canRequestWorkoutKit = false
+            }
+        }
     }
 }
 
@@ -260,37 +365,138 @@ struct UserProfileView: View {
 struct AboutRunalystView: View {
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Runalyst V2")
-                    .font(.title.bold())
-                
-                Text("Runalyst is your proactive, AI-driven biomechanical coach designed to sit alongside your existing training schedule.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                
-                Divider()
-                
-                Text("Key Pillars:")
-                    .font(.headline)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Pre-Run Biomechanical Primers", systemImage: "figure.run")
-                    Label("Dynamic Rolling 30-Day Baselines", systemImage: "chart.xyaxis.line")
-                    Label("On-Device Empathetic AI", systemImage: "sparkles")
-                    Label("Reactive Form Correction", systemImage: "bolt.heart")
-                    Label("Native Apple Watch WorkoutKit Handoff", systemImage: "applewatch")
+            VStack(alignment: .leading, spacing: 24) {
+                // MARK: - Hero
+                VStack(spacing: 8) {
+                    Image(systemName: "figure.run.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.linearGradient(colors: [.teal, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    Text("Runalyst")
+                        .font(.largeTitle.bold())
+                    Text("Your biomechanical running coach")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                .font(.subheadline)
-                .foregroundColor(.primary)
-                
-                Divider()
-                
-                Text("AI-generated insights are for informational and training purposes only and do not replace professional medical or coaching advice.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+
+                // MARK: - Philosophy
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Philosophy")
+                        .font(.headline)
+                    Text("Runalyst is built on a simple belief: every runner — from a first-time jogger to a seasoned competitor — deserves a coach that prioritizes long-term health over short-term speed. We focus on biomechanical efficiency, aerobic adaptation, and injury prevention so you can run better, not just faster.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineSpacing(3)
+                }
+                .padding(16)
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+
+                // MARK: - How It Works
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("How It Works")
+                        .font(.headline)
+
+                    AboutFeatureRow(
+                        icon: "waveform.path.ecg",
+                        color: .red,
+                        title: "Framboise Engine",
+                        description: "Analyzes your runs minute-by-minute, filters out stops and pauses, and shows your true running pace, cadence, and heart rate."
+                    )
+                    AboutFeatureRow(
+                        icon: "brain.head.profile",
+                        color: .purple,
+                        title: "On-Device AI Coaching",
+                        description: "Apple Foundation Models coach your running form privately on your phone. Your workout data never leaves your device."
+                    )
+                    AboutFeatureRow(
+                        icon: "chart.xyaxis.line",
+                        color: .teal,
+                        title: "Rolling Baselines",
+                        description: "Every metric is compared against your own rolling baseline — not generic textbook averages. Drills and targets adapt as you improve."
+                    )
+                    AboutFeatureRow(
+                        icon: "figure.run",
+                        color: .orange,
+                        title: "Pre-Run Primers",
+                        description: "Quick 10-minute warm-up drills designed to help your form, sent straight to your Apple Watch."
+                    )
+                    AboutFeatureRow(
+                        icon: "cpu",
+                        color: .indigo,
+                        title: "Smart Run Classification",
+                        description: "A smart on-device model labels each run (Easy, Tempo, Intervals, etc.) and learns from your adjustments over time."
+                    )
+                }
+
+                // MARK: - Privacy
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.shield.fill")
+                            .foregroundColor(.green)
+                            .font(.title3)
+                        Text("Privacy First")
+                            .font(.headline)
+                    }
+                    Text("All AI coaching, calculations, and analysis happen entirely on your device. Runalyst reads from Apple Health but never sends your data to external servers. Your running data stays with you.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineSpacing(3)
+                }
+                .padding(16)
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+
+                // MARK: - Footer
+                VStack(spacing: 12) {
+                    Divider()
+
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.shield.fill")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.8))
+                        Text("AI-generated insights are for informational and training purposes only and do not replace professional medical or coaching advice. Always listen to your body.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Text("Made with ❤️ for runners everywhere")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                }
             }
             .padding()
         }
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("About Runalyst")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct AboutFeatureRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let description: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+                .frame(width: 28, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+            }
+        }
     }
 }

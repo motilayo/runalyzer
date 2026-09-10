@@ -28,6 +28,7 @@
 		DEE345D7801E107E3983DDDE /* FramboiseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11742538A05B00142AABD16 /* FramboiseEngine.swift */; };
 		E281FD251253EC8B87980001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 580A0BC2BD569014814FB14C /* PrivacyInfo.xcprivacy */; };
 		E2BA48FFFCCF7AE4809E455B /* RunRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376830066BD295E24C449FB2 /* RunRecord.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* RunalystMigrationPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A708192A3B4C5D /* RunalystMigrationPlan.swift */; };
 		E3784833987D299F1E0A3301 /* PaceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED84D71A6E15EE3D9CFDA45 /* PaceFormatter.swift */; };
 		F20E4C048AB2389BBF14327D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35724688B362914BC9EAC058 /* ModelManager.swift */; };
 		M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */; };
@@ -51,6 +52,7 @@
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyst/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
 		35724688B362914BC9EAC058 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ModelManager.swift; path = Runalyst/Engine/ModelManager.swift; sourceTree = SOURCE_ROOT; };
 		376830066BD295E24C449FB2 /* RunRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunRecord.swift; path = Runalyst/Models/RunRecord.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A708192A3B4C5D /* RunalystMigrationPlan.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunalystMigrationPlan.swift; path = Runalyst/Models/RunalystMigrationPlan.swift; sourceTree = "<group>"; };
 		3EF4AE46EBF2F38F6B44624C /* RunalystTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunalystTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		438FD3173051C866003DEDA5 /* LiveCoachDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoachDTOs.swift; sourceTree = "<group>"; };
 		438FD3183051C866003DEDA5 /* LiveCoachEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCoachEngine.swift; sourceTree = "<group>"; };
@@ -166,6 +168,7 @@
 				8B51607F39154844B5E46210 /* CoachingInsight.swift */,
 				0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */,
 				376830066BD295E24C449FB2 /* RunRecord.swift */,
+				B2C3D4E5F6A708192A3B4C5D /* RunalystMigrationPlan.swift */,
 				2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */,
 				52FF9D9245C901D4BDBA1FFB /* RunalystApp.swift */,
 				C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */,
@@ -303,6 +306,7 @@
 				8EE242FF8F81F965BDC748CC /* WorkoutBridge.swift in Sources */,
 				A9994594B624150A24D868E9 /* DrillsLibraryView.swift in Sources */,
 				5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* RunalystMigrationPlan.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -471,7 +475,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalystTests;
 				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runalyst.app/Runalyst";
 			};
@@ -486,7 +490,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runalyzer.RunalystTests;
 				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runalyst.app/Runalyst";
 				VALIDATE_PRODUCT = YES;

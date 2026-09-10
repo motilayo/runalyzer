@@ -1,0 +1,19 @@
+# SwiftFormat configuration for Runalyst
+
+--swiftversion 6.0
+--indent 4
+--indentcase false
+--allman false
+--semicolons never
+--linebreaks lf
+--trimwhitespace always
+--stripunusedargs closure-only
+--wraparguments before-first
+--wrapparameters before-first
+--self insert
+--importgrouping testable-bottom
+--modifierorder prefer-trailing
+--disable redundantSelf
+
+# Exclude generated & build artifacts
+--exclude DerivedData,Build,.build

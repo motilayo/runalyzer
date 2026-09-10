@@ -5,10 +5,10 @@ import CoreML
 /// In the absence of a pre-trained `.mlmodel` file, this actor delegates predictions
 /// to the deterministic `FramboiseEngine` as a fallback.
 actor ModelManager {
-    
+
     // CoreML integration
     private var runClassifier: PersonalizedRunClassifier?
-    
+
     init() {
         do {
             let config = MLModelConfiguration()
@@ -17,7 +17,7 @@ actor ModelManager {
             print("Failed to load PersonalizedRunClassifier: \(error)")
         }
     }
-    
+
     /// Predicts the run type based on mathematical features using the retrained CoreML model.
     /// Enforces strict cardiac guardrails (high HR / zone4 runs are never misclassified as easy).
     func predictRunType(
@@ -46,9 +46,9 @@ actor ModelManager {
                 print("CoreML prediction failed: \(error). Falling back to FramboiseEngine.")
             }
         }
-        
+
         let framboise = FramboiseEngine()
         return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, averageHR: averageHeartRate)
     }
-    
+
 }

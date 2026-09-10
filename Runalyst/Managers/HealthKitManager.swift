@@ -2,12 +2,12 @@ import Foundation
 import HealthKit
 import SwiftData
 
-@MainActor
 protocol HKHealthStoreProtocol: AnyObject, Sendable {
     func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
     func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus
+    func statusForAuthorizationRequest(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws -> HKAuthorizationRequestStatus
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) async throws
-    func execute(_ query: HKQuery)
+    nonisolated func execute(_ query: HKQuery)
 }
 
 extension HKHealthStore: HKHealthStoreProtocol {}
@@ -17,7 +17,6 @@ enum DateFilter {
     case thirtyDays
     case allTime
 }
-
 
 struct RunRecordDTO: Sendable {
     let hkWorkoutID: UUID
@@ -63,24 +62,32 @@ class HealthKitManager: ObservableObject {
         }
     }
 
+    var allTypesToRead: Set<HKObjectType> {
+        let quantityIdentifiers: [HKQuantityTypeIdentifier] = [
+            .heartRate,
+            .runningSpeed,
+            .stepCount,
+            .distanceWalkingRunning,
+            .runningVerticalOscillation,
+            .vo2Max,
+            .runningGroundContactTime,
+            .runningStrideLength
+        ]
+        var types: Set<HKObjectType> = [HKObjectType.workoutType()]
+        for identifier in quantityIdentifiers {
+            if let type = HKObjectType.quantityType(forIdentifier: identifier) {
+                types.insert(type)
+            }
+        }
+        return types
+    }
+
     func requestAuthorization() async throws {
         guard isHealthDataAvailable() else {
             throw HKError(.errorHealthDataUnavailable)
         }
 
-        let typesToRead: Set<HKObjectType> = [
-            HKObjectType.workoutType(),
-            HKObjectType.quantityType(forIdentifier: .heartRate)!,
-            HKObjectType.quantityType(forIdentifier: .runningSpeed)!,
-            HKObjectType.quantityType(forIdentifier: .stepCount)!,
-            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
-            HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!,
-            HKObjectType.quantityType(forIdentifier: .vo2Max)!,
-            HKObjectType.quantityType(forIdentifier: .runningGroundContactTime)!,
-            HKObjectType.quantityType(forIdentifier: .runningStrideLength)!
-        ]
-
-        try await healthStore?.requestAuthorization(toShare: [], read: typesToRead)
+        try await healthStore?.requestAuthorization(toShare: [], read: allTypesToRead)
 
         let workoutStatus = healthStore?.authorizationStatus(for: HKObjectType.workoutType())
         self.isAuthorized = (workoutStatus == .sharingAuthorized) || (workoutStatus == .notDetermined)
@@ -91,6 +98,13 @@ class HealthKitManager: ObservableObject {
 
     func enableBackgroundDelivery() async throws {
         try await healthStore?.enableBackgroundDelivery(for: .workoutType(), frequency: .immediate)
+    }
+
+    func getRequestStatusForAuthorization() async throws -> HKAuthorizationRequestStatus {
+        guard isHealthDataAvailable(), let store = healthStore else {
+            return .unknown
+        }
+        return try await store.statusForAuthorizationRequest(toShare: [], read: allTypesToRead)
     }
 
     func startObservingWorkouts() {
@@ -112,7 +126,7 @@ class HealthKitManager: ObservableObject {
 
     func fetchRunningWorkouts(filter: DateFilter = .allTime) async throws -> [HKWorkout] {
         var subpredicates = [HKQuery.predicateForWorkouts(with: .running)]
-        
+
         switch filter {
         case .sevenDays:
             if let date = Calendar.current.date(byAdding: .day, value: -7, to: Date()) {
@@ -199,34 +213,65 @@ class HealthKitManager: ObservableObject {
             healthStore?.execute(query)
         }
     }
-    
+
+    func fetchVO2MaxClosestTo(date: Date) async throws -> Double? {
+        guard let quantityType = HKObjectType.quantityType(forIdentifier: .vo2Max) else {
+            return nil
+        }
+        let predicate = HKQuery.predicateForSamples(withStart: nil, end: date, options: .strictEndDate)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: quantityType,
+                predicate: predicate,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let samples = samples as? [HKQuantitySample], let first = samples.first else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let vo2 = first.quantity.doubleValue(for: HKUnit(from: "ml/kg*min"))
+                continuation.resume(returning: vo2)
+            }
+            healthStore?.execute(query)
+        }
+    }
+
     // MARK: - Bucketing & Extraction
 
     func fetchBucketedSamples(for workout: HKWorkout) async throws -> [BucketData] {
-        let distanceType = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!
-        let stepType = HKObjectType.quantityType(forIdentifier: .stepCount)!
-        let hrType = HKObjectType.quantityType(forIdentifier: .heartRate)!
-        let oscType = HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!
-        
+        guard let distanceType = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning),
+              let stepType = HKObjectType.quantityType(forIdentifier: .stepCount),
+              let hrType = HKObjectType.quantityType(forIdentifier: .heartRate),
+              let oscType = HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation) else {
+            return []
+        }
+
         async let distanceStats = fetchCollection(for: workout, type: distanceType, options: .cumulativeSum)
         async let stepStats = fetchCollection(for: workout, type: stepType, options: .cumulativeSum)
         async let hrStats = fetchCollection(for: workout, type: hrType, options: .discreteAverage)
         async let oscStats = fetchCollection(for: workout, type: oscType, options: .discreteAverage)
-        
+
         let (distances, steps, hrs, oscs) = try await (distanceStats, stepStats, hrStats, oscStats)
-        
+
         var buckets: [BucketData] = []
         var currentDate = workout.startDate
-        
+
         while currentDate < workout.endDate {
             let distance = distances[currentDate]?.sumQuantity()?.doubleValue(for: .meter()) ?? 0
             let stepCount = steps[currentDate]?.sumQuantity()?.doubleValue(for: .count()) ?? 0
             let hr = hrs[currentDate]?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())) ?? 0
             let osc = oscs[currentDate]?.averageQuantity()?.doubleValue(for: HKUnit.meterUnit(with: .centi)) ?? 0
-            
+
             let cadence = stepCount // since bucket is 1 minute
             let pace = distance > 0 ? (60.0 / (distance / 1000.0)) : 0
-            
+
             buckets.append(BucketData(
                 startTime: currentDate,
                 distanceMeters: distance,
@@ -235,13 +280,13 @@ class HealthKitManager: ObservableObject {
                 meanHR: hr,
                 meanVerticalOscillation: osc
             ))
-            
+
             currentDate = currentDate.addingTimeInterval(60)
         }
-        
+
         return buckets
     }
-    
+
     private func fetchCollection(for workout: HKWorkout, type: HKQuantityType, options: HKStatisticsOptions) async throws -> [Date: HKStatistics] {
         return try await withCheckedThrowingContinuation { continuation in
             let workoutPredicate = HKQuery.predicateForObjects(from: workout)
@@ -249,10 +294,10 @@ class HealthKitManager: ObservableObject {
             let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [workoutPredicate, datePredicate])
             var interval = DateComponents()
             interval.minute = 1
-            
+
             // Align to workout start
             let anchor = workout.startDate
-            
+
             let query = HKStatisticsCollectionQuery(
                 quantityType: type,
                 quantitySamplePredicate: predicate,
@@ -260,21 +305,21 @@ class HealthKitManager: ObservableObject {
                 anchorDate: anchor,
                 intervalComponents: interval
             )
-            
+
             query.initialResultsHandler = { _, results, error in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
                 }
-                
+
                 var statsDict: [Date: HKStatistics] = [:]
                 results?.enumerateStatistics(from: workout.startDate, to: workout.endDate) { stats, _ in
                     statsDict[stats.startDate] = stats
                 }
-                
+
                 continuation.resume(returning: statsDict)
             }
-            
+
             healthStore?.execute(query)
         }
     }
@@ -284,30 +329,32 @@ class HealthKitManager: ObservableObject {
         let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
 
         let rawAvgPace = distance > 0 ? (duration / (distance / 1000.0)) : 0.0
-        
-        let hrType = HKObjectType.quantityType(forIdentifier: .heartRate)!
-        let stepType = HKObjectType.quantityType(forIdentifier: .stepCount)!
-        
+
+        guard let hrType = HKObjectType.quantityType(forIdentifier: .heartRate),
+              let stepType = HKObjectType.quantityType(forIdentifier: .stepCount),
+              let oscType = HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation) else {
+            throw NSError(domain: "HealthKitManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Required HealthKit quantity types unavailable"])
+        }
+
         let rawAvgHeartRate = try await fetchAverage(for: workout, type: hrType, unit: HKUnit.count().unitDivided(by: .minute()))
         let totalSteps = try await fetchSum(for: workout, type: stepType, unit: HKUnit.count())
         let rawAvgCadence = duration > 0 ? (totalSteps / (duration / 60.0)) : 0.0
-        
-        let oscType = HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation)!
+
         let rawAvgOscillation = try? await fetchAverage(for: workout, type: oscType, unit: HKUnit.meterUnit(with: .centi))
-        
+
         let buckets = try await fetchBucketedSamples(for: workout)
         let trimmed = await engine.trimDeadStops(buckets: buckets)
         let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration) = await engine.calculateWorkingAverages(trimmed: trimmed, rawWorkoutDuration: duration)
-        
+
         let paces = trimmed.map { $0.meanPaceSecPerKm }
         let hrs = trimmed.map { $0.meanHR }
-        
+
         let cv = await engine.calculatePaceCV(bucketPaces: paces)
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
         // Hardcoding maxHR to 190 for now as it's not globally tracked in this context,
         // or we could use the classic 220 - age if we had DOB.
         let zone4 = await engine.calculatePercentZone4(bucketHRs: hrs, maxHR: 190)
-        
+
         let validRawOsc = (rawAvgOscillation ?? 0) > 0 ? rawAvgOscillation : nil
         let validWorkingOsc = workingOscillation > 0 ? workingOscillation : validRawOsc
         let finalRawOsc = validRawOsc ?? validWorkingOsc
@@ -356,12 +403,12 @@ class HealthKitManager: ObservableObject {
            avg > 0 {
             return avg
         }
-        
+
         // 2. Query HealthStore with object predicate, fallback to date predicate
         let store = healthStore
         return try await withCheckedThrowingContinuation { continuation in
             let predicate = HKQuery.predicateForObjects(from: workout)
-            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, result, error in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .discreteAverage) { _, result, _ in
                 if let avg = result?.averageQuantity()?.doubleValue(for: unit), avg > 0 {
                     continuation.resume(returning: avg)
                 } else {
@@ -384,12 +431,12 @@ class HealthKitManager: ObservableObject {
            sum > 0 {
             return sum
         }
-        
+
         // 2. Query HealthStore
         let store = healthStore
         return try await withCheckedThrowingContinuation { continuation in
             let predicate = HKQuery.predicateForObjects(from: workout)
-            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 if let sum = result?.sumQuantity()?.doubleValue(for: unit), sum > 0 {
                     continuation.resume(returning: sum)
                 } else {
@@ -412,9 +459,6 @@ class HealthKitManager: ObservableObject {
 //  Created by Joshua Agboola on 2026-08-22.
 //  Updated for Runalyst V2: 1-Minute Chunking & Variance Profiles
 //
-
-import Foundation
-import HealthKit
 
 enum MockRunProfile: String, CaseIterable {
     case easy = "Easy Run"
@@ -451,7 +495,7 @@ class HealthKitSeeder {
         }
         await seedAdvancedMockRuns()
     }
-    
+
     func seedAdvancedMockRuns() async {
         let typesToWrite: Set<HKSampleType> = [
             HKObjectType.workoutType(),
@@ -464,43 +508,43 @@ class HealthKitSeeder {
             HKQuantityType(.runningGroundContactTime),
             HKQuantityType(.runningStrideLength)
         ]
-        
+
         do {
             try await healthStore.requestAuthorization(toShare: typesToWrite, read: [])
         } catch {
             print("Failed to authorize HealthKit Seeder: \(error)")
             return
         }
-        
+
         let calendar = Calendar.current
         let today = Date()
-        
+
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .running
         configuration.locationType = .outdoor
-        
+
         // Seed 27 runs (3 cycles of 9 profiles) to give a good history
         let totalRuns = MockRunProfile.allCases.count * 3
         for index in 0..<totalRuns {
             let profile = MockRunProfile.allCases[index % MockRunProfile.allCases.count]
             let daysAgo = (totalRuns * 2) - (index * 2)
-            let workoutStartTime = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
-            
+            guard let workoutStartTime = calendar.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+
             let totalMinutes = profile.durationMinutes
             let workoutEndTime = workoutStartTime.addingTimeInterval(TimeInterval(totalMinutes * 60))
-            
+
             do {
                 let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: configuration, device: nil)
                 try await builder.beginCollection(at: workoutStartTime)
-                
+
                 var allSamples: [HKSample] = []
-                
+
                 for minute in 0..<totalMinutes {
                     let chunkStart = workoutStartTime.addingTimeInterval(TimeInterval(minute * 60))
                     let chunkEnd = chunkStart.addingTimeInterval(60)
-                    
+
                     let metrics = generateMinuteMetrics(for: profile, minuteIndex: minute)
-                    
+
                     let distanceQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.distanceMeters)
                     let speedQuantity = HKQuantity(
                         unit: HKUnit.meter().unitDivided(by: .second()),
@@ -511,7 +555,7 @@ class HealthKitSeeder {
                     let oscQuantity = HKQuantity(unit: HKUnit.meterUnit(with: .centi), doubleValue: metrics.oscillation)
                     let gctQuantity = HKQuantity(unit: HKUnit.secondUnit(with: .milli), doubleValue: metrics.gct)
                     let strideQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.stride)
-                    
+
                     allSamples.append(contentsOf: [
                         HKQuantitySample(type: HKQuantityType(.distanceWalkingRunning), quantity: distanceQuantity, start: chunkStart, end: chunkEnd),
                         HKQuantitySample(type: HKQuantityType(.runningSpeed), quantity: speedQuantity, start: chunkStart, end: chunkEnd),
@@ -522,12 +566,12 @@ class HealthKitSeeder {
                         HKQuantitySample(type: HKQuantityType(.runningStrideLength), quantity: strideQuantity, start: chunkStart, end: chunkEnd)
                     ])
                 }
-                
+
                 let vo2Quantity = HKQuantity(unit: HKUnit(from: "ml/kg*min"), doubleValue: 45.0)
                 allSamples.append(HKQuantitySample(type: HKQuantityType(.vo2Max), quantity: vo2Quantity, start: workoutStartTime, end: workoutEndTime))
-                
+
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    builder.add(allSamples) { success, error in
+                    builder.add(allSamples) { _, error in
                         if let error = error {
                             continuation.resume(throwing: error)
                         } else {
@@ -535,26 +579,26 @@ class HealthKitSeeder {
                         }
                     }
                 }
-                
+
                 try await builder.endCollection(at: workoutEndTime)
                 _ = try await builder.finishWorkout()
-                
+
             } catch {
                 print("Failed to save mock workout for day \(index): \(error)")
             }
         }
         print("✅ Successfully seeded advanced variance profiles to Apple Health!")
     }
-    
+
     func seedDirectToSwiftData(context: ModelContext) {
         let calendar = Calendar.current
         let today = Date()
         let profiles = MockRunProfile.allCases
-        
+
         for (index, profile) in profiles.enumerated() {
             let daysAgo = Double(index * 2) + 0.5
             guard let date = calendar.date(byAdding: .hour, value: -Int(daysAgo * 24), to: today) else { continue }
-            
+
             let durationMin = Double(profile.durationMinutes)
             let durationSec = durationMin * 60.0
             let avgPaceSec = Double.random(in: 320...390) // ~5:20 - 6:30 /km
@@ -565,7 +609,7 @@ class HealthKitSeeder {
             let paceCV = profile == .intervals || profile == .fartlek ? 0.18 : 0.04
             let paceSlope = profile == .progression ? -0.45 : (profile == .longRun ? 0.35 : 0.0)
             let percentZone4 = profile == .tempo ? 0.65 : (profile == .intervals ? 0.45 : 0.08)
-            
+
             let drill = DrillRecommendation(
                 drillTitle: "Cadence Correction Drill",
                 preRunDrillId: "cadence_accelerator",
@@ -577,14 +621,14 @@ class HealthKitSeeder {
                 targetCadence: "\(Int(avgCadence) + 6) SPM",
                 previousCadence: Int(avgCadence)
             )
-            
+
             let insight = CoachingInsight(
                 headline: "Form breakdown under late fatigue",
                 longitudinalObservation: "Your cadence dropped slightly near the final kilometer, correlating with a minor spike in heart rate.",
                 drillRecommendation: drill,
                 drillRecommendations: [drill]
             )
-            
+
             let record = RunRecord(
                 hkWorkoutID: UUID(),
                 date: date,
@@ -607,40 +651,40 @@ class HealthKitSeeder {
                 framboiseTags: [profile.rawValue],
                 insight: insight
             )
-            
+
             context.insert(record)
         }
-        
+
         try? context.save()
         print("✅ Successfully seeded 12 SwiftData RunRecords directly!")
     }
-    
+
     private func generateMinuteMetrics(for profile: MockRunProfile, minuteIndex: Int) -> (distanceMeters: Double, heartRate: Double, cadence: Double, oscillation: Double, gct: Double, stride: Double) {
         var distance: Double = 0
         var hr: Double = 0
         var cadence: Double = 0
-        
+
         switch profile {
         case .easy:
             distance = Double.random(in: 155...165)
             hr = Double.random(in: 135...142)
             cadence = Double.random(in: 158...162)
-            
+
         case .recovery:
             distance = Double.random(in: 145...155)
             hr = Double.random(in: 125...132)
             cadence = Double.random(in: 154...158)
-            
+
         case .steady:
             distance = Double.random(in: 175...185)
             hr = Double.random(in: 148...152)
             cadence = Double.random(in: 164...166)
-            
+
         case .tempo:
             distance = Double.random(in: 210...220)
             hr = Double.random(in: 175...182)
             cadence = Double.random(in: 172...176)
-            
+
         case .intervals:
             let isWorkInterval = (minuteIndex % 5) < 3
             if isWorkInterval {
@@ -652,7 +696,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 130...145)
                 cadence = Double.random(in: 145...155)
             }
-            
+
         case .fartlek:
             // 1 min fast, 3 min slow
             let isFast = (minuteIndex % 4) == 0
@@ -665,21 +709,21 @@ class HealthKitSeeder {
                 hr = Double.random(in: 135...145)
                 cadence = Double.random(in: 155...160)
             }
-            
+
         case .progression:
             // Starts around 145m/min, ends around 210m/min
             let progress = Double(minuteIndex) / 45.0
             distance = 145.0 + (progress * 65.0) + Double.random(in: -5...5)
             hr = 135.0 + (progress * 45.0) + Double.random(in: -3...3)
             cadence = 155.0 + (progress * 20.0) + Double.random(in: -2...2)
-            
+
         case .longRun:
             // Distance slowly decreases (fatigue drift), HR drifts up
             let progress = Double(minuteIndex) / 90.0
             distance = 175.0 - (progress * 15.0) + Double.random(in: -5...5)
             hr = 145.0 + (progress * 20.0) + Double.random(in: -3...3)
             cadence = 165.0 - (progress * 5.0) + Double.random(in: -2...2)
-            
+
         case .pyramids:
             // Ascending then descending effort
             let cycle = minuteIndex % 8
@@ -719,11 +763,11 @@ class HealthKitSeeder {
                 cadence = Double.random(in: 160...165)
             }
         }
-        
+
         let osc = cadence > 0 ? (9.0 + Double.random(in: -0.5...0.5)) : 0.0
         let gct = cadence > 0 ? (240.0 + Double.random(in: -10...10)) : 0.0
         let stride = cadence > 0 ? (1.1 + (distance - 150) / 500.0) : 0.0
-        
+
         return (distanceMeters: distance, heartRate: hr, cadence: cadence, oscillation: osc, gct: gct, stride: stride)
     }
 }

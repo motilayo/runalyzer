@@ -10,7 +10,7 @@ struct OnboardingView: View {
     @StateObject private var healthKitManager = HealthKitManager.shared
 
     @State private var isLoading = false
-    @State private var errorMessage: String? = nil
+    @State private var errorMessage: String?
 
     var body: some View {
         VStack(spacing: 40) {

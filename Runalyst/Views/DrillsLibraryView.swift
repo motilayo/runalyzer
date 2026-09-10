@@ -5,22 +5,104 @@ import WorkoutKit
 struct DrillsLibraryView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var selectedCategory: String = "All"
-    
+
+    @AppStorage("dashboardTimeRange") private var dashboardTimeRange: String = "30 Days"
+    @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
+    @AppStorage("lastBaselineChangeTimestamp") private var lastBaselineChangeTimestamp: Double = 0
+    @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
+    @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
+
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var isShowingWorkoutPreview: Bool = false
-    
+    @State private var isAutoSyncing: Bool = false
+    @State private var autoSyncSuccess: Bool = false
+
     let categories = ["All", "Foundation", "Threshold", "Speed"]
-    
-    private var baselineCadence: Int {
-        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) else { return 160 }
-        let recentRuns = runRecords.filter { $0.date >= thirtyDaysAgo && $0.workingAvgCadence > 0 }
-        guard !recentRuns.isEmpty else { return 160 }
-        return Int(recentRuns.map(\.workingAvgCadence).reduce(0, +) / Double(recentRuns.count))
+
+    private var filteredRunRecords: [RunRecord] {
+        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+        var filtered = runRecords.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
+        let now = Date()
+        if dashboardTimeRange == "7 Days", let limit = Calendar.current.date(byAdding: .day, value: -7, to: now) {
+            filtered = filtered.filter { $0.date >= limit }
+        } else if dashboardTimeRange == "30 Days", let limit = Calendar.current.date(byAdding: .day, value: -30, to: now) {
+            filtered = filtered.filter { $0.date >= limit }
+        }
+        return filtered
     }
-    
+
+    private var baselineCadence: Int {
+        let recentRuns = filteredRunRecords.filter { $0.workingAvgCadence > 0 }
+        guard !recentRuns.isEmpty else { return 160 }
+        return Int(recentRuns.map(\.workingAvgCadence).reduce(0, +)) / recentRuns.count
+    }
+
+    private var isExportStale: Bool {
+        lastWatchExportTimestamp > 0 && lastBaselineChangeTimestamp > lastWatchExportTimestamp
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
+                if isAutoSyncing {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(Color(red: 0.05, green: 0.45, blue: 0.5))
+                        Text("Auto-updating Watch targets for your new \(baselineCadence) SPM baseline...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.secondarySystemGroupedBackground))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                } else if autoSyncSuccess {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Watch targets auto-updated for your new \(baselineCadence) SPM baseline ✓")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.green.opacity(0.12))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                } else if isExportStale {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Baseline Updated (\(baselineCadence) SPM)")
+                                .font(.caption.bold())
+                                .foregroundColor(.primary)
+                            Text("Update Watch targets to match your new baseline.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Button("Sync Now") {
+                            Task {
+                                await autoSyncStaleExportIfNeeded()
+                            }
+                        }
+                        .font(.caption.bold())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.orange)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.12))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+
                 // Category Picker
                 Picker("Category", selection: $selectedCategory) {
                     ForEach(categories, id: \.self) { category in
@@ -29,8 +111,8 @@ struct DrillsLibraryView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
-                .padding(.top, 8)
-                
+                .padding(.top, 4)
+
                 // Section 1: Foundation & Recovery Primers
                 if selectedCategory == "All" || selectedCategory == "Foundation" {
                     VStack(alignment: .leading, spacing: 12) {
@@ -38,15 +120,11 @@ struct DrillsLibraryView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        
+
                         DrillPrimerCardView(
-                            icon: "chart.line.downtrend.xyaxis",
-                            iconColor: .blue,
-                            title: "Recovery Run Prep (Shakeout)",
-                            description: "10 min low-impact flush. strictly Zone 1.",
-                            target: "Target HR: 100 - 118 BPM",
-                            drillId: "aerobic_flush",
-                            targetCadence: nil,
+                            drillId: .aerobicFlush,
+                            customTitle: "Recovery Run Prep (Shakeout)",
+                            customTarget: "Target HR: 100 - 118 BPM",
                             baselineCadence: baselineCadence,
                             onStart: { plan in
                                 activeWorkoutPlan = plan
@@ -56,7 +134,7 @@ struct DrillsLibraryView: View {
                         .padding(.horizontal)
                     }
                 }
-                
+
                 // Section 2: Speed & Efficiency Primers
                 if selectedCategory == "All" || selectedCategory == "Speed" {
                     VStack(alignment: .leading, spacing: 12) {
@@ -64,17 +142,9 @@ struct DrillsLibraryView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        
-                        let cadenceTemplate = DrillTemplate.template(for: .cadencePyramids)
-                        let targetCadence = cadenceTemplate.calculateTargetCadence(baselineCadence)
+
                         DrillPrimerCardView(
-                            icon: "stopwatch",
-                            iconColor: .orange,
-                            title: cadenceTemplate.title,
-                            description: cadenceTemplate.defaultPurpose,
-                            target: "Target: \(targetCadence) SPM (Current Baseline: \(baselineCadence) SPM)",
-                            drillId: "cadence_pyramids",
-                            targetCadence: targetCadence,
+                            drillId: .cadencePyramids,
                             baselineCadence: baselineCadence,
                             onStart: { plan in
                                 activeWorkoutPlan = plan
@@ -82,17 +152,9 @@ struct DrillsLibraryView: View {
                             }
                         )
                         .padding(.horizontal)
-                        
-                        let stridesTemplate = DrillTemplate.template(for: .strides)
-                        let stridesTarget = stridesTemplate.calculateTargetCadence(baselineCadence)
+
                         DrillPrimerCardView(
-                            icon: "bolt.fill",
-                            iconColor: .yellow,
-                            title: "Neuromuscular Strides",
-                            description: stridesTemplate.defaultPurpose,
-                            target: "Target: \(stridesTarget) SPM (Baseline: \(baselineCadence) SPM)",
-                            drillId: "strides",
-                            targetCadence: stridesTarget,
+                            drillId: .strides,
                             baselineCadence: baselineCadence,
                             onStart: { plan in
                                 activeWorkoutPlan = plan
@@ -102,7 +164,7 @@ struct DrillsLibraryView: View {
                         .padding(.horizontal)
                     }
                 }
-                
+
                 // Section 3: Threshold & Form Primers
                 if selectedCategory == "All" || selectedCategory == "Threshold" {
                     VStack(alignment: .leading, spacing: 12) {
@@ -110,17 +172,9 @@ struct DrillsLibraryView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        
-                        let rhythmTemplate = DrillTemplate.template(for: .rhythmIntervals)
-                        let rhythmTarget = rhythmTemplate.calculateTargetCadence(baselineCadence)
+
                         DrillPrimerCardView(
-                            icon: "waveform.path.ecg",
-                            iconColor: .purple,
-                            title: rhythmTemplate.title,
-                            description: rhythmTemplate.defaultPurpose,
-                            target: "Target: \(rhythmTarget) SPM (Baseline: \(baselineCadence) SPM)",
-                            drillId: "rhythm_intervals",
-                            targetCadence: rhythmTarget,
+                            drillId: .rhythmIntervals,
                             baselineCadence: baselineCadence,
                             onStart: { plan in
                                 activeWorkoutPlan = plan
@@ -137,147 +191,253 @@ struct DrillsLibraryView: View {
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("🏃 Pre-Run Library")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if isExportStale {
+                await autoSyncStaleExportIfNeeded()
+            }
+        }
+        .onChange(of: baselineCadence) {
+            if lastWatchExportTimestamp > 0 {
+                Task {
+                    await autoSyncStaleExportIfNeeded()
+                }
+            }
+        }
+    }
+
+    private func autoSyncStaleExportIfNeeded() async {
+        guard !lastExportedDrillId.isEmpty || lastWatchExportTimestamp > 0 else { return }
+        guard #available(iOS 17.0, *) else { return }
+
+        await MainActor.run {
+            self.isAutoSyncing = true
+        }
+
+        let drillIdToSync = !lastExportedDrillId.isEmpty ? lastExportedDrillId : "cadence_pyramids"
+        let preRunId = PreRunDrillId(rawValue: drillIdToSync) ?? .strides
+        let template = DrillTemplate.template(for: preRunId)
+        let newTarget = template.calculateTargetCadence(baselineCadence)
+
+        let dto = DrillPrescriptionDTO(
+            title: template.title,
+            preRunDrillId: preRunId.rawValue,
+            purpose: template.defaultPurpose,
+            targetCadence: newTarget,
+            previousCadence: baselineCadence
+        )
+
+        do {
+            let bridge = WorkoutBridge()
+            try await bridge.scheduleDrill(dto: dto)
+            await MainActor.run {
+                self.lastWatchExportTimestamp = Date().timeIntervalSince1970
+                self.isAutoSyncing = false
+                self.autoSyncSuccess = true
+            }
+        } catch {
+            await MainActor.run {
+                self.isAutoSyncing = false
+            }
+        }
     }
 }
 
 struct DrillPrimerCardView: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let description: String
-    let target: String
-    let drillId: String
-    let targetCadence: Int?
+    let drillId: PreRunDrillId
+    var customTitle: String?
+    var customPurpose: String?
+    var customTarget: String?
     let baselineCadence: Int
-    var onStart: ((WorkoutPlan) -> Void)? = nil
-    
-    @State private var isScheduling = false
-    @State private var scheduledSuccess = false
-    @State private var errorMessage: String? = nil
-    
+    var onStart: ((WorkoutPlan) -> Void)?
+
+    @State private var selectedDuration: DrillDuration = .fifteenMinutes
+    @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
+    @State private var showingTargetExplainer = false
+
+    private var selectedHapticMode: HapticFeedbackMode {
+        get { HapticFeedbackMode(rawValue: selectedHapticModeRaw) ?? .on }
+        nonmutating set { selectedHapticModeRaw = newValue.rawValue }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let template = DrillTemplate.template(for: drillId)
+        let displayTitle = customTitle ?? template.title
+        let purpose = customPurpose ?? template.defaultPurpose
+        let work = template.workString(for: selectedDuration)
+        let recovery = template.recoveryString(for: selectedDuration)
+        let effort = template.defaultEffort
+        let targetCadence: Int? = template.calculateTargetCadence(baselineCadence)
+        let cue = template.generateInstructionalCue(targetCadence ?? baselineCadence)
+        let icon = drillId.iconName
+        let iconColor = drillId.iconColor
+
+        let hasCadenceTarget = drillId != .aerobicFlush && drillId != .recoveryJog && drillId != .aerobicBaseBuilder
+        let displayTargetText = customTarget ?? (hasCadenceTarget ? targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" } : nil)
+
+        VStack(alignment: .leading, spacing: 14) {
+            // Header
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .foregroundColor(iconColor)
                     .font(.headline)
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-            }
-            
-            Text(description)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Text(target)
-                .font(.subheadline.bold())
-                .foregroundColor(.primary)
-            
-            HStack(spacing: 12) {
-                Button(action: {
-                    startDrill()
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.fill")
-                            .foregroundColor(.white)
-                        Text("Start")
-                            .foregroundColor(.white)
-                    }
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.green)
-                    .cornerRadius(12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayTitle)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("\(selectedDuration.rawValue) min drill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                
-                Button(action: {
-                    scheduleToWatch()
-                }) {
-                    HStack(spacing: 6) {
-                        if isScheduling {
-                            ProgressView()
-                                .tint(.white)
-                        } else if scheduledSuccess {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.white)
-                            Text("Loaded")
-                                .foregroundColor(.white)
-                        } else {
-                            Image(systemName: "applewatch")
-                                .foregroundColor(.white)
-                            Text("Load to Watch")
-                                .foregroundColor(.white)
+            }
+
+            // Purpose
+            if !purpose.isEmpty {
+                Text(purpose)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Repeat / Rest / Effort Badges
+            HStack(spacing: 16) {
+                if !work.isEmpty {
+                    Label(work, systemImage: "repeat")
+                        .font(.caption.bold())
+                        .foregroundColor(.primary)
+                }
+                if !recovery.isEmpty {
+                    Label(recovery, systemImage: "moon.zzz")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                if !effort.isEmpty {
+                    Label(effort, systemImage: "bolt.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            // Cue
+            if !cue.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.orange)
+                        .font(.caption)
+                    Text(cue)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(UIColor.tertiarySystemFill))
+                .cornerRadius(10)
+            }
+
+            // Target
+            if let targetText = displayTargetText, !targetText.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "target")
+                        .foregroundColor(.orange)
+                        .font(.caption.bold())
+                    Text(targetText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if hasCadenceTarget {
+                        Image(systemName: "info.circle")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if hasCadenceTarget {
+                        showingTargetExplainer = true
+                    }
+                }
+                .sheet(isPresented: $showingTargetExplainer) {
+                    let explainer = MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false)
+                    MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
+                }
+            }
+
+            // Duration Selector
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Duration")
+                        .font(.caption.bold())
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Picker("Duration", selection: $selectedDuration) {
+                        ForEach(DrillDuration.allCases, id: \.self) { dur in
+                            Text(dur.title).tag(dur)
                         }
                     }
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        scheduledSuccess ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.5)
-                    )
-                    .cornerRadius(12)
-                }
-                .disabled(isScheduling || scheduledSuccess)
-            }
-            
-            if let err = errorMessage {
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                    Text(err)
-                        .font(.caption)
-                        .foregroundColor(.red)
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 220)
                 }
             }
+
+            // Haptic Feedback (on cadence/rhythm drills)
+            if hasCadenceTarget {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "waveform")
+                                .font(.caption)
+                                .foregroundColor(.teal)
+                            Text("Haptic Feedback")
+                                .font(.caption.bold())
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Picker("Haptic Feedback", selection: Binding(
+                            get: { selectedHapticMode },
+                            set: { selectedHapticMode = $0 }
+                        )) {
+                            ForEach(HapticFeedbackMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 130)
+                    }
+                }
+            }
+
+            // Single Action Button: Start Drill
+            Button(action: {
+                startDrill(preRunId: drillId, targetCadence: targetCadence, duration: selectedDuration, hapticMode: selectedHapticMode)
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill")
+                        .foregroundColor(.white)
+                    Text("Start Drill")
+                        .foregroundColor(.white)
+                }
+                .font(.subheadline.bold())
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.green)
+                .cornerRadius(12)
+            }
+            .padding(.top, 2)
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
-    
-    private func startDrill() {
-        let preRunId = PreRunDrillId(rawValue: drillId) ?? .strides
-        let drill = PreRunDrill(id: preRunId, previousCadence: baselineCadence, targetCadence: targetCadence)
+
+    private func startDrill(preRunId: PreRunDrillId, targetCadence: Int?, duration: DrillDuration, hapticMode: HapticFeedbackMode) {
+        let drill = PreRunDrill(
+            id: preRunId,
+            previousCadence: baselineCadence,
+            targetCadence: targetCadence,
+            duration: duration,
+            hapticMode: hapticMode
+        )
         let plan = drill.buildWorkoutPlan()
         onStart?(plan)
-    }
-    
-    private func scheduleToWatch() {
-        isScheduling = true
-        errorMessage = nil
-        
-        Task {
-            if #available(iOS 17.0, *) {
-                let dto = DrillPrescriptionDTO(
-                    title: title,
-                    preRunDrillId: drillId,
-                    purpose: description,
-                    targetCadence: targetCadence,
-                    previousCadence: baselineCadence
-                )
-                
-                do {
-                    let bridge = WorkoutBridge()
-                    try await bridge.scheduleDrill(dto: dto)
-                    await MainActor.run {
-                        self.isScheduling = false
-                        self.scheduledSuccess = true
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    }
-                } catch {
-                    await MainActor.run {
-                        self.isScheduling = false
-                        self.errorMessage = error.localizedDescription
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    self.isScheduling = false
-                    self.errorMessage = "WorkoutKit requires iOS 17.0 or newer."
-                }
-            }
-        }
     }
 }

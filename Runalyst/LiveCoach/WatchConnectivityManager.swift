@@ -9,7 +9,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked S
     // To handle SwiftData operations on main actor without being tied to view
     @MainActor public var sharedModelContext: ModelContext?
 
-    private override init() {
+    override private init() {
         super.init()
         if WCSession.isSupported() {
             let session = WCSession.default
@@ -27,7 +27,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked S
     }
     #endif
 
-    public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+    public func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         if let runRecordData = message["completedRun"] as? Data {
             let decoder = JSONDecoder()
             if let dto = try? decoder.decode(WatchRunRecordDTO.self, from: runRecordData) {
