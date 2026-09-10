@@ -5,7 +5,7 @@ import WorkoutKit
 struct DrillsLibraryView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var selectedCategory: String = "All"
-    
+
     @AppStorage("dashboardTimeRange") private var dashboardTimeRange: String = "30 Days"
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
@@ -17,9 +17,9 @@ struct DrillsLibraryView: View {
     @State private var isShowingWorkoutPreview: Bool = false
     @State private var isAutoSyncing: Bool = false
     @State private var autoSyncSuccess: Bool = false
-    
+
     let categories = ["All", "Foundation", "Threshold", "Speed"]
-    
+
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
         var filtered = runRecords.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
@@ -41,7 +41,7 @@ struct DrillsLibraryView: View {
     private var isExportStale: Bool {
         lastWatchExportTimestamp > 0 && lastBaselineChangeTimestamp > lastWatchExportTimestamp
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -112,7 +112,7 @@ struct DrillsLibraryView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 .padding(.top, 4)
-                
+
                 // Section 1: Foundation & Recovery Primers
                 if selectedCategory == "All" || selectedCategory == "Foundation" {
                     VStack(alignment: .leading, spacing: 12) {
@@ -120,7 +120,7 @@ struct DrillsLibraryView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        
+
                         DrillPrimerCardView(
                             drillId: .aerobicFlush,
                             customTitle: "Recovery Run Prep (Shakeout)",
@@ -134,7 +134,7 @@ struct DrillsLibraryView: View {
                         .padding(.horizontal)
                     }
                 }
-                
+
                 // Section 2: Speed & Efficiency Primers
                 if selectedCategory == "All" || selectedCategory == "Speed" {
                     VStack(alignment: .leading, spacing: 12) {
@@ -142,7 +142,7 @@ struct DrillsLibraryView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        
+
                         DrillPrimerCardView(
                             drillId: .cadencePyramids,
                             baselineCadence: baselineCadence,
@@ -152,7 +152,7 @@ struct DrillsLibraryView: View {
                             }
                         )
                         .padding(.horizontal)
-                        
+
                         DrillPrimerCardView(
                             drillId: .strides,
                             baselineCadence: baselineCadence,
@@ -164,7 +164,7 @@ struct DrillsLibraryView: View {
                         .padding(.horizontal)
                     }
                 }
-                
+
                 // Section 3: Threshold & Form Primers
                 if selectedCategory == "All" || selectedCategory == "Threshold" {
                     VStack(alignment: .leading, spacing: 12) {
@@ -172,7 +172,7 @@ struct DrillsLibraryView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        
+
                         DrillPrimerCardView(
                             drillId: .rhythmIntervals,
                             baselineCadence: baselineCadence,
@@ -208,16 +208,16 @@ struct DrillsLibraryView: View {
     private func autoSyncStaleExportIfNeeded() async {
         guard !lastExportedDrillId.isEmpty || lastWatchExportTimestamp > 0 else { return }
         guard #available(iOS 17.0, *) else { return }
-        
+
         await MainActor.run {
             self.isAutoSyncing = true
         }
-        
+
         let drillIdToSync = !lastExportedDrillId.isEmpty ? lastExportedDrillId : "cadence_pyramids"
         let preRunId = PreRunDrillId(rawValue: drillIdToSync) ?? .strides
         let template = DrillTemplate.template(for: preRunId)
         let newTarget = template.calculateTargetCadence(baselineCadence)
-        
+
         let dto = DrillPrescriptionDTO(
             title: template.title,
             preRunDrillId: preRunId.rawValue,
@@ -225,7 +225,7 @@ struct DrillsLibraryView: View {
             targetCadence: newTarget,
             previousCadence: baselineCadence
         )
-        
+
         do {
             let bridge = WorkoutBridge()
             try await bridge.scheduleDrill(dto: dto)
@@ -244,21 +244,21 @@ struct DrillsLibraryView: View {
 
 struct DrillPrimerCardView: View {
     let drillId: PreRunDrillId
-    var customTitle: String? = nil
-    var customPurpose: String? = nil
-    var customTarget: String? = nil
+    var customTitle: String?
+    var customPurpose: String?
+    var customTarget: String?
     let baselineCadence: Int
-    var onStart: ((WorkoutPlan) -> Void)? = nil
-    
+    var onStart: ((WorkoutPlan) -> Void)?
+
     @State private var selectedDuration: DrillDuration = .fifteenMinutes
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
     @State private var showingTargetExplainer = false
-    
+
     private var selectedHapticMode: HapticFeedbackMode {
         get { HapticFeedbackMode(rawValue: selectedHapticModeRaw) ?? .on }
         nonmutating set { selectedHapticModeRaw = newValue.rawValue }
     }
-    
+
     var body: some View {
         let template = DrillTemplate.template(for: drillId)
         let displayTitle = customTitle ?? template.title
@@ -270,10 +270,10 @@ struct DrillPrimerCardView: View {
         let cue = template.generateInstructionalCue(targetCadence ?? baselineCadence)
         let icon = drillId.iconName
         let iconColor = drillId.iconColor
-        
+
         let hasCadenceTarget = drillId != .aerobicFlush && drillId != .recoveryJog && drillId != .aerobicBaseBuilder
-        let displayTargetText = customTarget ?? (hasCadenceTarget && targetCadence != nil ? "Target: \(targetCadence!) SPM (Baseline: \(baselineCadence) SPM)" : nil)
-        
+        let displayTargetText = customTarget ?? (hasCadenceTarget ? targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" } : nil)
+
         VStack(alignment: .leading, spacing: 14) {
             // Header
             HStack(spacing: 8) {
@@ -289,7 +289,7 @@ struct DrillPrimerCardView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             // Purpose
             if !purpose.isEmpty {
                 Text(purpose)
@@ -297,7 +297,7 @@ struct DrillPrimerCardView: View {
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            
+
             // Repeat / Rest / Effort Badges
             HStack(spacing: 16) {
                 if !work.isEmpty {
@@ -316,7 +316,7 @@ struct DrillPrimerCardView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             // Cue
             if !cue.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
@@ -333,7 +333,7 @@ struct DrillPrimerCardView: View {
                 .background(Color(UIColor.tertiarySystemFill))
                 .cornerRadius(10)
             }
-            
+
             // Target
             if let targetText = displayTargetText, !targetText.isEmpty {
                 HStack(spacing: 4) {
@@ -360,7 +360,7 @@ struct DrillPrimerCardView: View {
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }
             }
-            
+
             // Duration Selector
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -428,7 +428,7 @@ struct DrillPrimerCardView: View {
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
-    
+
     private func startDrill(preRunId: PreRunDrillId, targetCadence: Int?, duration: DrillDuration, hapticMode: HapticFeedbackMode) {
         let drill = PreRunDrill(
             id: preRunId,

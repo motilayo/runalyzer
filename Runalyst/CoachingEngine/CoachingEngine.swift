@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
+#if canImport(FoundationModels)
 import FoundationModels
+#endif
 
 struct BaselineStats: Sendable {
     let avgPace: Double
@@ -30,6 +32,7 @@ struct AggregateRunDataForAI: Sendable {
     let stageContext: String
 }
 
+#if canImport(FoundationModels)
 @available(iOS 26.0, *)
 @Generable
 struct DashboardFatigueInsight {
@@ -45,7 +48,7 @@ struct DashboardFatigueInsight {
 struct SuggestedDrill {
     @Guide(description: "A recognized drill name. Keep it extremely concise.")
     var drillTitle: String
-    
+
     @Guide(description: "Must be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog")
     var preRunDrillId: String
 
@@ -82,7 +85,7 @@ class CoachingEngine {
         }
 
         let language = Locale.current.language.languageCode?.identifier ?? "en"
-        
+
         let instructions = """
         persona: elite_running_coach
         task: synthesize_precomputed_metrics_into_coaching_advice
@@ -90,7 +93,7 @@ class CoachingEngine {
         - use_a_conversational_and_motivational_tone_do_not_sound_like_a_textbook
         - speak directly to user using second person ("You", "Your")
         - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
-        - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided. 
+        - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided.
         - explain what the grouped trends indicate about their form and efficiency.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
         - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog
@@ -123,15 +126,15 @@ class CoachingEngine {
         TARGET_DRILL_CADENCES:
         - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
         - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
-        
+
         --- METRIC GROUP A: CARDIOVASCULAR EFFICIENCY ---
         HEART_RATE_BPM: {{HR_CONTEXT}}
         ZONE4_PERCENT: {{ZONE4_CONTEXT}}
-        
+
         --- METRIC GROUP B: RUNNING ECONOMY & FORM ---
         CADENCE_SPM: {{CADENCE_CONTEXT}}
         PACE: {{PACE_CONTEXT}}
-        
+
         --- METRIC GROUP C: PACING DYNAMICS ---
         PACE_VARIABILITY: {{CV_CONTEXT}}
         PACE_SLOPE: {{SLOPE_CONTEXT}}
@@ -171,7 +174,7 @@ class CoachingEngine {
         }
 
         let language = Locale.current.language.languageCode?.identifier ?? "en"
-        
+
         let focusDirective: String
         if timeFrame == "7 Days" {
             focusDirective = "Focus on week-over-week cadence drops, heart rate spikes, and immediate readiness for acute fatigue."
@@ -180,7 +183,7 @@ class CoachingEngine {
         } else {
             focusDirective = "Focus on the runner's current stage progression."
         }
-        
+
         let instructions = """
         persona: elite_running_coach
         task: evaluate_macro_physiological_trends_and_provide_conversational_insight
@@ -203,7 +206,7 @@ class CoachingEngine {
         [AGGREGATE_DATA_START]
         TIMEFRAME: \(timeFrame)
         STAGE: {{STAGE_CONTEXT}}
-        
+
         --- METRICS ---
         HEART_RATE_BPM: {{HR_CONTEXT}}
         ZONE4_PERCENT: {{ZONE4_CONTEXT}}
@@ -234,6 +237,56 @@ class CoachingEngine {
         }
     }
 }
+#else
+@available(iOS 26.0, *)
+struct DashboardFatigueInsight: Sendable {
+    var headline: String
+    var body: String
+}
+
+@available(iOS 26.0, *)
+struct SuggestedDrill: Sendable {
+    var drillTitle: String
+    var preRunDrillId: String
+    var drillPurpose: String
+    var drillCues: String
+}
+
+@available(iOS 26.0, *)
+struct RunInsight: Sendable {
+    var headline: String
+    var observation: String
+    var drills: [SuggestedDrill]
+}
+
+@available(iOS 26.0, *)
+@MainActor
+class CoachingEngine {
+    static let shared = CoachingEngine()
+
+    private init() {}
+
+    func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
+        RunInsight(
+            headline: String(localized: "Run Analyzed Successfully"),
+            observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
+            drills: [SuggestedDrill(
+                drillTitle: String(localized: "Strides"),
+                preRunDrillId: "strides",
+                drillPurpose: String(localized: "Builds turnover and neural recruitment."),
+                drillCues: String(localized: "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you.")
+            )]
+        )
+    }
+
+    func generateDashboardInsight(for timeFrame: String, runData: AggregateRunDataForAI) async throws -> DashboardFatigueInsight {
+        DashboardFatigueInsight(
+            headline: String(localized: "Keep It Up"),
+            body: String(localized: "Keep up the consistent training rhythm.")
+        )
+    }
+}
+#endif
 
 @available(iOS 26.0, *)
 @ModelActor
@@ -255,7 +308,7 @@ actor RunAnalyzerActor {
         )
         let priorRuns = (try? modelContext.fetch(descriptor)) ?? []
 
-        var baseline: BaselineStats? = nil
+        var baseline: BaselineStats?
         if priorRuns.count >= 3 {
             let avgPace = priorRuns.map(\.workingAvgPace).reduce(0, +) / Double(priorRuns.count)
             let avgHR = priorRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(priorRuns.count)
@@ -339,9 +392,9 @@ actor RunAnalyzerActor {
                 let template = DrillTemplate.template(for: preRunId)
                 let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
                 let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
-                
-                let targetCadenceStr = preRunDrill.computedCadence != nil ? "\(preRunDrill.computedCadence!) SPM" : nil
-                
+
+                let targetCadenceStr = preRunDrill.computedCadence.map { "\($0) SPM" }
+
                 // Prescriptive somatic cue (form, breathing, posture) without conflicting workout plan stats
                 let templateCue = template.generateInstructionalCue(computedTarget)
                 let drillCueText: String
@@ -350,7 +403,7 @@ actor RunAnalyzerActor {
                 } else {
                     drillCueText = templateCue
                 }
-                
+
                 let drill = DrillRecommendation(
                     drillTitle: suggestedDrill.drillTitle,
                     preRunDrillId: preRunId.rawValue,

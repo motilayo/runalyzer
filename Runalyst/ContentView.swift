@@ -14,7 +14,7 @@ struct ContentView: View {
     @Query private var existingRuns: [RunRecord]
 
     @State private var isSyncing = false
-    @State private var syncError: String? = nil
+    @State private var syncError: String?
     @State private var showError = false
 
     var body: some View {
@@ -122,7 +122,7 @@ struct ContentView: View {
                 }
                 return results
             }
-            
+
             let extractedRuns = extractedRunsUnsorted.sorted { $0.date < $1.date }
 
             for dto in extractedRuns {
@@ -154,24 +154,22 @@ struct ContentView: View {
             // Lazy load AI analysis ONLY for runs within the last 7 days
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
             let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
-            
+
             if let allRuns = try? modelContext.fetch(descriptor) {
                 let recentRuns = allRuns.filter { $0.date >= sevenDaysAgo }
                 let container = modelContext.container
 
-                for run in recentRuns {
-                    if run.insight == nil {
-                        let runId = run.persistentModelID
-                        if #available(iOS 26.0, *) {
-                            Task.detached {
-                                let analyzer = RunAnalyzerActor(modelContainer: container)
-                                await analyzer.generateAnalysis(for: runId)
-                            }
+                for run in recentRuns where run.insight == nil {
+                    let runId = run.persistentModelID
+                    if #available(iOS 26.0, *) {
+                        Task.detached {
+                            let analyzer = RunAnalyzerActor(modelContainer: container)
+                            await analyzer.generateAnalysis(for: runId)
                         }
-
-                        // Delay slightly to avoid overloading device resources
-                        try await Task.sleep(nanoseconds: 2_500_000_000)
                     }
+
+                    // Delay slightly to avoid overloading device resources
+                    try await Task.sleep(nanoseconds: 2_500_000_000)
                 }
             }
 

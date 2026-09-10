@@ -111,7 +111,7 @@ public class LiveCoachEngine {
     }
 
     /// Evaluates if haptic feedback should be delivered according to the selected HapticFeedbackMode.
-    public nonisolated static func shouldTriggerHaptic(
+    nonisolated public static func shouldTriggerHaptic(
         mode: HapticFeedbackMode,
         currentSPM: Int,
         targetSPM: Int,
@@ -179,8 +179,8 @@ public class LiveCoachEngine {
         buffer.frameLength = frameCount
 
         let channels = Int(format.channelCount)
-        for ch in 0..<channels {
-            let channelData = buffer.floatChannelData?[ch]
+        for channelIndex in 0..<channels {
+            let channelData = buffer.floatChannelData?[channelIndex]
             for frame in 0..<Int(frameCount) {
                 let time = Double(frame) / sampleRate
                 let value = Float(sin(2.0 * Double.pi * Double(frequency) * time))

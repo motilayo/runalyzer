@@ -7,22 +7,22 @@ enum PaceFormatter {
     /// Automatically applies metric/imperial conversions based on user preferences.
     static func formatPace(secondsPerKilometer totalSeconds: Double) -> String {
         guard totalSeconds.isFinite && totalSeconds > 0 else { return "--:--" }
-        
+
         let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
-        
+
         var adjustedSeconds = totalSeconds
         var unitString = "/km"
-        
+
         if !useMetricSystem {
             // Convert sec/km to sec/mi
             adjustedSeconds = totalSeconds * 1.609344
             unitString = "/mi"
         }
-        
+
         let totalSecs = Int(adjustedSeconds.rounded())
         let minutes = totalSecs / 60
         let seconds = totalSecs % 60
-        
+
         return String(format: "%d:%02d%@", minutes, seconds, unitString)
     }
 }
@@ -221,11 +221,11 @@ struct MetricDetailExplainer {
 struct MetricExplainerInfo: Identifiable {
     var id: String { title + (mode ?? "") }
     let title: String
-    var mode: String? = nil
+    var mode: String?
     let overview: String
-    var modeContext: String? = nil
-    var whyItMatters: String? = nil
-    var targetRange: String? = nil
+    var modeContext: String?
+    var whyItMatters: String?
+    var targetRange: String?
 
     init(title: String, definition: String) {
         self.title = title
@@ -251,7 +251,7 @@ struct MetricExplainerInfo: Identifiable {
         self.whyItMatters = whyItMatters
         self.targetRange = targetRange
     }
-    
+
     init(explainer: MetricDetailExplainer, mode: String? = nil) {
         self.title = explainer.title
         self.mode = mode
@@ -265,11 +265,11 @@ struct MetricExplainerInfo: Identifiable {
 /// Standard bottom sheet modal explaining a running metric or data setting.
 struct MetricExplainerSheet: View {
     let title: String
-    var mode: String? = nil
+    var mode: String?
     var overview: String
-    var modeContext: String? = nil
-    var whyItMatters: String? = nil
-    var targetRange: String? = nil
+    var modeContext: String?
+    var whyItMatters: String?
+    var targetRange: String?
     @Environment(\.dismiss) private var dismiss
 
     init(title: String, definition: String) {
@@ -596,4 +596,3 @@ private struct ClassificationCategoryRow: View {
         .padding(.vertical, 4)
     }
 }
-

@@ -11,7 +11,7 @@ final class RunalystTests: XCTestCase {
             let plan = drill.buildWorkoutPlan()
             print("Successfully built plan for \(id.rawValue)")
         }
-        
+
         let alertThreshold = CadenceThresholdAlert.cadence(160.0)
         XCTAssertTrue(CustomWorkout.supportsAlert(alertThreshold, activity: .running, location: .outdoor))
         XCTAssertTrue(CustomWorkout.supportsGoal(.time(3, .minutes), activity: .running, location: .outdoor))
@@ -69,7 +69,9 @@ final class HealthKitManagerTests: XCTestCase {
 
         let readTypes = try XCTUnwrap(mockStore.requestedTypesToRead)
         XCTAssertTrue(readTypes.contains(HKObjectType.workoutType()))
-        XCTAssertTrue(readTypes.contains(HKObjectType.quantityType(forIdentifier: .heartRate)!))
+        if let hrType = HKObjectType.quantityType(forIdentifier: .heartRate) {
+            XCTAssertTrue(readTypes.contains(hrType))
+        }
 
         XCTAssertTrue(mockStore.authorizationStatusCalled)
         XCTAssertTrue(mockStore.enableBackgroundDeliveryCalled)
@@ -147,29 +149,29 @@ final class MockHealthStore: @unchecked Sendable, HKHealthStoreProtocol {
 
 final class FramboiseEngineTests: XCTestCase {
     var engine: FramboiseEngine!
-    
+
     override func setUp() async throws {
         engine = FramboiseEngine()
     }
-    
+
     func testTrimDeadStops() async {
         let buckets = [
             BucketData(startTime: Date(), distanceMeters: 0, meanPaceSecPerKm: 0, meanCadence: 0, meanHR: 100),
             BucketData(startTime: Date(), distanceMeters: 100, meanPaceSecPerKm: 300, meanCadence: 160, meanHR: 140),
             BucketData(startTime: Date(), distanceMeters: 0.1, meanPaceSecPerKm: 0, meanCadence: 20, meanHR: 120)
         ]
-        
+
         let trimmed = await engine.trimDeadStops(buckets: buckets)
         XCTAssertEqual(trimmed.count, 1)
         XCTAssertEqual(trimmed[0].distanceMeters, 100)
     }
-    
+
     func testCalculateWorkingAverages() async {
         let buckets = [
             BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 160, meanHR: 140),
             BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 164, meanHR: 144)
         ]
-        
+
         let averages = await engine.calculateWorkingAverages(trimmed: buckets)
         XCTAssertEqual(averages.workingCadence, 162)
         XCTAssertEqual(averages.workingHR, 142)
@@ -185,12 +187,12 @@ final class FramboiseEngineTests: XCTestCase {
             BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 164, meanHR: 144, meanVerticalOscillation: 0.0), // no sample this minute
             BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 162, meanHR: 142, meanVerticalOscillation: 9.2)
         ]
-        
+
         let averages = await engine.calculateWorkingAverages(trimmed: buckets)
         // Only the two non-zero buckets (8.8 and 9.2) should be averaged -> 9.0, not (8.8 + 0 + 9.2) / 3 = 6.0
         XCTAssertEqual(averages.workingOscillation, 9.0, accuracy: 0.01)
     }
-    
+
     func testFilterRunningSamples_DropsStationaryAndWalking() async {
         let buckets = [
             // Stationary: 0 m/s, 0 SPM -> Drop
@@ -202,7 +204,7 @@ final class FramboiseEngineTests: XCTestCase {
             // Running by cadence: 80m in 60s = 1.33 m/s, cadence 150 (> 130) -> Keep
             BucketData(startTime: Date(), distanceMeters: 80, meanPaceSecPerKm: 750, meanCadence: 150, meanHR: 140)
         ]
-        
+
         let filtered = await engine.filterRunningSamples(buckets: buckets)
         XCTAssertEqual(filtered.count, 2)
         XCTAssertEqual(filtered[0].distanceMeters, 120)
@@ -232,25 +234,25 @@ final class FramboiseEngineTests: XCTestCase {
         let averages = await engine.calculateWorkingAverages(trimmed: buckets)
         XCTAssertEqual(averages.workingPace, 300, accuracy: 0.01, "workingPace must use pure aggregate ratio (duration / distanceKm)")
     }
-    
+
     func testCalculatePaceCV() async {
         let paces = [300.0, 300.0, 300.0, 300.0]
-        let cv = await engine.calculatePaceCV(bucketPaces: paces)
-        XCTAssertEqual(cv, 0, accuracy: 0.001)
-        
+        let calculatedCV = await engine.calculatePaceCV(bucketPaces: paces)
+        XCTAssertEqual(calculatedCV, 0, accuracy: 0.001)
+
         let variablePaces = [200.0, 400.0]
-        let cv2 = await engine.calculatePaceCV(bucketPaces: variablePaces)
+        let calculatedCV2 = await engine.calculatePaceCV(bucketPaces: variablePaces)
         // mean = 300. variance = sum((x-300)^2) / 1 = 10000 + 10000 = 20000. sigma = sqrt(20000) ~ 141.42
         // CV = 141.42 / 300 = 0.471
-        XCTAssertEqual(cv2, 0.471, accuracy: 0.01)
+        XCTAssertEqual(calculatedCV2, 0.471, accuracy: 0.01)
     }
-    
+
     func testCalculatePaceSlope() async {
         let paces = [300.0, 310.0, 320.0, 330.0]
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
         // Increasing by 10 per bucket -> slope = +10
         XCTAssertEqual(slope, 10, accuracy: 0.01)
-        
+
         let paces2 = [300.0, 290.0, 280.0, 270.0]
         let slope2 = await engine.calculatePaceSlope(bucketPaces: paces2)
         // Decreasing by 10 per bucket -> slope = -10
@@ -261,19 +263,19 @@ final class FramboiseEngineTests: XCTestCase {
 final class SafeTargetCalculatorTests: XCTestCase {
     func testSafeCadenceTarget() {
         let unit = HKUnit.count().unitDivided(by: .minute())
-        
+
         // Requested normal cadence
         let target1 = SafeTargetCalculator.safeCadenceTarget(requestedCadence: 165, previousCadence: 160)
         XCTAssertEqual(target1?.doubleValue(for: unit), 165)
-        
+
         // Requested extremely high cadence (should be clamped to 185)
         let target2 = SafeTargetCalculator.safeCadenceTarget(requestedCadence: 200, previousCadence: 160)
         XCTAssertEqual(target2?.doubleValue(for: unit), 185)
-        
+
         // Requested lower than previous cadence (should be clamped to floor of previous)
         let target3 = SafeTargetCalculator.safeCadenceTarget(requestedCadence: 140, previousCadence: 160)
         XCTAssertEqual(target3?.doubleValue(for: unit), 160)
-        
+
         // No requested cadence
         let target4 = SafeTargetCalculator.safeCadenceTarget(requestedCadence: nil, previousCadence: 160)
         XCTAssertNil(target4)
@@ -283,17 +285,17 @@ final class SafeTargetCalculatorTests: XCTestCase {
 final class PaceFormatterTests: XCTestCase {
     func testFormatPaceMetric() {
         UserDefaults.standard.set(true, forKey: "useMetricSystem")
-        
+
         let pace1 = PaceFormatter.formatPace(secondsPerKilometer: 300) // 5:00/km
         XCTAssertEqual(pace1, "5:00/km")
-        
+
         let pace2 = PaceFormatter.formatPace(secondsPerKilometer: 315) // 5:15/km
         XCTAssertEqual(pace2, "5:15/km")
     }
-    
+
     func testFormatPaceImperial() {
         UserDefaults.standard.set(false, forKey: "useMetricSystem")
-        
+
         // 300 sec/km * 1.609344 = 482.8032 sec/mi -> 8 min 3 sec -> 8:03/mi
         let pace1 = PaceFormatter.formatPace(secondsPerKilometer: 300)
         XCTAssertEqual(pace1, "8:03/mi")
@@ -305,10 +307,10 @@ final class DrillTemplateTests: XCTestCase {
         let template = DrillTemplate.template(for: .cadencePyramids)
         let thirtyDayCadence = 151
         let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
-        
+
         // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158)
         XCTAssertEqual(computedTarget, 158)
-        
+
         // Instructional cues provide prescriptive biomechanical focus
         let cue = template.generateInstructionalCue(computedTarget)
         XCTAssertFalse(cue.isEmpty, "Instructional cue should be present")
@@ -319,13 +321,13 @@ final class DrillTemplateTests: XCTestCase {
 final class CardiacGuardrailTests: XCTestCase {
     func testCardiacGuardrailHighHR() async {
         let framboise = FramboiseEngine()
-        
+
         // High HR run (175 BPM, zone 4 = 0.5) must never be classified as Easy Run or Recovery Run
         let highHRClass = await framboise.classifyRun(cv: 0.04, slope: -0.1, zone4: 0.5, durationMinutes: 30, averageHR: 175)
         XCTAssertNotEqual(highHRClass, "Easy Run")
         XCTAssertNotEqual(highHRClass, "Recovery Run")
         XCTAssertTrue(highHRClass == "Tempo Run" || highHRClass == "Intervals" || highHRClass == "Progression Run")
-        
+
         // Low HR run (125 BPM, zone 4 = 0.04, duration 45 min) is Easy Run
         let lowHRClass = await framboise.classifyRun(cv: 0.04, slope: -0.1, zone4: 0.04, durationMinutes: 45, averageHR: 125)
         XCTAssertEqual(lowHRClass, "Easy Run")
@@ -594,7 +596,7 @@ final class LiveCoachDTOCodableTests: XCTestCase {
 
     func testDrillDurationScaling() {
         let drill = PreRunDrill(id: .cadencePyramids, previousCadence: 160)
-        
+
         let work10 = drill.workString(for: .tenMinutes)
         let work15 = drill.workString(for: .fifteenMinutes)
         let work30 = drill.workString(for: .thirtyMinutes)
@@ -641,5 +643,3 @@ final class LiveCoachDTOCodableTests: XCTestCase {
         XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 175, targetSPM: 170, intervalElapsedSeconds: 30))
     }
 }
-
-

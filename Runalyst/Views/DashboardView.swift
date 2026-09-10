@@ -12,7 +12,7 @@ struct DashboardView: View {
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
 
     @State private var isSyncing: Bool = true
-    @State private var selectedFilter: String? = nil
+    @State private var selectedFilter: String?
 
     @AppStorage("dashboardTimeRange") private var timeRange: String = "30 Days"
     @AppStorage("lastBaselineChangeTimestamp") private var lastBaselineChangeTimestamp: Double = 0
@@ -28,20 +28,20 @@ struct DashboardView: View {
 
     @AppStorage("cachedHeadline_AllTime") private var cachedHeadlineAllTime: String = ""
     @AppStorage("cachedBody_AllTime") private var cachedBodyAllTime: String = ""
-    
+
     @AppStorage("lastInsightRunCount") private var lastInsightRunCount: Int = 0
 
     @State private var isFetchingInsight = false
     @State private var isShowingWorkoutPreview: Bool = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
-    @State private var activeExplainer: MetricExplainerInfo? = nil
+    @State private var activeExplainer: MetricExplainerInfo?
     @State private var isSchedulingWatch: Bool = false
     @State private var scheduledWatchSuccess: Bool = false
 
     private var filteredRunRecords: [RunRecord] {
         let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
         var filtered = runRecords.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
-        
+
         // Time filter
         let now = Date()
         if timeRange == "7 Days", let limit = Calendar.current.date(byAdding: .day, value: -7, to: now) {
@@ -49,7 +49,7 @@ struct DashboardView: View {
         } else if timeRange == "30 Days", let limit = Calendar.current.date(byAdding: .day, value: -30, to: now) {
             filtered = filtered.filter { $0.date >= limit }
         }
-        
+
         if let filter = selectedFilter {
             filtered = filtered.filter { $0.detectedTypeRaw == filter || $0.framboiseTags.contains(filter) }
         }
@@ -143,7 +143,7 @@ struct DashboardView: View {
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
-    
+
     // Extract unique tags for filter chips
     var availableFilters: [String] {
         var tags = Set<String>()
@@ -156,11 +156,11 @@ struct DashboardView: View {
         return Array(tags).sorted()
     }
 
-    var onSync: ((Bool) async -> Void)? = nil
+    var onSync: ((Bool) async -> Void)?
 
-    @State private var globalVO2Max: Double? = nil
-    @State private var baselineVO2Max: Double? = nil
-    
+    @State private var globalVO2Max: Double?
+    @State private var baselineVO2Max: Double?
+
     @ViewBuilder
     private var filterControlsSection: some View {
         VStack(spacing: 12) {
@@ -171,7 +171,7 @@ struct DashboardView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
-            
+
             VStack(alignment: .leading) {
                 Text("Min Distance: \(String(format: "%.1f", minimumRunDistance)) \(useMetricSystem ? "km" : "mi")")
                     .font(.caption)
@@ -232,7 +232,7 @@ struct DashboardView: View {
             autoSyncStaleWatchDrillIfNeeded()
         }
     }
-    
+
     private func currentHeadline() -> String {
         switch timeRange {
         case "7 Days": return cachedHeadline7Day
@@ -241,7 +241,7 @@ struct DashboardView: View {
         default: return ""
         }
     }
-    
+
     private func currentBody() -> String {
         switch timeRange {
         case "7 Days": return cachedBody7Day
@@ -250,7 +250,7 @@ struct DashboardView: View {
         default: return ""
         }
     }
-    
+
     private func checkAndFetchInsight() {
         let currentRunCount = runRecords.count
         if currentRunCount != lastInsightRunCount {
@@ -263,24 +263,24 @@ struct DashboardView: View {
             cachedBodyAllTime = ""
             lastInsightRunCount = currentRunCount
         }
-        
+
         if currentHeadline().isEmpty || currentBody().isEmpty {
             fetchInsight()
         }
     }
-    
+
     private func fetchInsight() {
         guard !isFetchingInsight else { return }
         guard !filteredRunRecords.isEmpty else { return }
         isFetchingInsight = true
-        
+
         let avgPace = filteredRunRecords.map(\.workingAvgPace).reduce(0, +) / Double(filteredRunRecords.count)
         let avgHR = filteredRunRecords.map(\.workingAvgHeartRate).reduce(0, +) / Double(filteredRunRecords.count)
         let avgCadence = filteredRunRecords.map(\.workingAvgCadence).reduce(0, +) / Double(filteredRunRecords.count)
         let avgCV = filteredRunRecords.map(\.paceCV).reduce(0, +) / Double(filteredRunRecords.count)
         let avgSlope = filteredRunRecords.map(\.paceSlope).reduce(0, +) / Double(filteredRunRecords.count)
         let zone4Sum = filteredRunRecords.map(\.percentZone4).reduce(0, +) / Double(filteredRunRecords.count)
-        
+
         let paceContext = PaceFormatter.formatPace(secondsPerKilometer: avgPace)
         let hrContext = "\(Int(avgHR)) BPM"
         let cadenceContext = "\(Int(avgCadence)) SPM"
@@ -288,7 +288,7 @@ struct DashboardView: View {
         let cvContext = String(format: "%.3f", avgCV)
         let slopeContext = String(format: "%.3f", avgSlope)
         let stageContext = "Competitor" // Simplified for now, or could calculate from volume
-        
+
         let runData = AggregateRunDataForAI(
             paceContext: paceContext,
             hrContext: hrContext,
@@ -298,9 +298,9 @@ struct DashboardView: View {
             slopeContext: slopeContext,
             stageContext: stageContext
         )
-        
+
         let targetTimeRange = timeRange
-        
+
         Task {
             do {
                 if #available(iOS 26.0, *) {
@@ -329,7 +329,7 @@ struct DashboardView: View {
             }
         }
     }
-    
+
     private var activePrimerId: PreRunDrillId {
         if let cadence = baselineCadence, cadence < 150 {
             return .cadencePyramids
@@ -348,7 +348,7 @@ struct DashboardView: View {
         let template = DrillTemplate.template(for: primerId)
         let baseCadence = baselineCadence ?? 155
         let computedTarget = template.calculateTargetCadence(baseCadence)
-        
+
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: primerId.iconName)
@@ -507,12 +507,12 @@ struct DashboardView: View {
     private func autoSyncStaleWatchDrillIfNeeded() {
         guard lastWatchExportTimestamp > 0 && lastBaselineChangeTimestamp > lastWatchExportTimestamp, !lastExportedDrillId.isEmpty else { return }
         guard #available(iOS 17.0, *) else { return }
-        
+
         let preRunId = PreRunDrillId(rawValue: lastExportedDrillId) ?? activePrimerId
         let template = DrillTemplate.template(for: preRunId)
         let baseCadence = baselineCadence ?? 155
         let computedTarget = template.calculateTargetCadence(baseCadence)
-        
+
         Task {
             let dto = DrillPrescriptionDTO(
                 title: template.title,
@@ -750,7 +750,7 @@ struct DashboardView: View {
             MetricExplainerSheet(info: info)
         }
     }
-    
+
     @ViewBuilder
     private var filterChips: some View {
         if !availableFilters.isEmpty {
@@ -765,7 +765,7 @@ struct DashboardView: View {
                             .foregroundColor(selectedFilter == nil ? .white : .primary)
                             .clipShape(Capsule())
                     }
-                    
+
                     ForEach(availableFilters, id: \.self) { filter in
                         Button(action: {
                             if selectedFilter == filter {
@@ -795,13 +795,13 @@ struct DashboardView: View {
             ScrollView {
                 LazyVStack(spacing: 20) {
                     filterControlsSection
-                    
+
                     fitnessBaselineCard
-                    
+
                     aiFatigueInsightCard
-                    
+
                     proactiveCoachCard
-                    
+
                     filterChips
 
                     if filteredRunRecords.isEmpty {
@@ -817,7 +817,7 @@ struct DashboardView: View {
                             .padding(.top, 60)
                         }
                     } else {
-                        if filteredRunRecords.count > 0 {
+                        if !filteredRunRecords.isEmpty {
                             Section(header: Text(selectedFilter == nil ? "Past Runs" : "Filtered Runs")
                                                 .font(.title3.bold())
                                                 .padding(.horizontal)
@@ -896,7 +896,7 @@ struct DashboardView: View {
                                 .foregroundColor(.red)
                         }
                         #endif
-                        
+
                         NavigationLink(destination: SettingsView(onForceSync: onSync)) {
                             Image(systemName: "gearshape")
                         }
@@ -1055,7 +1055,7 @@ struct HeroCardView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(runRecord.insight != nil ? "Latest Insight. \(runRecord.insight!.headline)." : "Analyzing your run...")
+        .accessibilityLabel(runRecord.insight.map { "Latest Insight. \($0.headline)." } ?? "Analyzing your run...")
     }
 
     @ViewBuilder
@@ -1072,9 +1072,9 @@ enum MetricPolarity {
 struct MetricView: View {
     let title: String
     let value: String
-    var currentValue: Double? = nil
-    var baselineValue: Double? = nil
-    var polarity: MetricPolarity? = nil
+    var currentValue: Double?
+    var baselineValue: Double?
+    var polarity: MetricPolarity?
 
     @State private var showingInfo = false
 

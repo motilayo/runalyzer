@@ -215,7 +215,7 @@ struct RunDetailView: View {
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
                     StatBox(
                         title: "Vert. Osc.",
-                        value: currentOscillation != nil ? String(format: "%.1f", currentOscillation!) : "--",
+                        value: currentOscillation.map { String(format: "%.1f", $0) } ?? "--",
                         unit: currentOscillation != nil ? "cm" : "",
                         currentValue: currentOscillation,
                         baselineValue: showRawMetrics ? nil : baselineOscillation,
@@ -323,9 +323,9 @@ struct StatBox: View {
     var title: String
     var value: String
     var unit: String
-    var currentValue: Double? = nil
-    var baselineValue: Double? = nil
-    var polarity: MetricPolarity? = nil
+    var currentValue: Double?
+    var baselineValue: Double?
+    var polarity: MetricPolarity?
     var isWorkoutStats: Bool = false
 
     @State private var showingInfo = false
@@ -440,7 +440,7 @@ struct DrillDeckView: View {
         .padding(.horizontal)
         .padding(.bottom, 20)
         .gesture(
-            DragGesture(minimumDistance: 15).onChanged { g in updateDragOffset(g.translation, isActive: relativeIndex == 0) }
+            DragGesture(minimumDistance: 15).onChanged { dragGesture in updateDragOffset(dragGesture.translation, isActive: relativeIndex == 0) }
             .onEnded { _ in finishDrag(isActive: relativeIndex == 0, totalDrills: totalDrills) }
         )
     }
@@ -489,10 +489,10 @@ private struct DrillCardView: View {
         let preRunId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
         let template = DrillTemplate.template(for: preRunId)
         let displayTitle = drill.drillTitle.isEmpty ? template.title : drill.drillTitle
-        let work = drill.drillWork?.isEmpty == false ? drill.drillWork! : template.defaultWork
-        let recovery = drill.drillRecovery?.isEmpty == false ? drill.drillRecovery! : template.defaultRecovery
-        let effort = drill.drillEffort?.isEmpty == false ? drill.drillEffort! : template.defaultEffort
-        let purpose = drill.drillPurpose?.isEmpty == false ? drill.drillPurpose! : template.defaultPurpose
+        let work = (drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork
+        let recovery = (drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery
+        let effort = (drill.drillEffort?.isEmpty == false ? drill.drillEffort : nil) ?? template.defaultEffort
+        let purpose = (drill.drillPurpose?.isEmpty == false ? drill.drillPurpose : nil) ?? template.defaultPurpose
 
         VStack(alignment: .leading, spacing: 12) {
             if totalDrills > 1 {
@@ -551,8 +551,8 @@ private struct DrillCardView: View {
             }
 
             let cue: String? = {
-                if let c = drill.drillCues, !c.isEmpty, !c.localizedCaseInsensitiveContains("spm") {
-                    return c
+                if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
+                    return cueText
                 }
                 let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
                 let generated = template.generateInstructionalCue(targetInt)
@@ -685,5 +685,3 @@ private struct DrillCardView: View {
     }
 }
 }
-
-

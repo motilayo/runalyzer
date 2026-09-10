@@ -3,15 +3,12 @@ import SwiftUI
 @preconcurrency import WorkoutKit
 import HealthKit
 
-
-
-
 /// A lightweight, Sendable Data Transfer Object used to pass AI recommendations
 public enum DrillDuration: Int, CaseIterable, Sendable, Codable {
     case tenMinutes = 10
     case fifteenMinutes = 15
     case thirtyMinutes = 30
-    
+
     public var title: String {
         "\(rawValue) min"
     }
@@ -40,11 +37,11 @@ enum SafeTargetCalculator {
     /// Caps the prescribed cadence alert range to a maximum of 185 SPM to prevent overstriding.
     static func safeCadenceTarget(requestedCadence: Int?, previousCadence: Int?) -> HKQuantity? {
         guard let requested = requestedCadence else { return nil }
-        
+
         let safeMax = 185
         let floor = max(140, previousCadence ?? 150)
         let safeTarget = min(safeMax, max(floor, requested))
-        
+
         return HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: Double(safeTarget))
     }
 }
@@ -54,7 +51,7 @@ enum SafeTargetCalculator {
 @available(iOS 17.0, *)
 @MainActor
 final class WorkoutBridge {
-    
+
     /// Translates a DTO into a scheduled WorkoutKit plan for Apple Watch.
     func scheduleDrill(dto: DrillPrescriptionDTO) async throws {
         if await WorkoutScheduler.shared.authorizationState != .authorized {
@@ -63,7 +60,7 @@ final class WorkoutBridge {
                 throw NSError(domain: "WorkoutBridge", code: 1, userInfo: [NSLocalizedDescriptionKey: "WorkoutKit authorization denied."])
             }
         }
-        
+
         let preRunId = PreRunDrillId(rawValue: dto.preRunDrillId ?? "") ?? .strides
         let duration = DrillDuration(rawValue: dto.durationMinutes ?? 15) ?? .fifteenMinutes
         let haptic = HapticFeedbackMode(rawValue: dto.hapticMode ?? "") ?? .on
@@ -75,14 +72,11 @@ final class WorkoutBridge {
             hapticMode: haptic
         )
         let plan = drill.buildWorkoutPlan()
-        
+
         let now = Calendar.current.dateComponents([.calendar, .timeZone, .year, .month, .day, .hour, .minute], from: Date())
         await WorkoutScheduler.shared.schedule(plan, at: now)
     }
 }
-
-
-
 
 enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
     case cadencePyramids = "cadence_pyramids"
@@ -95,7 +89,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
     case hillBounds = "hill_bounds"
     case recoveryJog = "recovery_jog"
     case aerobicBaseBuilder = "aerobic_base_builder"
-    
+
     var title: String {
         switch self {
         case .cadencePyramids: return "Cadence Pyramids"
@@ -224,7 +218,7 @@ struct PreRunDrill: Sendable {
     let targetCadence: Int?
     let duration: DrillDuration
     let hapticMode: HapticFeedbackMode
-    
+
     init(
         id: PreRunDrillId,
         previousCadence: Int? = nil,
@@ -238,11 +232,11 @@ struct PreRunDrill: Sendable {
         self.duration = duration
         self.hapticMode = hapticMode
     }
-    
+
     // Mathematical variables for constraints
     private let safeMaxCadence = 185
     private let safeMinCadence = 140
-    
+
     var effectiveTargetCadence: Int? {
         // Recovery / flush / base builder drills do not use cadence turnover alerts
         switch id {
@@ -251,7 +245,7 @@ struct PreRunDrill: Sendable {
         default:
             break
         }
-        
+
         if let target = targetCadence, target > 0 {
             return min(safeMaxCadence, max(safeMinCadence, target))
         }
@@ -261,11 +255,11 @@ struct PreRunDrill: Sendable {
         }
         return nil
     }
-    
+
     var computedCadence: Int? {
         return effectiveTargetCadence
     }
-    
+
     func workString(for customDuration: DrillDuration) -> String {
         switch id {
         case .cadencePyramids:
@@ -375,11 +369,11 @@ struct PreRunDrill: Sendable {
     var defaultWorkString: String {
         workString(for: duration)
     }
-    
+
     var defaultRecoveryString: String {
         recoveryString(for: duration)
     }
-    
+
     var defaultEffortString: String {
         switch id {
         case .recoveryJog, .aerobicFlush: return "Easy / Zone 1-2"
@@ -389,14 +383,14 @@ struct PreRunDrill: Sendable {
         case .strides, .neuromuscularPrimer, .hillBounds: return "Sprint / Zone 5"
         }
     }
-    
+
     @available(iOS 17.0, *)
     func buildWorkoutPlan() -> WorkoutPlan {
         var workout = CustomWorkout(activity: .running, location: .outdoor, displayName: id.title)
-        
+
         let warmUpDuration: Double
         let coolDownDuration: Double
-        
+
         if id == .aerobicBaseBuilder {
             warmUpDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0)
             coolDownDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
@@ -407,22 +401,22 @@ struct PreRunDrill: Sendable {
             warmUpDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 4.0 : 3.0)
             coolDownDuration = duration == .tenMinutes ? 1.0 : (duration == .thirtyMinutes ? 3.0 : 2.0)
         }
-        
+
         let warmUp = warmUpDuration > 0 ? WorkoutStep(goal: .time(warmUpDuration, .minutes)) : nil
         let coolDown = coolDownDuration > 0 ? WorkoutStep(goal: .time(coolDownDuration, .minutes)) : nil
-        
-        var alert: (any WorkoutAlert)? = nil
+
+        var alert: (any WorkoutAlert)?
         if let target = effectiveTargetCadence {
             let cadenceValue = Double(target)
             alert = CadenceThresholdAlert.cadence(cadenceValue)
         } else if id == .aerobicBaseBuilder {
             alert = HeartRateZoneAlert(zone: 2)
         }
-        
+
         var iterations = 1
         var workGoal = WorkoutGoal.open
-        var recoveryGoal: WorkoutGoal? = nil
-        
+        var recoveryGoal: WorkoutGoal?
+
         switch id {
         case .cadencePyramids:
             switch duration {
@@ -542,19 +536,19 @@ struct PreRunDrill: Sendable {
             workGoal = .time(Double(duration.rawValue), .minutes)
             recoveryGoal = nil
         }
-        
+
         let workStep = WorkoutStep(goal: workGoal, alert: alert)
-        
+
         if let rec = recoveryGoal {
             let recStep = WorkoutStep(goal: rec)
             workout.blocks = [IntervalBlock(steps: [IntervalStep(.work, step: workStep), IntervalStep(.recovery, step: recStep)], iterations: iterations)]
         } else {
             workout.blocks = [IntervalBlock(steps: [IntervalStep(.work, step: workStep)], iterations: iterations)]
         }
-        
+
         workout.warmup = warmUp
         workout.cooldown = coolDown
-        
+
         return WorkoutPlan(.custom(workout))
     }
 }
@@ -568,11 +562,11 @@ struct DrillTemplate: Sendable {
     let defaultWork: String
     let defaultRecovery: String
     let defaultEffort: String
-    
+
     /// Target calculation closures enforcing 30-day user baselines
     let calculateTargetCadence: @Sendable (_ thirtyDayCadence: Int) -> Int
     let calculateTargetPace: @Sendable (_ thirtyDayPace: Double) -> Double
-    
+
     /// Instructional text interpolating the computed target output from the closure
     let generateInstructionalCue: @Sendable (_ computedTargetCadence: Int) -> String
 
@@ -605,7 +599,7 @@ struct DrillTemplate: Sendable {
         self.calculateTargetPace = calculateTargetPace
         self.generateInstructionalCue = generateInstructionalCue
     }
-    
+
     static func template(for id: PreRunDrillId) -> DrillTemplate {
         switch id {
         case .cadencePyramids:

@@ -48,9 +48,9 @@ struct SettingsView: View {
                         Text("Unit System")
                             .font(.body)
                     }
-                    
+
                     Spacer()
-                    
+
                     Picker("Unit System", selection: $useMetricSystem) {
                         Text("Metric").tag(true)
                         Text("Imperial").tag(false)
@@ -77,7 +77,7 @@ struct SettingsView: View {
                         } catch {
                             print("Health authorization error: \(error.localizedDescription)")
                         }
-                        
+
                         if prevStatus == .unnecessary {
                             showHealthSettingsAlert = true
                         }
