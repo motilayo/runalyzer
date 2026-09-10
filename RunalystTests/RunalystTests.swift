@@ -28,15 +28,13 @@ final class HealthKitManagerTests: XCTestCase {
     var mockStore: MockHealthStore!
     var sut: HealthKitManager!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
         mockStore = MockHealthStore()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         mockStore = nil
         sut = nil
-        super.tearDown()
     }
 
     func testRequestAuthorization_WhenHealthDataNotAvailable_ThrowsError() async {
@@ -338,14 +336,12 @@ final class CardiacGuardrailTests: XCTestCase {
 final class LiveCoachEngineTests: XCTestCase {
     var engine: LiveCoachEngine!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
         engine = LiveCoachEngine()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         engine = nil
-        super.tearDown()
     }
 
     func testTranslatePrescription_ValidPattern() {
