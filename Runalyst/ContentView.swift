@@ -151,15 +151,20 @@ struct ContentView: View {
             }
             try modelContext.save()
 
-            // Lazy load AI analysis ONLY for runs within the last 7 days
+            // Preload AI analysis ONLY for runs within the last 7 days or past 5 runs
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
             let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
 
             if let allRuns = try? modelContext.fetch(descriptor) {
-                let recentRuns = allRuns.filter { $0.date >= sevenDaysAgo }
+                let runsToPreload = allRuns.enumerated().compactMap { index, run -> RunRecord? in
+                    if run.date >= sevenDaysAgo || index < 5 {
+                        return run
+                    }
+                    return nil
+                }
                 let container = modelContext.container
 
-                for run in recentRuns where run.insight == nil {
+                for run in runsToPreload where run.insight == nil {
                     let runId = run.persistentModelID
                     if #available(iOS 26.0, *) {
                         Task.detached {

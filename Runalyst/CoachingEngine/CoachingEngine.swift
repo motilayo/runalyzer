@@ -386,38 +386,42 @@ actor RunAnalyzerActor {
                 longitudinalObservation: payload.observation
             )
 
+            let isOlderThan7Days = (Calendar.current.dateComponents([.day], from: targetDate, to: Date()).day ?? 0) > 7
+
             var drillRecs: [DrillRecommendation] = []
-            for (index, suggestedDrill) in payload.drills.enumerated() {
-                let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
-                let template = DrillTemplate.template(for: preRunId)
-                let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
-                let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
+            if !isOlderThan7Days {
+                for (index, suggestedDrill) in payload.drills.enumerated() {
+                    let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
+                    let template = DrillTemplate.template(for: preRunId)
+                    let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
+                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
 
-                let targetCadenceStr = preRunDrill.computedCadence.map { "\($0) SPM" }
+                    let targetCadenceStr = preRunDrill.computedCadence.map { "\($0) SPM" }
 
-                // Prescriptive somatic cue (form, breathing, posture) without conflicting workout plan stats
-                let templateCue = template.generateInstructionalCue(computedTarget)
-                let drillCueText: String
-                if !suggestedDrill.drillCues.isEmpty && !suggestedDrill.drillCues.localizedCaseInsensitiveContains("spm") {
-                    drillCueText = suggestedDrill.drillCues
-                } else {
-                    drillCueText = templateCue
+                    // Prescriptive somatic cue (form, breathing, posture) without conflicting workout plan stats
+                    let templateCue = template.generateInstructionalCue(computedTarget)
+                    let drillCueText: String
+                    if !suggestedDrill.drillCues.isEmpty && !suggestedDrill.drillCues.localizedCaseInsensitiveContains("spm") {
+                        drillCueText = suggestedDrill.drillCues
+                    } else {
+                        drillCueText = templateCue
+                    }
+
+                    let drill = DrillRecommendation(
+                        drillTitle: suggestedDrill.drillTitle,
+                        preRunDrillId: preRunId.rawValue,
+                        drillPurpose: suggestedDrill.drillPurpose.isEmpty ? template.defaultPurpose : suggestedDrill.drillPurpose,
+                        drillWork: preRunDrill.defaultWorkString,
+                        drillCues: drillCueText,
+                        drillEffort: preRunDrill.defaultEffortString,
+                        drillRecovery: preRunDrill.defaultRecoveryString,
+                        targetCadence: targetCadenceStr,
+                        previousCadence: preRunDrill.previousCadence,
+                        isCompleted: false,
+                        orderIndex: index
+                    )
+                    drillRecs.append(drill)
                 }
-
-                let drill = DrillRecommendation(
-                    drillTitle: suggestedDrill.drillTitle,
-                    preRunDrillId: preRunId.rawValue,
-                    drillPurpose: suggestedDrill.drillPurpose.isEmpty ? template.defaultPurpose : suggestedDrill.drillPurpose,
-                    drillWork: preRunDrill.defaultWorkString,
-                    drillCues: drillCueText,
-                    drillEffort: preRunDrill.defaultEffortString,
-                    drillRecovery: preRunDrill.defaultRecoveryString,
-                    targetCadence: targetCadenceStr,
-                    previousCadence: preRunDrill.previousCadence,
-                    isCompleted: false,
-                    orderIndex: index
-                )
-                drillRecs.append(drill)
             }
             insight.drillRecommendations = drillRecs
 

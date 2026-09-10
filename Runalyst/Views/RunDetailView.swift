@@ -226,7 +226,52 @@ struct RunDetailView: View {
                 .padding(.horizontal)
 
                 // MARK: Drills Section
-                if let insight = runRecord.insight {
+                let isOlderThan7Days = (Calendar.current.dateComponents([.day], from: runRecord.date, to: Date()).day ?? 0) > 7
+
+                if isOlderThan7Days {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Pre-Run Drills")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+
+                        VStack(spacing: 12) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "figure.run.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.accentColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Drills Library")
+                                        .font(.subheadline.bold())
+                                    Text("Drill recommendations are tailored for recent runs. Explore all pre-run technique drills in the library.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                            }
+
+                            NavigationLink(destination: DrillsLibraryView()) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "list.bullet.rectangle.portrait.fill")
+                                    Text("View All Drills")
+                                }
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(20)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                } else if let insight = runRecord.insight {
                     if let drills = insight.drillRecommendations, !drills.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -262,38 +307,38 @@ struct RunDetailView: View {
                     .multilineTextAlignment(.center)
                     .frame(minHeight: 1)
                     .padding(32)
-                    .task(id: runRecord.id) {
-                        let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
-                           (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
-                        let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
-                        if needsOscRepair || needsWorkingRepair {
-                            if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
-                                let engine = FramboiseEngine()
-                                if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
-                                    runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
-                                    runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
-                                    runRecord.workingDistanceMeters = dto.workingDistanceMeters
-                                    runRecord.workingDurationSeconds = dto.workingDurationSeconds
-                                    runRecord.workingAvgPace = dto.workingAvgPace
-                                    try? modelContext.save()
-                                }
-                            }
+                }
+            }
+            .padding(.vertical)
+            .task(id: runRecord.id) {
+                let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
+                   (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
+                let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
+                if needsOscRepair || needsWorkingRepair {
+                    if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
+                        let engine = FramboiseEngine()
+                        if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
+                            runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
+                            runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+                            runRecord.workingDistanceMeters = dto.workingDistanceMeters
+                            runRecord.workingDurationSeconds = dto.workingDurationSeconds
+                            runRecord.workingAvgPace = dto.workingAvgPace
+                            try? modelContext.save()
                         }
+                    }
+                }
 
-                        if runRecord.insight == nil {
-                            let container = modelContext.container
-                            let runId = runRecord.persistentModelID
-                            if #available(iOS 26.0, *) {
-                                Task.detached {
-                                    let analyzer = RunAnalyzerActor(modelContainer: container)
-                                    await analyzer.generateAnalysis(for: runId)
-                                }
-                            }
+                if runRecord.insight == nil {
+                    let container = modelContext.container
+                    let runId = runRecord.persistentModelID
+                    if #available(iOS 26.0, *) {
+                        Task.detached {
+                            let analyzer = RunAnalyzerActor(modelContainer: container)
+                            await analyzer.generateAnalysis(for: runId)
                         }
                     }
                 }
             }
-            .padding(.vertical)
         }
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80)

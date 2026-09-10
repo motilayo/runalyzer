@@ -638,4 +638,47 @@ final class LiveCoachDTOCodableTests: XCTestCase {
         XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 170, targetSPM: 170, intervalElapsedSeconds: 30))
         XCTAssertFalse(LiveCoachEngine.shouldTriggerHaptic(mode: .on, currentSPM: 175, targetSPM: 170, intervalElapsedSeconds: 30))
     }
+
+    func testPreloadFilter_Past7DaysOrPast5Runs() {
+        let calendar = Calendar.current
+        let today = Date()
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+
+        // Create 10 dummy run dates (newest first, indices 0 to 9)
+        // 0: today (within 7d, index < 5) -> preload
+        // 1: 2d ago (within 7d, index < 5) -> preload
+        // 2: 5d ago (within 7d, index < 5) -> preload
+        // 3: 8d ago (> 7d, index < 5) -> preload (because index < 5)
+        // 4: 9d ago (> 7d, index < 5) -> preload (because index < 5)
+        // 5: 10d ago (> 7d, index >= 5) -> skip
+        // 6: 12d ago (> 7d, index >= 5) -> skip
+        // 7: 15d ago (> 7d, index >= 5) -> skip
+        let daysAgoList = [0, 2, 5, 8, 9, 10, 12, 15]
+        let dummyRuns = daysAgoList.map { days in
+            calendar.date(byAdding: .day, value: -days, to: today) ?? today
+        }
+
+        let preloadedIndices = dummyRuns.enumerated().compactMap { index, date -> Int? in
+            if date >= sevenDaysAgo || index < 5 {
+                return index
+            }
+            return nil
+        }
+
+        XCTAssertEqual(preloadedIndices, [0, 1, 2, 3, 4])
+    }
+
+    func testDrillRecommendationEligibility_OlderThan7Days() {
+        let calendar = Calendar.current
+        let now = Date()
+
+        let recentDate = calendar.date(byAdding: .day, value: -3, to: now) ?? now
+        let oldDate = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+
+        let recentDays = calendar.dateComponents([.day], from: recentDate, to: now).day ?? 0
+        let oldDays = calendar.dateComponents([.day], from: oldDate, to: now).day ?? 0
+
+        XCTAssertFalse(recentDays > 7, "Recent run should be <= 7 days")
+        XCTAssertTrue(oldDays > 7, "Old run should be > 7 days")
+    }
 }
