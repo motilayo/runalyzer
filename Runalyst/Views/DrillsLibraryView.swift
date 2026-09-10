@@ -252,6 +252,8 @@ struct DrillPrimerCardView: View {
 
     @State private var selectedDuration: DrillDuration = .fifteenMinutes
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
+    @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
+    @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @State private var showingTargetExplainer = false
 
     private var selectedHapticMode: HapticFeedbackMode {
@@ -407,7 +409,13 @@ struct DrillPrimerCardView: View {
 
             // Single Action Button: Start Drill
             Button(action: {
-                startDrill(preRunId: drillId, targetCadence: targetCadence, duration: selectedDuration, hapticMode: selectedHapticMode)
+                startDrill(
+                    title: displayTitle,
+                    purpose: purpose,
+                    targetCadence: targetCadence,
+                    duration: selectedDuration,
+                    hapticMode: selectedHapticMode
+                )
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "play.fill")
@@ -429,9 +437,15 @@ struct DrillPrimerCardView: View {
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
-    private func startDrill(preRunId: PreRunDrillId, targetCadence: Int?, duration: DrillDuration, hapticMode: HapticFeedbackMode) {
+    private func startDrill(
+        title: String,
+        purpose: String,
+        targetCadence: Int?,
+        duration: DrillDuration,
+        hapticMode: HapticFeedbackMode
+    ) {
         let drill = PreRunDrill(
-            id: preRunId,
+            id: drillId,
             previousCadence: baselineCadence,
             targetCadence: targetCadence,
             duration: duration,
@@ -439,5 +453,30 @@ struct DrillPrimerCardView: View {
         )
         let plan = drill.buildWorkoutPlan()
         onStart?(plan)
+
+        Task {
+            if #available(iOS 17.0, *) {
+                let dto = DrillPrescriptionDTO(
+                    title: title,
+                    preRunDrillId: drillId.rawValue,
+                    purpose: purpose,
+                    targetCadence: targetCadence,
+                    previousCadence: baselineCadence,
+                    durationMinutes: duration.rawValue,
+                    hapticMode: hapticMode.rawValue
+                )
+                do {
+                    let bridge = WorkoutBridge()
+                    try await bridge.scheduleDrill(dto: dto)
+                    await MainActor.run {
+                        self.lastExportedDrillId = self.drillId.rawValue
+                        self.lastWatchExportTimestamp = Date().timeIntervalSince1970
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                } catch {
+                    // Preview sheet is displayed; background scheduling error is non-fatal
+                }
+            }
+        }
     }
 }

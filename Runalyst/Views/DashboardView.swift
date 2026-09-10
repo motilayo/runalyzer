@@ -433,6 +433,13 @@ struct DashboardView: View {
                 Button(action: {
                     activeWorkoutPlan = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget).buildWorkoutPlan()
                     isShowingWorkoutPreview = true
+                    scheduleDashboardDrillToWatch(
+                        title: template.title,
+                        drillId: primerId,
+                        purpose: template.defaultPurpose,
+                        targetCadence: computedTarget,
+                        baseCadence: baseCadence
+                    )
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")

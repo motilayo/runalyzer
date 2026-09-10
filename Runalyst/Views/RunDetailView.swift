@@ -658,6 +658,13 @@ private struct DrillCardView: View {
                     let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
                     activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
                     isShowingWorkoutPreview = true
+                    scheduleToWatch(
+                        title: drill.drillTitle,
+                        drillId: preRunId,
+                        purpose: drill.drillPurpose ?? "",
+                        targetCadence: targetInt,
+                        baseCadence: drill.previousCadence
+                    )
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "eye.fill")
@@ -726,7 +733,7 @@ private struct DrillCardView: View {
                 await MainActor.run {
                     self.isSchedulingWatch = false
                 }
+            }
         }
     }
-}
 }
