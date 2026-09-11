@@ -35,7 +35,7 @@ def generate_smooth_seed_data(num_samples=15000):
             avg_pace_sec = random.gauss(360, 30)       # ~6:00/km
             avg_hr = random.gauss(155, 10)             # Overlaps into 160-170 BPM due to drift/efficiency
             percent_zone4 = random.betavariate(3, 4)   # Moderate spread
-            workout_class = "Steady Run"
+            workout_class = "Steady Effort"
             
         elif archetype == "Progression":
             avg_pace_sec = random.gauss(330, 25)

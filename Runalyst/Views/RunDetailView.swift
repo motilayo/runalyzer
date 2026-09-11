@@ -161,9 +161,6 @@ struct RunDetailView: View {
                         Text("Workout Stats").tag(true)
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: showRawMetrics) {
-                        showingToggleInfo = true
-                    }
 
                     Button(action: { showingToggleInfo = true }) {
                         Image(systemName: "info.circle")
@@ -195,11 +192,12 @@ struct RunDetailView: View {
                     let activeDuration = showRawMetrics ? runRecord.duration : runRecord.effectiveWorkingDurationSeconds
                     let minutes = Int(activeDuration) / 60
                     let seconds = Int(activeDuration) % 60
-                    StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
+                    StatBox(title: showRawMetrics ? "Total Time" : "Moving Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
 
                     let currentPace: Double = {
                         if showRawMetrics {
-                            return runRecord.rawAvgPace
+                            let totalKm = runRecord.totalDistanceMeters / 1000.0
+                            return totalKm > 0 ? (runRecord.duration / totalKm) : runRecord.rawAvgPace
                         } else {
                             let workingKm = runRecord.effectiveWorkingDistanceMeters / 1000.0
                             return workingKm > 0 ? (runRecord.effectiveWorkingDurationSeconds / workingKm) : runRecord.workingAvgPace

@@ -90,23 +90,15 @@ class CoachingEngine {
         persona: elite_running_coach
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
-        - use_a_conversational_and_motivational_tone_do_not_sound_like_a_textbook
-        - speak directly to user using second person ("You", "Your")
-        - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
-        - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided.
-        - explain what the grouped trends indicate about their form and efficiency.
-        - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
-        - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
-        - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
-        - generate exactly 1 targeted drill by default; add exactly 1 second drill only when it directly reinforces the primary DIRECTIVE
-        - make every returned drill highly targeted to the primary DIRECTIVE; never generate unrelated drills
-        - for overstriding or excessive vertical bounce, prefer cadence_pyramids or rhythm_intervals
-        - for aerobic strain or heart-rate control, prefer zone_2_run or rhythm_intervals
-        - for faster pace with lower heart rate, prefer tempo_surges
-        - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
-        - prefer one excellent drill over multiple generic drills
-        - drill cues must be prescriptive biomechanical or somatic cues focusing strictly on physical execution, breathing, posture, or arm/foot positioning (e.g., "Focus on your breathing", "Toes wide and quick ground contact", "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you"). Do NOT repeat cadence numbers, minutes, reps, or workout plan stats in the cue.
-        - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
+        - conversational, motivational tone; speak directly to the runner ("You", "Your")
+        - strictly_follow_the_DIRECTIVE_for_tone_and_drill_selection
+        - observation: write exactly ONE qualitative sentence per metric group explaining form and efficiency trends
+        - Cadence is ALWAYS SPM, Heart Rate is ALWAYS BPM
+        - preRunDrillId MUST be one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
+        - generate 1 targeted pre-run drill (max 2 if the second directly reinforces the DIRECTIVE); prefer quality over quantity
+        - drill selection: overstriding → cadence_pyramids/rhythm_intervals; aerobic strain → zone_2_run/rhythm_intervals; fitness gains → tempo_surges; strides only as optional reinforcement
+        - drill cues: prescriptive biomechanical/somatic cues only (posture, breathing, foot positioning). No numbers, reps, or workout stats in cues.
+        - never prescribe stretches, warm-ups, cooldowns, or full workouts
         - respond_entirely_in_\(language)
         """
 
@@ -119,25 +111,13 @@ class CoachingEngine {
         let unitContext = useMetric ? "Pace is in min/km." : "Pace is in min/mi."
 
         var promptTemplate = """
-        You are a running coach.
         \(unitContext)
         [RUN_DATA_START]
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
-        TARGET_DRILL_CADENCES:
-        - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
-        - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
-
-        --- METRIC GROUP A: CARDIOVASCULAR EFFICIENCY ---
-        HEART_RATE_BPM: {{HR_CONTEXT}}
-        ZONE4_PERCENT: {{ZONE4_CONTEXT}}
-
-        --- METRIC GROUP B: RUNNING ECONOMY & FORM ---
-        CADENCE_SPM: {{CADENCE_CONTEXT}}
-        PACE: {{PACE_CONTEXT}}
-
-        --- METRIC GROUP C: PACING DYNAMICS ---
-        PACE_VARIABILITY: {{CV_CONTEXT}}
-        PACE_SLOPE: {{SLOPE_CONTEXT}}
+        DRILL_CADENCES: interval={{INTERVAL_CADENCE}}, recovery={{RECOVERY_CADENCE}}
+        GROUP_A_CARDIO: HR={{HR_CONTEXT}}, ZONE4={{ZONE4_CONTEXT}}
+        GROUP_B_FORM: CADENCE={{CADENCE_CONTEXT}}, PACE={{PACE_CONTEXT}}
+        GROUP_C_PACING: CV={{CV_CONTEXT}}, SLOPE={{SLOPE_CONTEXT}}
         [RUN_DATA_END]
         """
 
@@ -186,13 +166,11 @@ class CoachingEngine {
 
         let instructions = """
         persona: elite_running_coach
-        task: evaluate_macro_physiological_trends_and_provide_conversational_insight
+        task: evaluate_macro_physiological_trends
         rules:
-        - Role & Tone: You are an empathetic, expert running coach. Your tone must be warm, encouraging, and conversational. Speak directly to the runner using "you."
-        - Translate physiological data into relatable, everyday language. (e.g., instead of "acute neuromuscular fatigue," say "your legs are carrying some fatigue").
-        - Always frame feedback positively. If their form is breaking down, frame it as an opportunity to recover and bounce back.
-        - Strict Length: Your response must be exactly 1 to 2 short sentences.
-        - Zero Numbers: Do not prescribe specific metrics, target paces, or times. Offer qualitative guidance only.
+        - warm, conversational tone; speak directly to the runner ("you"); translate data into everyday language
+        - frame feedback positively; breakdowns are opportunities to recover
+        - response: exactly 1–2 short sentences, zero numbers or specific metrics
         - \(focusDirective)
         - respond_entirely_in_\(language)
         """
@@ -202,18 +180,16 @@ class CoachingEngine {
             instructions: instructions
         )
 
+        let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+
         var promptTemplate = """
         [AGGREGATE_DATA_START]
+        GOAL: \(trainingGoal)
         TIMEFRAME: \(timeFrame)
         STAGE: {{STAGE_CONTEXT}}
-
-        --- METRICS ---
-        HEART_RATE_BPM: {{HR_CONTEXT}}
-        ZONE4_PERCENT: {{ZONE4_CONTEXT}}
-        CADENCE_SPM: {{CADENCE_CONTEXT}}
-        PACE: {{PACE_CONTEXT}}
-        PACE_VARIABILITY: {{CV_CONTEXT}}
-        PACE_SLOPE: {{SLOPE_CONTEXT}}
+        HR: {{HR_CONTEXT}}, ZONE4: {{ZONE4_CONTEXT}}
+        CADENCE: {{CADENCE_CONTEXT}}, PACE: {{PACE_CONTEXT}}
+        PACE_CV: {{CV_CONTEXT}}, PACE_SLOPE: {{SLOPE_CONTEXT}}
         [AGGREGATE_DATA_END]
         """
 
@@ -340,14 +316,18 @@ actor RunAnalyzerActor {
             let hrImpact = hrDelta <= 0 ? "A GOOD trend indicating aerobic efficiency." : "A BAD trend indicating higher cardiovascular strain."
             hrContext = "Current: \(Int(run.workingAvgHeartRate)) BPM, Baseline: \(Int(base.avgHR)) BPM, Deltas: \(Int(hrDelta)). \(hrImpact)"
 
+            let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+            let goalSuffix = " Runner goal: \(trainingGoal)."
+
             if run.workingAvgCadence < 150 {
-                directiveContext = "The runner is overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence."
+                directiveContext = "The runner is overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence." + goalSuffix
             } else if paceDiff < 0 && hrDelta > 0 {
-                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. Praise consistency but prescribe a drill focused on Easy Aerobic Recovery and HR control."
+                // GUARDRAIL: fatigue detected — Swift overrides goal with recovery priority
+                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. PRIORITY: prescribe Easy Aerobic Recovery and HR control. Safety overrides any race goal."
             } else if paceDiff > 0 && hrDelta < 0 {
-                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill."
+                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill." + goalSuffix
             } else {
-                directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill."
+                directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill." + goalSuffix
             }
         } else {
             directiveContext = "Evaluate this isolated run and provide a basic introductory drill."

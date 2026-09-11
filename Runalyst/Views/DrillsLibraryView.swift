@@ -33,9 +33,9 @@ struct DrillsLibraryView: View {
         return filtered
     }
 
-    private var baselineCadence: Int {
+    private var baselineCadence: Int? {
         let recentRuns = filteredRunRecords.filter { $0.workingAvgCadence > 0 }
-        guard !recentRuns.isEmpty else { return 160 }
+        guard !recentRuns.isEmpty else { return nil }
         return Int(recentRuns.map(\.workingAvgCadence).reduce(0, +)) / recentRuns.count
     }
 
@@ -46,11 +46,11 @@ struct DrillsLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                if isAutoSyncing {
+                if isAutoSyncing, let base = baselineCadence {
                     HStack(spacing: 8) {
                         ProgressView()
                             .tint(Color(red: 0.05, green: 0.45, blue: 0.5))
-                        Text("Auto-updating Watch targets for your new \(baselineCadence) SPM baseline...")
+                        Text("Auto-updating Watch targets for your new \(base) SPM baseline...")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -59,11 +59,11 @@ struct DrillsLibraryView: View {
                     .background(Color(UIColor.secondarySystemGroupedBackground))
                     .cornerRadius(12)
                     .padding(.horizontal)
-                } else if autoSyncSuccess {
+                } else if autoSyncSuccess, let base = baselineCadence {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("Watch targets auto-updated for your new \(baselineCadence) SPM baseline ✓")
+                        Text("Watch targets auto-updated for your new \(base) SPM baseline ✓")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -72,12 +72,12 @@ struct DrillsLibraryView: View {
                     .background(Color.green.opacity(0.12))
                     .cornerRadius(12)
                     .padding(.horizontal)
-                } else if isExportStale {
+                } else if isExportStale, let base = baselineCadence {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .foregroundColor(.orange)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Baseline Updated (\(baselineCadence) SPM)")
+                            Text("Baseline Updated (\(base) SPM)")
                                 .font(.caption.bold())
                                 .foregroundColor(.primary)
                             Text("Update Watch targets to match your new baseline.")
@@ -273,6 +273,7 @@ struct DrillsLibraryView: View {
     private func autoSyncStaleExportIfNeeded() async {
         guard !lastExportedDrillId.isEmpty || lastWatchExportTimestamp > 0 else { return }
         guard #available(iOS 17.0, *) else { return }
+        guard let baseline = baselineCadence else { return }
 
         await MainActor.run {
             self.isAutoSyncing = true
@@ -281,14 +282,14 @@ struct DrillsLibraryView: View {
         let drillIdToSync = !lastExportedDrillId.isEmpty ? lastExportedDrillId : "cadence_pyramids"
         let preRunId = PreRunDrillId(rawValue: drillIdToSync) ?? .strides
         let template = DrillTemplate.template(for: preRunId)
-        let newTarget = template.calculateTargetCadence(baselineCadence)
+        let newTarget = template.calculateTargetCadence(baseline)
 
         let dto = DrillPrescriptionDTO(
             title: template.title,
             preRunDrillId: preRunId.rawValue,
             purpose: template.defaultPurpose,
             targetCadence: newTarget,
-            previousCadence: baselineCadence
+            previousCadence: baseline
         )
 
         do {
@@ -312,7 +313,7 @@ struct DrillPrimerCardView: View {
     var customTitle: String?
     var customPurpose: String?
     var customTarget: String?
-    let baselineCadence: Int
+    let baselineCadence: Int?
     var onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
     @State private var selectedDuration: DrillDuration = .fifteenMinutes
@@ -331,8 +332,8 @@ struct DrillPrimerCardView: View {
         let work = template.workString(for: selectedDuration)
         let recovery = template.recoveryString(for: selectedDuration)
         let effort = template.defaultEffort
-        let targetCadence: Int? = template.calculateTargetCadence(baselineCadence)
-        let cue = template.generateInstructionalCue(targetCadence ?? baselineCadence)
+        let targetCadence: Int? = baselineCadence.map { template.calculateTargetCadence($0) }
+        let cue = template.generateInstructionalCue(targetCadence ?? 0)
         let icon = drillId.iconName
         let iconColor = drillId.iconColor
 
@@ -349,7 +350,11 @@ struct DrillPrimerCardView: View {
                 return "Target: Zone 2 HR"
             }
             if hasCadenceTarget {
-                return targetCadence.map { "Target: \($0) SPM (Baseline: \(baselineCadence) SPM)" }
+                if let target = targetCadence, let baseline = baselineCadence {
+                    return "Target: \(target) SPM (Baseline: \(baseline) SPM)"
+                } else {
+                    return "Target: Dynamic cadence"
+                }
             }
             return nil
         }()

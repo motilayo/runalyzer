@@ -31,6 +31,15 @@ actor ModelManager {
         slope: Double = 0.0,
         durationMinutes: Double = 30.0
     ) async -> String {
+        // High pace variability (CV > 0.12) indicates an Interval / Fartlek workout,
+        // not a steady-state continuous Tempo run.
+        if cv > 0.15 {
+            return "Intervals"
+        }
+        if cv > 0.10 && percentZone4 < 0.25 {
+            return "Fartlek"
+        }
+
         if let classifier = self.runClassifier {
             do {
                 let prediction = try classifier.prediction(
