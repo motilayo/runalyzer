@@ -1,25 +1,22 @@
 import Foundation
 import CoreML
 
-/// A manager for interfacing with the CoreML PersonalizedRunClassifier.
-/// In the absence of a pre-trained `.mlmodel` file, this actor delegates predictions
-/// to the deterministic `FramboiseEngine` as a fallback.
+/// A manager for interfacing with the CoreML RunalystClassifier.
 actor ModelManager {
 
     // CoreML integration
-    private var runClassifier: PersonalizedRunClassifier?
+    private var runClassifier: RunalystClassifier?
 
     init() {
         do {
             let config = MLModelConfiguration()
-            self.runClassifier = try PersonalizedRunClassifier(configuration: config)
+            self.runClassifier = try RunalystClassifier(configuration: config)
         } catch {
-            print("Failed to load PersonalizedRunClassifier: \(error)")
+            print("Failed to load RunalystClassifier: \(error)")
         }
     }
 
-    /// Predicts the run type based on mathematical features using the retrained CoreML model.
-    /// Enforces strict cardiac guardrails (high HR / zone4 runs are never misclassified as easy).
+    /// Predicts the run type using the CoreML model.
     func predictRunType(
         averagePace: Double,
         averageHeartRate: Double,
@@ -31,33 +28,26 @@ actor ModelManager {
         slope: Double = 0.0,
         durationMinutes: Double = 30.0
     ) async -> String {
-        // High pace variability (CV > 0.12) indicates an Interval / Fartlek workout,
-        // not a steady-state continuous Tempo run.
-        if cv > 0.15 {
-            return "Intervals"
-        }
-        if cv > 0.10 && percentZone4 < 0.25 {
-            return "Fartlek"
-        }
-
         if let classifier = self.runClassifier {
             do {
-                let prediction = try classifier.prediction(
+                let input = RunalystClassifierInput(
                     averagePace: averagePace,
                     averageHeartRate: averageHeartRate,
                     percentZone4: percentZone4,
                     averageCadence: averageCadence,
                     verticalOscillation: verticalOscillation,
-                    runnerStage: Int64(runnerStage)
+                    runnerStage: Double(runnerStage)
                 )
+                let prediction = try await classifier.prediction(input: input)
                 return prediction.targetClass
             } catch {
-                print("CoreML prediction failed: \(error). Falling back to FramboiseEngine.")
+                print("CoreML prediction failed: \(error).")
             }
         }
 
-        let framboise = FramboiseEngine()
-        return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, averageHR: averageHeartRate)
+        return "Steady Effort"
     }
 
 }
+
+extension RunalystClassifier: @unchecked Sendable {}

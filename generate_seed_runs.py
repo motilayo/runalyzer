@@ -19,41 +19,41 @@ def generate_smooth_seed_data(num_samples=15000):
         )[0]
         
         if archetype == "Recovery":
-            avg_pace_sec = random.gauss(450, 40)       # ~7:30/km
-            avg_hr = random.gauss(125, 8)              # Low HR
-            percent_zone4 = random.betavariate(1, 10)  # Skewed heavily toward 0%
+            avg_pace_sec = random.gauss(480, 15)       # ~8:00/km
+            avg_hr = random.gauss(120, 5)              # Low HR
+            percent_zone4 = random.betavariate(1, 20)  # Skewed heavily toward 0%
             workout_class = "Recovery Run"
             
         elif archetype == "Easy":
-            avg_pace_sec = random.gauss(400, 35)       # ~6:40/km
-            avg_hr = random.gauss(138, 8)
-            percent_zone4 = random.betavariate(2, 8)   # Very low Zone 4
+            avg_pace_sec = random.gauss(400, 15)       # ~6:40/km
+            avg_hr = random.gauss(135, 5)
+            percent_zone4 = random.betavariate(1, 10)   # Very low Zone 4
             workout_class = "Easy Run"
             
         elif archetype == "Steady":
-            # This covers the 6:00 - 6:40 pace range with moderate-to-high HR (e.g., Sep 5 and Sep 8 runs)
-            avg_pace_sec = random.gauss(360, 30)       # ~6:00/km
-            avg_hr = random.gauss(155, 10)             # Overlaps into 160-170 BPM due to drift/efficiency
-            percent_zone4 = random.betavariate(3, 4)   # Moderate spread
+            # This covers the 5:40 - 6:00 pace range with moderate HR
+            avg_pace_sec = random.gauss(350, 15)       # ~5:50/km
+            avg_hr = random.gauss(150, 5)              
+            percent_zone4 = random.betavariate(2, 8)   # Moderate spread
             workout_class = "Steady Effort"
             
         elif archetype == "Progression":
-            avg_pace_sec = random.gauss(330, 25)
-            avg_hr = random.gauss(162, 8)
-            percent_zone4 = random.betavariate(4, 3)
+            avg_pace_sec = random.gauss(310, 15)       # ~5:10/km
+            avg_hr = random.gauss(165, 5)
+            percent_zone4 = random.betavariate(4, 4)
             workout_class = "Progression Run"
             
         elif archetype == "Tempo":
             # True structured fast effort with high anaerobic load
-            avg_pace_sec = random.gauss(280, 20)       # ~4:40/km to 5:00/km
-            avg_hr = random.gauss(176, 6)
-            percent_zone4 = random.betavariate(7, 2)   # High Zone 4
+            avg_pace_sec = random.gauss(270, 15)       # ~4:30/km
+            avg_hr = random.gauss(178, 4)
+            percent_zone4 = random.betavariate(8, 2)   # High Zone 4
             workout_class = "Tempo Run"
             
         else: # Intervals
-            avg_pace_sec = random.gauss(240, 25)
-            avg_hr = random.gauss(182, 5)
-            percent_zone4 = random.betavariate(9, 1)
+            avg_pace_sec = random.gauss(220, 15)       # ~3:40/km
+            avg_hr = random.gauss(188, 4)
+            percent_zone4 = random.betavariate(10, 1)
             workout_class = "Intervals"
 
         # Clamp values to realistic human bounds
