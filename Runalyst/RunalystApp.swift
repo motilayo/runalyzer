@@ -21,8 +21,7 @@ struct RunalystApp: App {
         } catch {
             print("ERROR: Failed to load persistent ModelContainer with migration plan: \(error)")
 
-            #if DEBUG
-            print("DEBUG: Development mode fallback - recreating store: \(error)")
+            print("Schema mismatch or unrecoverable error - recreating store: \(error)")
             let storeURL = modelConfiguration.url
             let storePath = storeURL.path
             let shmPath = storePath + "-shm"
@@ -37,10 +36,9 @@ struct RunalystApp: App {
                 migrationPlan: RunalystMigrationPlan.self,
                 configurations: [modelConfiguration]
             ) {
-                print("DEBUG: Re-created container successfully after recovery")
+                print("Re-created container successfully after recovery")
                 return fallbackContainer
             }
-            #endif
 
             print("WARNING: Falling back to in-memory ModelContainer to prevent user data crash")
             let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
