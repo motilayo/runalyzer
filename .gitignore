@@ -37,3 +37,7 @@ fastlane/test_output
 # Swift Package Manager & Tools
 .build/
 .swiftpm/
+
+# Python
+__pycache__/
+*.py[cod]
