@@ -107,15 +107,18 @@ struct DashboardView: View {
 
     private var workoutDensityTier: String {
         let count = filteredRunRecords.count
+        if count == 0 { return "—" }
         switch timeRange {
         case "7 Days":
             if count <= 2 { return "Low" }
-            if count <= 4 { return "Moderate" }
-            return "Optimal"
+            if count <= 3 { return "Moderate" }
+            if count <= 5 { return "Optimal" }
+            return "High"
         case "30 Days":
             if count <= 6 { return "Low" }
             if count <= 12 { return "Moderate" }
-            return "Optimal"
+            if count <= 18 { return "Optimal" }
+            return "High"
         default: // All Time
             if count <= 10 { return "Low" }
             if count <= 25 { return "Moderate" }
@@ -185,30 +188,38 @@ struct DashboardView: View {
     @ViewBuilder
     private var aiFatigueInsightCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkle")
-                    .foregroundColor(.primary)
-                Text("AI Fatigue Insight")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-            }
-            .padding(.horizontal)
-
             VStack(alignment: .leading, spacing: 8) {
                 let headline = currentHeadline()
-                HStack {
-                    Text("✨ \(headline.isEmpty ? "Acute Fatigue Detected" : headline)")
-                        .font(.subheadline.bold())
-                        .foregroundColor(.primary)
-                }
-
                 let bodyText = currentBody()
-                Text(bodyText.isEmpty ? "You've put in some solid work this week, but your heart rate shows you're carrying a bit of fatigue. Keep things light today to let your legs bounce back." : bodyText)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineSpacing(2)
 
-                AIDisclaimerFooter()
+                if isFetchingInsight && headline.isEmpty {
+                    AnimatedLoadingView(
+                        text: "Analyzing fatigue trends...",
+                        isHorizontal: true,
+                        imageSize: 18,
+                        textFont: .subheadline,
+                        textColor: .secondary,
+                        iconColor: .primary,
+                        spacing: 8
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkle")
+                            .foregroundColor(.primary)
+                        Text("AI Fatigue Insight")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.primary)
+                    }
+
+                    Text(bodyText.isEmpty ? "Complete more runs to view updated fatigue and recovery trends." : bodyText)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineSpacing(2)
+
+                    AIDisclaimerFooter()
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
@@ -345,8 +356,8 @@ struct DashboardView: View {
     private var proactiveCoachCard: some View {
         let primerId = activePrimerId
         let template = DrillTemplate.template(for: primerId)
-        let baseCadence = baselineCadence ?? 155
-        let computedTarget = template.calculateTargetCadence(baseCadence)
+        let baseCadence = baselineCadence
+        let computedTarget = baseCadence.map { template.calculateTargetCadence($0) }
 
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -357,7 +368,7 @@ struct DashboardView: View {
                     Text(template.title)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    Text("10–15 min drill")
+                    Text("\(PreRunDrill(id: primerId).duration.title) drill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -390,7 +401,7 @@ struct DashboardView: View {
                     .foregroundColor(.secondary)
             }
 
-            let cue = template.generateInstructionalCue(computedTarget)
+            let cue = template.generateInstructionalCue(computedTarget ?? 0)
             if !cue.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "lightbulb.fill")
@@ -450,9 +461,15 @@ struct DashboardView: View {
                     Image(systemName: "target")
                         .foregroundColor(.orange)
                         .font(.caption.bold())
-                    Text("Target: \(computedTarget) SPM (\(timeRange) Baseline: \(baseCadence) SPM)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if let target = computedTarget, let base = baseCadence {
+                        Text("Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Target: Dynamic cadence")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     Image(systemName: "info.circle")
                         .font(.caption2)
                         .foregroundColor(.secondary.opacity(0.7))
@@ -539,12 +556,12 @@ struct DashboardView: View {
     }
 
     private func autoSyncStaleWatchDrillIfNeeded() {
-        guard lastWatchExportTimestamp > 0 && lastBaselineChangeTimestamp > lastWatchExportTimestamp, !lastExportedDrillId.isEmpty else { return }
+        guard !lastExportedDrillId.isEmpty else { return }
         guard #available(iOS 17.0, *) else { return }
+        guard let baseCadence = baselineCadence else { return }
 
         let preRunId = PreRunDrillId(rawValue: lastExportedDrillId) ?? activePrimerId
         let template = DrillTemplate.template(for: preRunId)
-        let baseCadence = baselineCadence ?? 155
         let computedTarget = template.calculateTargetCadence(baseCadence)
 
         Task {
@@ -557,6 +574,7 @@ struct DashboardView: View {
             )
             do {
                 let bridge = WorkoutBridge()
+                await WorkoutScheduler.shared.removeAllWorkouts()
                 try await bridge.scheduleDrill(dto: dto)
                 await MainActor.run {
                     self.lastWatchExportTimestamp = Date().timeIntervalSince1970
@@ -612,26 +630,31 @@ struct DashboardView: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
 
-                    let vo2Val = globalVO2Max ?? 40.5
-                    Text(String(format: "%.1f", vo2Val))
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                    if let vo2Val = globalVO2Max {
+                        Text(String(format: "%.1f", vo2Val))
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
 
-                    if let base = baselineVO2Max {
-                        let diff = vo2Val - base
-                        if abs(diff) > 0.05 {
-                            HStack(spacing: 4) {
-                                Image(systemName: diff >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                    .font(.caption2.bold())
-                                Text(String(format: "%@%.1f", diff >= 0 ? "+" : "", diff))
-                                    .font(.caption2.bold())
+                        if let base = baselineVO2Max {
+                            let diff = vo2Val - base
+                            if abs(diff) > 0.05 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: diff >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                        .font(.caption2.bold())
+                                    Text(String(format: "%@%.1f", diff >= 0 ? "+" : "", diff))
+                                        .font(.caption2.bold())
+                                }
+                                .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Capsule())
                             }
-                            .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Capsule())
                         }
+                    } else {
+                        Text("—")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.6))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -657,27 +680,31 @@ struct DashboardView: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
 
-                    let cadenceVal = baselineCadence ?? (filteredRunRecords.isEmpty ? 155 : Int(filteredRunRecords.map(\.workingAvgCadence).reduce(0, +) / Double(filteredRunRecords.count)))
-                    let displayCadence = cadenceVal > 0 ? cadenceVal : 155
-                    Text("\(displayCadence) SPM")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                    if let cadenceVal = baselineCadence, cadenceVal > 0 {
+                        Text("\(cadenceVal) SPM")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
 
-                    if let prevCadence = previousBaselineCadence {
-                        let diff = displayCadence - prevCadence
-                        if diff != 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: diff > 0 ? "arrow.up.right" : "arrow.down.right")
-                                    .font(.caption2.bold())
-                                Text(String(format: "%@%d SPM", diff > 0 ? "+" : "", diff))
-                                    .font(.caption2.bold())
+                        if let prevCadence = previousBaselineCadence {
+                            let diff = cadenceVal - prevCadence
+                            if diff != 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: diff > 0 ? "arrow.up.right" : "arrow.down.right")
+                                        .font(.caption2.bold())
+                                    Text(String(format: "%@%d SPM", diff > 0 ? "+" : "", diff))
+                                        .font(.caption2.bold())
+                                }
+                                .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Capsule())
                             }
-                            .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Capsule())
                         }
+                    } else {
+                        Text("—")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.6))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -709,28 +736,33 @@ struct DashboardView: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
 
-                    let paceVal = baselinePace ?? (filteredRunRecords.isEmpty ? 381.0 : (filteredRunRecords.map(\.workingAvgPace).reduce(0, +) / Double(filteredRunRecords.count)))
-                    let displayPace = paceVal > 0 ? PaceFormatter.formatPace(secondsPerKilometer: paceVal) : "6:21/km"
-                    Text(displayPace)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                    if let paceVal = baselinePace, paceVal > 0 {
+                        let displayPace = PaceFormatter.formatPace(secondsPerKilometer: paceVal)
+                        Text(displayPace)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
 
-                    if let prevPace = previousBaselinePace, paceVal > 0 {
-                        let diffSecs = Int(round(paceVal - prevPace))
-                        if diffSecs != 0 {
-                            let isFaster = diffSecs < 0
-                            HStack(spacing: 4) {
-                                Image(systemName: isFaster ? "arrow.down.right" : "arrow.up.right")
-                                    .font(.caption2.bold())
-                                Text(String(format: "%@%ds", diffSecs > 0 ? "+" : "", diffSecs))
-                                    .font(.caption2.bold())
+                        if let prevPace = previousBaselinePace {
+                            let diffSecs = Int(round(paceVal - prevPace))
+                            if diffSecs != 0 {
+                                let isFaster = diffSecs < 0
+                                HStack(spacing: 4) {
+                                    Image(systemName: isFaster ? "arrow.down.right" : "arrow.up.right")
+                                        .font(.caption2.bold())
+                                    Text(String(format: "%@%ds", diffSecs > 0 ? "+" : "", diffSecs))
+                                        .font(.caption2.bold())
+                                }
+                                .foregroundColor(isFaster ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Capsule())
                             }
-                            .foregroundColor(isFaster ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Capsule())
                         }
+                    } else {
+                        Text("—")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.6))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -759,9 +791,9 @@ struct DashboardView: View {
                     let density = workoutDensityTier
                     Text(density)
                         .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : .orange))
+                        .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .white.opacity(0.6)))))
 
-                    Text("\(filteredRunRecords.count) runs in \(timeRange.lowercased())")
+                    Text(filteredRunRecords.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(filteredRunRecords.count) runs in \(timeRange.lowercased())")
                         .font(.caption2)
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -832,11 +864,13 @@ struct DashboardView: View {
 
                     fitnessBaselineCard
 
-                    aiFatigueInsightCard
+                    if !filteredRunRecords.isEmpty {
+                        aiFatigueInsightCard
 
-                    proactiveCoachCard
+                        proactiveCoachCard
 
-                    filterChips
+                        filterChips
+                    }
 
                     if filteredRunRecords.isEmpty {
                         if isSyncing && runRecords.isEmpty {
@@ -891,14 +925,14 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
-                if let onSync {
-                    isSyncing = true
-                    let task = Task {
-                        await onSync(false)
-                    }
-                    _ = await task.result
-                    isSyncing = false
-                }
+                // Invalidate cache
+                cachedHeadline7Day = ""
+                cachedBody7Day = ""
+                cachedHeadline30Day = ""
+                cachedBody30Day = ""
+                cachedHeadlineAllTime = ""
+                cachedBodyAllTime = ""
+                fetchInsight()
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)

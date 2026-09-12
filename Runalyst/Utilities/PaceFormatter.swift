@@ -129,7 +129,7 @@ struct MetricDetailExplainer {
                 whyItMatters: "Efficiency: Tracking your true running mileage helps you build volume safely without doing too much too soon.",
                 targetRange: "Target Range: Matched to what you planned for today's run.\n\n• Too Much Volume: Bumping up mileage too quickly raises injury risk.\n• Low Volume: Great for easy recovery runs."
             )
-        case "total time", "time":
+        case "total time", "time", "moving time":
             return MetricDetailExplainer(
                 title: "Total Time",
                 overview: "How long you were out, displayed in minutes and seconds.",

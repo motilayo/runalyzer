@@ -1,19 +1,19 @@
-name: CI Quality & Security Gates
+name: Release Runalyst
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    tags:
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
-  # 1. Secret Scanning (Fast fail)
+  # 1. Secret Scanning
   secret-scan:
     name: Secret & Credential Scan
     runs-on: ubuntu-latest
@@ -77,3 +77,32 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             build test
+
+  # 4. Publish GitHub Release
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [lint, build-and-test]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Release Notes
+        id: notes
+        run: |
+          if [ -f "RELEASENOTES.md" ]; then
+            echo "has_notes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_notes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Runalyst ${{ github.ref_name }} — AI Biomechanical Coach
+          body_path: ${{ steps.notes.outputs.has_notes == 'true' && 'RELEASENOTES.md' || '' }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

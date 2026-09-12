@@ -58,7 +58,9 @@ actor FramboiseEngine {
     /// - Calculates pace using pure aggregate ratios (workingDuration / workingDistanceKm) to eliminate harmonic distortion.
     func calculateWorkingAverages(
         trimmed: [BucketData],
-        rawWorkoutDuration: Double? = nil
+        rawWorkoutDuration: Double? = nil,
+        rawWorkoutDistance: Double? = nil,
+        originalBucketCount: Int? = nil
     ) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double, workingDistance: Double, workingDuration: Double) {
         guard !trimmed.isEmpty else { return (0, 0, 0, 0, 0, 0) }
 
@@ -67,34 +69,44 @@ actor FramboiseEngine {
         var totalHR: Double = 0
         var totalOscillation: Double = 0
         var oscillationBucketCount: Int = 0
+        var validHRBucketCount: Int = 0
 
         for bucket in trimmed {
             totalDistanceMeters += bucket.distanceMeters
             totalCadence += bucket.meanCadence
-            totalHR += bucket.meanHR
+
+            if bucket.meanHR >= 40 {
+                totalHR += bucket.meanHR
+                validHRBucketCount += 1
+            }
+
             if bucket.meanVerticalOscillation > 0 {
                 totalOscillation += bucket.meanVerticalOscillation
                 oscillationBucketCount += 1
             }
         }
 
+        // If no buckets were trimmed (no dead stops), Working stats MUST perfectly equal Raw stats
+        let isFullyActive = (originalBucketCount != nil) && (trimmed.count == originalBucketCount)
+
         // Strictly sum the duration of only the kept/filtered samples (60s per bucket)
-        var workingDuration = Double(trimmed.count * 60)
+        var workingDuration = isFullyActive ? (rawWorkoutDuration ?? Double(trimmed.count * 60)) : Double(trimmed.count * 60)
 
         // Hard safety constraint: workingDuration must be <= rawWorkout.duration
-        if let rawDuration = rawWorkoutDuration, rawDuration > 0 {
+        if !isFullyActive, let rawDuration = rawWorkoutDuration, rawDuration > 0 {
             workingDuration = min(workingDuration, rawDuration)
         }
 
         // Pure aggregate ratio: Divide newly calculated workingDuration (in seconds) by workingDistance (in kilometers)
-        let workingDistanceKm = totalDistanceMeters / 1000.0
+        let workingDistanceKm = isFullyActive ? ((rawWorkoutDistance ?? totalDistanceMeters) / 1000.0) : (totalDistanceMeters / 1000.0)
+        let workingDistanceMetersFinal = isFullyActive ? (rawWorkoutDistance ?? totalDistanceMeters) : totalDistanceMeters
         let workingPace = workingDistanceKm > 0 ? (workingDuration / workingDistanceKm) : 0.0
 
         let workingCadence = totalCadence / Double(trimmed.count)
-        let workingHR = totalHR / Double(trimmed.count)
+        let workingHR = validHRBucketCount > 0 ? (totalHR / Double(validHRBucketCount)) : 0.0
         let workingOscillation = oscillationBucketCount > 0 ? (totalOscillation / Double(oscillationBucketCount)) : 0.0
 
-        return (workingPace, workingCadence, workingHR, workingOscillation, totalDistanceMeters, workingDuration)
+        return (workingPace, workingCadence, workingHR, workingOscillation, workingDistanceMetersFinal, workingDuration)
     }
 
     // MARK: - Mathematical Features
@@ -195,7 +207,7 @@ actor FramboiseEngine {
         }
 
         if zone4 > 0.05 && zone4 < 0.20 && cv < 0.06 {
-            return "Steady Run"
+            return "Steady Effort"
         }
 
         return "Easy Run"

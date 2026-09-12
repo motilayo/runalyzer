@@ -65,7 +65,7 @@ struct RunInsight {
     @Guide(description: "Constrain strictly to a 2–4 word title. Forbid full sentences, punctuation-heavy titles, numbers, and digits.")
     var headline: String
 
-    @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach.")
+    @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach. Zero numbers or specific metrics.")
     var observation: String
 
     @Guide(description: "One targeted short pre-run technique drill by default, with an optional second drill only when it directly reinforces the primary Swift directive. The drills together must take about 5 to 10 minutes. Do not prescribe stretches, warm-ups, cooldowns, or a full running workout. MAX 2 DRILLS.")
@@ -90,11 +90,9 @@ class CoachingEngine {
         persona: elite_running_coach
         task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
-        - use_a_conversational_and_motivational_tone_do_not_sound_like_a_textbook
-        - speak directly to user using second person ("You", "Your")
-        - you_must_strictly_follow_the_swift_directive_for_the_overall_tone_and_drill_focus
-        - for the `observation` field, write exactly ONE single sentence of qualitative feedback per metric group provided.
-        - explain what the grouped trends indicate about their form and efficiency.
+        - conversational, motivational tone; speak directly to the runner ("You", "Your")
+        - strictly_follow_the_DIRECTIVE_for_tone_and_drill_selection
+        - observation: write exactly ONE qualitative sentence per metric group explaining form and efficiency trends. Zero numbers or specific metrics.
         - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
         - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
         - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
@@ -122,6 +120,7 @@ class CoachingEngine {
         You are a running coach.
         \(unitContext)
         [RUN_DATA_START]
+        GOAL: {{TRAINING_GOAL}}
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
         TARGET_DRILL_CADENCES:
         - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
@@ -141,6 +140,8 @@ class CoachingEngine {
         [RUN_DATA_END]
         """
 
+        let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{TRAINING_GOAL}}", with: trainingGoal)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RECOVERY_CADENCE}}", with: runData.recoveryCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
@@ -202,8 +203,11 @@ class CoachingEngine {
             instructions: instructions
         )
 
+        let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+
         var promptTemplate = """
         [AGGREGATE_DATA_START]
+        GOAL: \(trainingGoal)
         TIMEFRAME: \(timeFrame)
         STAGE: {{STAGE_CONTEXT}}
 
@@ -316,7 +320,7 @@ actor RunAnalyzerActor {
             baseline = BaselineStats(avgPace: avgPace, avgCadence: avgCadence, avgHR: avgHR)
         }
 
-        let directiveContext: String
+        var directiveContext: String
         let paceContext: String
         let hrContext: String
         let cadenceContext: String
@@ -340,14 +344,18 @@ actor RunAnalyzerActor {
             let hrImpact = hrDelta <= 0 ? "A GOOD trend indicating aerobic efficiency." : "A BAD trend indicating higher cardiovascular strain."
             hrContext = "Current: \(Int(run.workingAvgHeartRate)) BPM, Baseline: \(Int(base.avgHR)) BPM, Deltas: \(Int(hrDelta)). \(hrImpact)"
 
+            let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+            let goalSuffix = " Runner goal: \(trainingGoal)."
+
             if run.workingAvgCadence < 150 {
-                directiveContext = "The runner is overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence."
+                directiveContext = "The runner is overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence." + goalSuffix
             } else if paceDiff < 0 && hrDelta > 0 {
-                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. Praise consistency but prescribe a drill focused on Easy Aerobic Recovery and HR control."
+                // GUARDRAIL: fatigue detected — Swift overrides goal with recovery priority
+                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. PRIORITY: prescribe Easy Aerobic Recovery and HR control. Safety overrides any race goal."
             } else if paceDiff > 0 && hrDelta < 0 {
-                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill."
+                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill." + goalSuffix
             } else {
-                directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill."
+                directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill." + goalSuffix
             }
         } else {
             directiveContext = "Evaluate this isolated run and provide a basic introductory drill."
@@ -356,6 +364,13 @@ actor RunAnalyzerActor {
             cadenceContext = "\(Int(run.workingAvgCadence)) SPM (\(cadenceStatus). No baseline available)."
             paceContext = "\(PaceFormatter.formatPace(secondsPerKilometer: run.workingAvgPace)) (No baseline available)."
             hrContext = "\(Int(run.workingAvgHeartRate)) BPM (No baseline available)."
+        }
+
+        // Check for previously prescribed drill execution
+        if let lastRun = priorRuns.sorted(by: { $0.date > $1.date }).first,
+           let lastInsight = lastRun.insight,
+           let prescribedDrill = lastInsight.drillRecommendations?.sorted(by: { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }).first {
+            directiveContext += " The user just completed the previously prescribed drill: \(prescribedDrill.drillTitle). Their target cadence was \(prescribedDrill.targetCadence ?? "unknown"), and their actual average cadence on this run was \(Int(run.workingAvgCadence)) SPM. Provide specific feedback on their execution of the drill."
         }
 
         // Enforce 30-day baselines in target calculation
@@ -393,8 +408,9 @@ actor RunAnalyzerActor {
                 for (index, suggestedDrill) in payload.drills.enumerated() {
                     let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
                     let template = DrillTemplate.template(for: preRunId)
-                    let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
-                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
+                    let effectiveCadence = max(thirtyDayCadence, Int(run.workingAvgCadence))
+                    let computedTarget = template.calculateTargetCadence(effectiveCadence)
+                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: effectiveCadence, targetCadence: computedTarget)
 
                     let targetCadenceStr = preRunDrill.computedCadence.map { "\($0) SPM" }
 

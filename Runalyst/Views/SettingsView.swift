@@ -153,7 +153,7 @@ struct SettingsView: View {
                     Button("Cancel", role: .cancel) {}
                     Button("Resync & Rebuild", role: .destructive) {
                         for run in runRecords {
-                            run.insight = nil
+                            modelContext.delete(run)
                         }
                         try? modelContext.save()
                         UserDefaults.standard.removeObject(forKey: "cachedHeadline_7Day")
@@ -193,7 +193,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Seed Sample Health Data (Debug)")
                                 .foregroundColor(.primary)
-                            Text("Seeds 12 runs across all categories with full biometrics")
+                            Text("Seeds 3 months of runs (38 runs) with beginner progression & aligned drills")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -341,24 +341,86 @@ struct SettingsView: View {
 }
 
 struct UserProfileView: View {
+    @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
+
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = true
+    @AppStorage("trainingGoal") private var trainingGoal: String = "Base Building"
+
+    let goalOptions = [
+        "Base Building",
+        "Injury Recovery",
+        "5K Race",
+        "10K Race",
+        "Half Marathon",
+        "Marathon",
+        "Just for Fun"
+    ]
+
     var body: some View {
+        let metrics = calculateUserMetrics()
+
         Form {
             Section(header: Text("Runner Profile")) {
+                Picker("Training Goal", selection: $trainingGoal) {
+                    ForEach(goalOptions, id: \.self) { option in
+                        Text(option).tag(option)
+                    }
+                }
+
                 HStack {
                     Text("Experience Level")
                     Spacer()
-                    Text("Athlete / Competitor")
+                    Text(metrics.level)
                         .foregroundColor(.secondary)
                 }
+
                 HStack {
-                    Text("Weekly Target")
+                    Text("Recent Weekly Volume")
                     Spacer()
-                    Text("25 - 40 km")
+                    Text(metrics.volume)
                         .foregroundColor(.secondary)
                 }
             }
+
+            Section(footer: Text("Runalyst automatically calculates your experience level and weekly volume based on your last 30 days of running data.")) {
+                EmptyView()
+            }
         }
         .navigationTitle("User Profile")
+    }
+
+    private func calculateUserMetrics() -> (level: String, volume: String) {
+        guard !runRecords.isEmpty else {
+            return ("Beginner / Novice", "0 \(useMetricSystem ? "km" : "mi")")
+        }
+
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let recentRuns = runRecords.filter { $0.date >= thirtyDaysAgo }
+
+        let totalDistanceMeters = recentRuns.reduce(0.0) { $0 + $1.totalDistanceMeters }
+        let totalDistanceKm = totalDistanceMeters / 1000.0
+        let weeklyAvgKm = totalDistanceKm / 4.28 // approx weeks in 30 days
+        let runsPerWeek = Double(recentRuns.count) / 4.28
+
+        let level: String
+        if weeklyAvgKm > 60 {
+            level = "Elite / Pro"
+        } else if weeklyAvgKm > 35 {
+            level = "Athlete / Competitor"
+        } else if weeklyAvgKm > 15 || runsPerWeek >= 3 {
+            level = "Intermediate / Enthusiast"
+        } else {
+            level = "Beginner / Novice"
+        }
+
+        let displayVolume: String
+        if useMetricSystem {
+            displayVolume = String(format: "%.1f km/wk", weeklyAvgKm)
+        } else {
+            displayVolume = String(format: "%.1f mi/wk", weeklyAvgKm * 0.621371)
+        }
+
+        return (level, displayVolume)
     }
 }
 
@@ -368,9 +430,22 @@ struct AboutRunalystView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // MARK: - Hero
                 VStack(spacing: 8) {
-                    Image(systemName: "figure.run.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.linearGradient(colors: [.teal, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    if let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+                       let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
+                       let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String],
+                       let lastIcon = iconFiles.last,
+                       let uiImage = UIImage(named: lastIcon) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                    } else {
+                        Image(systemName: "figure.run.circle.fill")
+                            .font(.system(size: 64))
+                            .foregroundStyle(.linearGradient(colors: [.teal, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    }
                     Text("Runalyst")
                         .font(.largeTitle.bold())
                     Text("Your biomechanical running coach")
@@ -420,7 +495,7 @@ struct AboutRunalystView: View {
                         icon: "figure.run",
                         color: .orange,
                         title: "Pre-Run Primers",
-                        description: "Quick 10-minute warm-up drills designed to help your form, sent straight to your Apple Watch."
+                        description: "Warm-up drills designed to help your form, sent straight to your Apple Watch."
                     )
                     AboutFeatureRow(
                         icon: "cpu",
