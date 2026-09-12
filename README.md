@@ -35,14 +35,22 @@ Runalyst is a minimal, native iOS application acting as an "analytical mirror" f
 5. Select a compatible iOS Physical Device (iOS 26+).
 6. Build and Run (`Cmd + R`).
 
+## Documentation & Architecture
+
+For a deep dive into how Runalyst operates under the hood, please refer to our detailed documentation:
+- **[System Architecture](docs/ARCHITECTURE.md)**: Unidirectional data flow, SwiftUI integration, and Live Coaching/Apple Watch structures.
+- **[AI & CoreML Pipeline](docs/AI_PIPELINE.md)**: Feature vectors, Create ML training, Apple TN3193 token limits, and strict `@Generable` schema constraints.
+- **[Data Schema & Persistence](docs/DATA_SCHEMA.md)**: SwiftData caching strategy, working vs raw metrics, and our V1 -> V2 schema wipe migration logic.
+- **[Contributing](CONTRIBUTING.md)**: Code style, environment setup (iOS 26, Xcode 18), and PR guidelines.
+
 ## Project Structure
 
 - `Runalyst/Engine/`: The core analytical layer. Contains `FramboiseEngine` (for mathematical normalization) and `ModelManager` (for CoreML predictions).
-- `Runalyst/Models/`: Contains the `SwiftData` schemas and migration plans (`RunRecord`, `CoachingInsight`, `DrillRecommendation`, `TrainingCorrection`).
+- `Runalyst/Models/`: Contains the `SwiftData` schemas and migration plans.
 - `Runalyst/LiveCoach/`: Structures and logic for integrating drill targets directly into Apple Watch workflows.
-- `Runalyst/CoachingEngine/`: The Intelligence layer interfacing with FoundationModels (`CoachingEngine.swift`).
-- `Runalyst/Managers/`: Contains singletons and actors like `HealthKitManager` for data ingestion.
-- `Runalyst/Views/`: Minimalist SwiftUI components (Dashboard, DrillsLibrary, Onboarding, RunDetail, Settings).
+- `Runalyst/CoachingEngine/`: The Intelligence layer interfacing with FoundationModels.
+- `Runalyst/Managers/`: Contains singletons and actors like `HealthKitManager`.
+- `Runalyst/Views/`: Minimalist SwiftUI components.
 
 ## Development & CI/CD
 
