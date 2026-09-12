@@ -69,11 +69,17 @@ actor FramboiseEngine {
         var totalHR: Double = 0
         var totalOscillation: Double = 0
         var oscillationBucketCount: Int = 0
+        var validHRBucketCount: Int = 0
 
         for bucket in trimmed {
             totalDistanceMeters += bucket.distanceMeters
             totalCadence += bucket.meanCadence
-            totalHR += bucket.meanHR
+            
+            if bucket.meanHR >= 40 {
+                totalHR += bucket.meanHR
+                validHRBucketCount += 1
+            }
+            
             if bucket.meanVerticalOscillation > 0 {
                 totalOscillation += bucket.meanVerticalOscillation
                 oscillationBucketCount += 1
@@ -97,7 +103,7 @@ actor FramboiseEngine {
         let workingPace = workingDistanceKm > 0 ? (workingDuration / workingDistanceKm) : 0.0
 
         let workingCadence = totalCadence / Double(trimmed.count)
-        let workingHR = totalHR / Double(trimmed.count)
+        let workingHR = validHRBucketCount > 0 ? (totalHR / Double(validHRBucketCount)) : 0.0
         let workingOscillation = oscillationBucketCount > 0 ? (totalOscillation / Double(oscillationBucketCount)) : 0.0
 
         return (workingPace, workingCadence, workingHR, workingOscillation, workingDistanceMetersFinal, workingDuration)

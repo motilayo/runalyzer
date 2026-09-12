@@ -65,7 +65,7 @@ struct RunInsight {
     @Guide(description: "Constrain strictly to a 2–4 word title. Forbid full sentences, punctuation-heavy titles, numbers, and digits.")
     var headline: String
 
-    @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach.")
+    @Guide(description: "Write exactly one qualitative sentence for each metric group provided in the prompt. Combine them into one cohesive, encouraging paragraph. Focus on biomechanics, be a good coach. Zero numbers or specific metrics.")
     var observation: String
 
     @Guide(description: "One targeted short pre-run technique drill by default, with an optional second drill only when it directly reinforces the primary Swift directive. The drills together must take about 5 to 10 minutes. Do not prescribe stretches, warm-ups, cooldowns, or a full running workout. MAX 2 DRILLS.")
@@ -92,13 +92,19 @@ class CoachingEngine {
         rules:
         - conversational, motivational tone; speak directly to the runner ("You", "Your")
         - strictly_follow_the_DIRECTIVE_for_tone_and_drill_selection
-        - observation: write exactly ONE qualitative sentence per metric group explaining form and efficiency trends
-        - Cadence is ALWAYS SPM, Heart Rate is ALWAYS BPM
-        - preRunDrillId MUST be one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
-        - generate 1 targeted pre-run drill (max 2 if the second directly reinforces the DIRECTIVE); prefer quality over quantity
-        - drill selection: overstriding → cadence_pyramids/rhythm_intervals; aerobic strain → zone_2_run/rhythm_intervals; fitness gains → tempo_surges; strides only as optional reinforcement
-        - drill cues: prescriptive biomechanical/somatic cues only (posture, breathing, foot positioning). No numbers, reps, or workout stats in cues.
-        - never prescribe stretches, warm-ups, cooldowns, or full workouts
+        - observation: write exactly ONE qualitative sentence per metric group explaining form and efficiency trends. Zero numbers or specific metrics.
+        - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
+        - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
+        - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
+        - generate exactly 1 targeted drill by default; add exactly 1 second drill only when it directly reinforces the primary DIRECTIVE
+        - make every returned drill highly targeted to the primary DIRECTIVE; never generate unrelated drills
+        - for overstriding or excessive vertical bounce, prefer cadence_pyramids or rhythm_intervals
+        - for aerobic strain or heart-rate control, prefer zone_2_run or rhythm_intervals
+        - for faster pace with lower heart rate, prefer tempo_surges
+        - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
+        - prefer one excellent drill over multiple generic drills
+        - drill cues must be prescriptive biomechanical or somatic cues focusing strictly on physical execution, breathing, posture, or arm/foot positioning (e.g., "Focus on your breathing", "Toes wide and quick ground contact", "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you"). Do NOT repeat cadence numbers, minutes, reps, or workout plan stats in the cue.
+        - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
         - respond_entirely_in_\(language)
         """
 
@@ -111,16 +117,31 @@ class CoachingEngine {
         let unitContext = useMetric ? "Pace is in min/km." : "Pace is in min/mi."
 
         var promptTemplate = """
+        You are a running coach.
         \(unitContext)
         [RUN_DATA_START]
+        GOAL: {{TRAINING_GOAL}}
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
-        DRILL_CADENCES: interval={{INTERVAL_CADENCE}}, recovery={{RECOVERY_CADENCE}}
-        GROUP_A_CARDIO: HR={{HR_CONTEXT}}, ZONE4={{ZONE4_CONTEXT}}
-        GROUP_B_FORM: CADENCE={{CADENCE_CONTEXT}}, PACE={{PACE_CONTEXT}}
-        GROUP_C_PACING: CV={{CV_CONTEXT}}, SLOPE={{SLOPE_CONTEXT}}
+        TARGET_DRILL_CADENCES:
+        - INTERVAL_CADENCE: {{INTERVAL_CADENCE}}
+        - RECOVERY_CADENCE: {{RECOVERY_CADENCE}}
+
+        --- METRIC GROUP A: CARDIOVASCULAR EFFICIENCY ---
+        HEART_RATE_BPM: {{HR_CONTEXT}}
+        ZONE4_PERCENT: {{ZONE4_CONTEXT}}
+
+        --- METRIC GROUP B: RUNNING ECONOMY & FORM ---
+        CADENCE_SPM: {{CADENCE_CONTEXT}}
+        PACE: {{PACE_CONTEXT}}
+
+        --- METRIC GROUP C: PACING DYNAMICS ---
+        PACE_VARIABILITY: {{CV_CONTEXT}}
+        PACE_SLOPE: {{SLOPE_CONTEXT}}
         [RUN_DATA_END]
         """
 
+        let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{TRAINING_GOAL}}", with: trainingGoal)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RECOVERY_CADENCE}}", with: runData.recoveryCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
@@ -166,11 +187,13 @@ class CoachingEngine {
 
         let instructions = """
         persona: elite_running_coach
-        task: evaluate_macro_physiological_trends
+        task: evaluate_macro_physiological_trends_and_provide_conversational_insight
         rules:
-        - warm, conversational tone; speak directly to the runner ("you"); translate data into everyday language
-        - frame feedback positively; breakdowns are opportunities to recover
-        - response: exactly 1–2 short sentences, zero numbers or specific metrics
+        - Role & Tone: You are an empathetic, expert running coach. Your tone must be warm, encouraging, and conversational. Speak directly to the runner using "you."
+        - Translate physiological data into relatable, everyday language. (e.g., instead of "acute neuromuscular fatigue," say "your legs are carrying some fatigue").
+        - Always frame feedback positively. If their form is breaking down, frame it as an opportunity to recover and bounce back.
+        - Strict Length: Your response must be exactly 1 to 2 short sentences.
+        - Zero Numbers: Do not prescribe specific metrics, target paces, or times. Offer qualitative guidance only.
         - \(focusDirective)
         - respond_entirely_in_\(language)
         """
@@ -187,9 +210,14 @@ class CoachingEngine {
         GOAL: \(trainingGoal)
         TIMEFRAME: \(timeFrame)
         STAGE: {{STAGE_CONTEXT}}
-        HR: {{HR_CONTEXT}}, ZONE4: {{ZONE4_CONTEXT}}
-        CADENCE: {{CADENCE_CONTEXT}}, PACE: {{PACE_CONTEXT}}
-        PACE_CV: {{CV_CONTEXT}}, PACE_SLOPE: {{SLOPE_CONTEXT}}
+
+        --- METRICS ---
+        HEART_RATE_BPM: {{HR_CONTEXT}}
+        ZONE4_PERCENT: {{ZONE4_CONTEXT}}
+        CADENCE_SPM: {{CADENCE_CONTEXT}}
+        PACE: {{PACE_CONTEXT}}
+        PACE_VARIABILITY: {{CV_CONTEXT}}
+        PACE_SLOPE: {{SLOPE_CONTEXT}}
         [AGGREGATE_DATA_END]
         """
 
@@ -292,7 +320,7 @@ actor RunAnalyzerActor {
             baseline = BaselineStats(avgPace: avgPace, avgCadence: avgCadence, avgHR: avgHR)
         }
 
-        let directiveContext: String
+        var directiveContext: String
         let paceContext: String
         let hrContext: String
         let cadenceContext: String
@@ -338,6 +366,13 @@ actor RunAnalyzerActor {
             hrContext = "\(Int(run.workingAvgHeartRate)) BPM (No baseline available)."
         }
 
+        // Check for previously prescribed drill execution
+        if let lastRun = priorRuns.sorted(by: { $0.date > $1.date }).first,
+           let lastInsight = lastRun.insight,
+           let prescribedDrill = lastInsight.drillRecommendations?.sorted(by: { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }).first {
+            directiveContext += " The user just completed the previously prescribed drill: \(prescribedDrill.drillTitle). Their target cadence was \(prescribedDrill.targetCadence ?? "unknown"), and their actual average cadence on this run was \(Int(run.workingAvgCadence)) SPM. Provide specific feedback on their execution of the drill."
+        }
+
         // Enforce 30-day baselines in target calculation
         let thirtyDayCadence = Int(baseline?.avgCadence ?? (run.workingAvgCadence > 0 ? run.workingAvgCadence : 155))
         let thirtyDayPace = baseline?.avgPace ?? (run.workingAvgPace > 0 ? run.workingAvgPace : 380.0)
@@ -373,8 +408,9 @@ actor RunAnalyzerActor {
                 for (index, suggestedDrill) in payload.drills.enumerated() {
                     let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
                     let template = DrillTemplate.template(for: preRunId)
-                    let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
-                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: thirtyDayCadence, targetCadence: computedTarget)
+                    let effectiveCadence = max(thirtyDayCadence, Int(run.workingAvgCadence))
+                    let computedTarget = template.calculateTargetCadence(effectiveCadence)
+                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: effectiveCadence, targetCadence: computedTarget)
 
                     let targetCadenceStr = preRunDrill.computedCadence.map { "\($0) SPM" }
 

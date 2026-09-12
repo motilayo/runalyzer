@@ -21,13 +21,19 @@ struct ContentView: View {
         Group {
             if hasCompletedOnboarding {
                 DashboardView(onSync: { force in
-                    await syncData(force: force)
+                    Task {
+                        await syncData(force: force)
+                    }
                 })
                 .task {
-                    await syncData()
+                    Task {
+                        await syncData()
+                    }
 
                     healthKitManager.onWorkoutsUpdated = {
-                        await syncData()
+                        Task {
+                            await syncData()
+                        }
                     }
                     healthKitManager.startObservingWorkouts()
                 }
@@ -157,7 +163,7 @@ struct ContentView: View {
 
             if let allRuns = try? modelContext.fetch(descriptor) {
                 let runsToPreload = allRuns.enumerated().compactMap { index, run -> RunRecord? in
-                    if run.date >= sevenDaysAgo || index < 5 {
+                    if index == 0 {
                         return run
                     }
                     return nil

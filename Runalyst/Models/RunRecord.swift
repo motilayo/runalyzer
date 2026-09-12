@@ -33,6 +33,8 @@ final class RunRecord {
     var workingDistanceMeters: Double?
     /// True working duration excluding dead stops (seconds)
     var workingDurationSeconds: Double?
+    /// Whether the workout was performed indoors (e.g., treadmill)
+    var isIndoor: Bool?
     /// True working average pace, excluding dead stops (seconds/km)
     var workingAvgPace: Double
     /// True working average cadence (SPM)
@@ -87,7 +89,8 @@ final class RunRecord {
         workingAvgVerticalOscillation: Double? = nil,
         rawAvgVerticalOscillation: Double? = nil,
         workingDistanceMeters: Double? = nil,
-        workingDurationSeconds: Double? = nil,
+        workingDurationSeconds: TimeInterval? = nil,
+        isIndoor: Bool? = nil,
         paceCV: Double,
         paceSlope: Double,
         percentZone4: Double,
@@ -110,6 +113,7 @@ final class RunRecord {
         self.rawAvgVerticalOscillation = rawAvgVerticalOscillation
         self.workingDistanceMeters = workingDistanceMeters
         self.workingDurationSeconds = workingDurationSeconds
+        self.isIndoor = isIndoor
         self.paceCV = paceCV
         self.paceSlope = paceSlope
         self.percentZone4 = percentZone4

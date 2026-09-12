@@ -188,15 +188,6 @@ struct DashboardView: View {
     @ViewBuilder
     private var aiFatigueInsightCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkle")
-                    .foregroundColor(.primary)
-                Text("AI Fatigue Insight")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-            }
-            .padding(.horizontal)
-
             VStack(alignment: .leading, spacing: 8) {
                 let headline = currentHeadline()
                 let bodyText = currentBody()
@@ -214,8 +205,10 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
                 } else {
-                    HStack {
-                        Text("✨ \(headline.isEmpty ? "Fatigue Analysis" : headline)")
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkle")
+                            .foregroundColor(.primary)
+                        Text("AI Fatigue Insight")
                             .font(.subheadline.bold())
                             .foregroundColor(.primary)
                     }
@@ -375,7 +368,7 @@ struct DashboardView: View {
                     Text(template.title)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    Text("10–15 min drill")
+                    Text("\(PreRunDrill(id: primerId).duration.title) drill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -563,7 +556,7 @@ struct DashboardView: View {
     }
 
     private func autoSyncStaleWatchDrillIfNeeded() {
-        guard lastWatchExportTimestamp > 0 && lastBaselineChangeTimestamp > lastWatchExportTimestamp, !lastExportedDrillId.isEmpty else { return }
+        guard !lastExportedDrillId.isEmpty else { return }
         guard #available(iOS 17.0, *) else { return }
         guard let baseCadence = baselineCadence else { return }
 
@@ -581,6 +574,7 @@ struct DashboardView: View {
             )
             do {
                 let bridge = WorkoutBridge()
+                await WorkoutScheduler.shared.removeAllWorkouts()
                 try await bridge.scheduleDrill(dto: dto)
                 await MainActor.run {
                     self.lastWatchExportTimestamp = Date().timeIntervalSince1970
@@ -931,14 +925,14 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
-                if let onSync {
-                    isSyncing = true
-                    let task = Task {
-                        await onSync(false)
-                    }
-                    _ = await task.result
-                    isSyncing = false
-                }
+                // Invalidate cache
+                cachedHeadline7Day = ""
+                cachedBody7Day = ""
+                cachedHeadline30Day = ""
+                cachedBody30Day = ""
+                cachedHeadlineAllTime = ""
+                cachedBodyAllTime = ""
+                fetchInsight()
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)

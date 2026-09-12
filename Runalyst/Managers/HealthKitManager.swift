@@ -33,6 +33,7 @@ struct RunRecordDTO: Sendable {
     let workingAvgVerticalOscillation: Double?
     let workingDistanceMeters: Double?
     let workingDurationSeconds: Double?
+    let isIndoor: Bool?
     let paceCV: Double
     let paceSlope: Double
     let percentZone4: Double
@@ -340,6 +341,7 @@ class HealthKitManager: ObservableObject {
         let totalSteps = try await fetchSum(for: workout, type: stepType, unit: HKUnit.count())
 
         let rawAvgOscillation = try? await fetchAverage(for: workout, type: oscType, unit: HKUnit.meterUnit(with: .centi))
+        let isIndoor = workout.metadata?[HKMetadataKeyIndoorWorkout] as? Bool
 
         let buckets = try await fetchBucketedSamples(for: workout)
         let trimmed = await engine.trimDeadStops(buckets: buckets)
@@ -395,6 +397,7 @@ class HealthKitManager: ObservableObject {
             workingAvgVerticalOscillation: validWorkingOsc,
             workingDistanceMeters: workingDistance,
             workingDurationSeconds: workingDuration,
+            isIndoor: isIndoor,
             paceCV: cv,
             paceSlope: slope,
             percentZone4: zone4,
