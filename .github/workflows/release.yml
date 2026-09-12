@@ -31,7 +31,7 @@ jobs:
   # 2. SwiftLint (Static Code Quality)
   lint:
     name: SwiftLint Static Analysis
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
   # 3. Build & Automated Tests
   build-and-test:
     name: Build & Test Suite
-    runs-on: macos-15
+    runs-on: macos-26
     needs: [secret-scan]
     steps:
       - name: Checkout repository
