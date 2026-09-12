@@ -51,3 +51,4 @@ actor ModelManager {
 }
 
 extension RunalystClassifier: @unchecked Sendable {}
+extension RunalystClassifierOutput: @unchecked Sendable {}

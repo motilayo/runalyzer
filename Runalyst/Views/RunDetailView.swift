@@ -11,9 +11,8 @@ struct RunDetailView: View {
 
     @State private var showRawMetrics: Bool = false
     @State private var isForceAnalyzing: Bool = false
-    @State private var showingToggleInfo = false
-    @State private var showingClassificationExplainer = false
-    @State private var isGeneratingInsight = false
+    @State private var showingToggleInfo: Bool = false
+    @State private var showingClassificationExplainer: Bool = false
 
     private var baselineRuns: [RunRecord] {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
@@ -65,24 +64,11 @@ struct RunDetailView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Formatted run date header
-                HStack {
-                    Text(formattedRunDate)
-                        .font(.subheadline.bold())
-                        .foregroundColor(.primary)
-
-                    if let isIndoor = runRecord.isIndoor {
-                        Text(isIndoor ? "Indoor Run" : "Outdoor Run")
-                            .font(.caption2.bold())
-                            .foregroundColor(isIndoor ? .purple : .blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isIndoor ? Color.purple.opacity(0.15) : Color.blue.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
+                Text(formattedRunDate)
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
                     .padding(.top, 4)
 
                 // MARK: Run Classification
@@ -137,16 +123,16 @@ struct RunDetailView: View {
                 }
 
                 // MARK: AI Run Analysis
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.purple)
-                        Text("AI Run Analysis")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.purple)
-                    }
+                if let insight = runRecord.insight {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.purple)
+                            Text("AI Run Analysis")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.purple)
+                        }
 
-                    if let insight = runRecord.insight {
                         if !insight.longitudinalObservation.isEmpty {
                             Text(insight.longitudinalObservation)
                                 .font(.body)
@@ -156,49 +142,16 @@ struct RunDetailView: View {
                                 .font(.body)
                                 .foregroundColor(.primary)
                         }
-                    } else if isGeneratingInsight {
-                        AnimatedLoadingView(
-                            text: "Generating AI insight...",
-                            isHorizontal: true,
-                            imageSize: 14,
-                            textFont: .body,
-                            spacing: 8
-                        )
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 8)
-                    } else {
-                        Text("AI insight not available for this run.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .italic()
-                    }
 
-                    aiDisclaimerFooter
-                }
-                .frame(minHeight: 1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-                .padding(.horizontal)
-                .task {
-                    if runRecord.insight == nil {
-                        isGeneratingInsight = true
-                        let runId = runRecord.persistentModelID
-                        let container = modelContext.container
-                        if #available(iOS 26.0, *) {
-                            Task.detached {
-                                let analyzer = RunAnalyzerActor(modelContainer: container)
-                                await analyzer.generateAnalysis(for: runId)
-                                await MainActor.run {
-                                    isGeneratingInsight = false
-                                }
-                            }
-                        } else {
-                            isGeneratingInsight = false
-                        }
+                        aiDisclaimerFooter
                     }
+                    .frame(minHeight: 1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .background(Color(UIColor.secondarySystemGroupedBackground))
+                    .cornerRadius(16)
+                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                    .padding(.horizontal)
                 }
 
                 // MARK: Data Toggle
@@ -208,6 +161,9 @@ struct RunDetailView: View {
                         Text("Workout Stats").tag(true)
                     }
                     .pickerStyle(.segmented)
+                    .onChange(of: showRawMetrics) {
+                        showingToggleInfo = true
+                    }
 
                     Button(action: { showingToggleInfo = true }) {
                         Image(systemName: "info.circle")
@@ -239,12 +195,11 @@ struct RunDetailView: View {
                     let activeDuration = showRawMetrics ? runRecord.duration : runRecord.effectiveWorkingDurationSeconds
                     let minutes = Int(activeDuration) / 60
                     let seconds = Int(activeDuration) % 60
-                    StatBox(title: showRawMetrics ? "Total Time" : "Moving Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
 
                     let currentPace: Double = {
                         if showRawMetrics {
-                            let totalKm = runRecord.totalDistanceMeters / 1000.0
-                            return totalKm > 0 ? (runRecord.duration / totalKm) : runRecord.rawAvgPace
+                            return runRecord.rawAvgPace
                         } else {
                             let workingKm = runRecord.effectiveWorkingDistanceMeters / 1000.0
                             return workingKm > 0 ? (runRecord.effectiveWorkingDurationSeconds / workingKm) : runRecord.workingAvgPace
@@ -254,7 +209,7 @@ struct RunDetailView: View {
                     let currentCadence = showRawMetrics ? runRecord.rawAvgCadence : runRecord.workingAvgCadence
 
                     StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace, baselineValue: showRawMetrics ? nil : baselinePace, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
-                    StatBox(title: "Avg HR", value: "\(Int(round(currentHR)))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg HR", value: "\(Int(currentHR))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
                     StatBox(title: "Avg Cadence", value: "\(Int(currentCadence))", unit: "SPM", currentValue: currentCadence, baselineValue: showRawMetrics ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
 
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
@@ -355,7 +310,6 @@ struct RunDetailView: View {
                 }
             }
             .padding(.vertical)
-
             .task(id: runRecord.id) {
                 let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
                    (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
@@ -384,28 +338,6 @@ struct RunDetailView: View {
                         }
                     }
                 }
-            }
-        }
-        .refreshable {
-            if #available(iOS 26.0, *) {
-                isGeneratingInsight = true
-                if let oldInsight = runRecord.insight {
-                    modelContext.delete(oldInsight)
-                    runRecord.insight = nil
-                    try? modelContext.save()
-                }
-
-                let runId = runRecord.persistentModelID
-                let container = modelContext.container
-
-                let task = Task.detached {
-                    let analyzer = RunAnalyzerActor(modelContainer: container)
-                    await analyzer.generateAnalysis(for: runId)
-                    await MainActor.run {
-                        isGeneratingInsight = false
-                    }
-                }
-                _ = await task.result
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -629,8 +561,7 @@ private struct DrillCardView: View {
                     Text(displayTitle)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    let drillId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
-                    Text("\(PreRunDrill(id: drillId).duration.title) drill")
+                    Text("10–15 min drill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
