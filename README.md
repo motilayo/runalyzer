@@ -50,6 +50,14 @@ Runalyst uses GitHub Actions for continuous integration.
 - **CI & Release**: Automated linting (`SwiftLint`) and testing runs on all pull requests and pushes to `main`.
 - **Seed Data Generation**: A python script (`generate_seed_runs.py`) can be triggered via workflow dispatch to generate synthetic balanced running data (CSV) used for offline CoreML training in Create ML.
 
+### Training the CoreML Classifier
+To train a new version of the `RunalystClassifier.mlmodel`:
+1. **Download Data**: Trigger the "Generate Seed Data" workflow on GitHub Actions and download the `coreml-training-data` artifact (CSV) when it completes.
+2. **Open Create ML**: On your Mac, open Xcode and select **Xcode > Open Developer Tool > Create ML**.
+3. **Create Project**: Select **File > New Project**, choose **Tabular Classification**, and name the project.
+4. **Configure**: Under *Training Data*, import your CSV. Set the *Target* to `targetClass` and select the relevant metrics (e.g., `averagePace`, `averageHeartRate`, `percentZone4`, etc.) under *Features*.
+5. **Train & Export**: Click **Train**. Once evaluation finishes, go to the *Output* tab, click **Get**, and drag the resulting `.mlmodel` file into the Xcode project to overwrite the old one.
+
 ## Note on Privacy & Scope
 
 Runalyst explicitly **does not** integrate third-party cloud APIs (OpenAI, Anthropic, etc.), **does not** build a custom backend or require user authentication, and **does not** track live workouts or request GPS permissions. All analysis is done securely and privately on-device.
