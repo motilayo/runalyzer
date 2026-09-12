@@ -69,7 +69,7 @@ struct RunDetailView: View {
                     Text(formattedRunDate)
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
-                    
+
                     if let isIndoor = runRecord.isIndoor {
                         Text(isIndoor ? "Indoor Run" : "Outdoor Run")
                             .font(.caption2.bold())
@@ -394,10 +394,10 @@ struct RunDetailView: View {
                     runRecord.insight = nil
                     try? modelContext.save()
                 }
-                
+
                 let runId = runRecord.persistentModelID
                 let container = modelContext.container
-                
+
                 let task = Task.detached {
                     let analyzer = RunAnalyzerActor(modelContainer: container)
                     await analyzer.generateAnalysis(for: runId)

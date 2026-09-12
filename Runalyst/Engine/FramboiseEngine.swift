@@ -74,12 +74,12 @@ actor FramboiseEngine {
         for bucket in trimmed {
             totalDistanceMeters += bucket.distanceMeters
             totalCadence += bucket.meanCadence
-            
+
             if bucket.meanHR >= 40 {
                 totalHR += bucket.meanHR
                 validHRBucketCount += 1
             }
-            
+
             if bucket.meanVerticalOscillation > 0 {
                 totalOscillation += bucket.meanVerticalOscillation
                 oscillationBucketCount += 1

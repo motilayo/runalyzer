@@ -1,0 +1,108 @@
+name: Release Runalyst
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  # 1. Secret Scanning
+  secret-scan:
+    name: Secret & Credential Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2. SwiftLint (Static Code Quality)
+  lint:
+    name: SwiftLint Static Analysis
+    runs-on: macos-15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run SwiftLint
+        run: |
+          if which swiftlint >/dev/null; then
+            swiftlint lint --config .swiftlint.yml --strict
+          else
+            echo "SwiftLint not pre-installed on runner; installing via Homebrew..."
+            brew install swiftlint
+            swiftlint lint --config .swiftlint.yml --strict
+          fi
+
+  # 3. Build & Automated Tests
+  build-and-test:
+    name: Build & Test Suite
+    runs-on: macos-15
+    needs: [secret-scan]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Discover Available iOS Simulator
+        id: simulator
+        run: |
+          DEVICE_NAME=$(xcrun simctl list devices available | grep -m 1 "iPhone" | sed -E 's/^[[:space:]]+//; s/ \([A-F0-9-]+\).*//')
+          echo "Using simulator device: $DEVICE_NAME"
+          echo "device=$DEVICE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Build and Test Runalyst
+        run: |
+          xcodebuild \
+            -project Runalyst.xcodeproj \
+            -scheme Runalyst \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.device }}" \
+            -enableCodeCoverage YES \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build test
+
+  # 4. Publish GitHub Release
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [lint, build-and-test]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Release Notes
+        id: notes
+        run: |
+          if [ -f "RELEASENOTES.md" ]; then
+            echo "has_notes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_notes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Runalyst ${{ github.ref_name }} — AI Biomechanical Coach
+          body_path: ${{ steps.notes.outputs.has_notes == 'true' && 'RELEASENOTES.md' || '' }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
