@@ -8,18 +8,18 @@ The following Mermaid diagram illustrates the lifecycle of a `RunRecord` from ex
 
 ```mermaid
 graph TD
-    A[Apple HealthKit] -->|HKWorkout Queries| B(HealthKitManager)
-    B -->|Raw Metrics| C{Framboise Engine}
-    C -->|Normalizes dead-stops| D[Working Averages]
-    D --> E(ModelManager / CoreML)
-    E -->|Predicts Class| F[RunRecord DTO]
-    F -->|Persisted| G[(SwiftData SQLite)]
-    G -->|On-Demand Task| H(RunAnalyzerActor)
-    H -->|Constructs Directive| I[CoachingEngine]
-    I -->|System Prompt| J((Apple FoundationModels))
-    J -->|Structured JSON| K[DrillRecommendation & Insight]
+    A["Apple HealthKit"] -->|"HKWorkout Queries"| B("HealthKitManager")
+    B -->|"Raw Metrics"| C{"Framboise Engine"}
+    C -->|"Normalizes dead-stops"| D["Working Averages"]
+    D --> E("ModelManager / CoreML")
+    E -->|"Predicts Class"| F["RunRecord DTO"]
+    F -->|"Persisted"| G[("SwiftData SQLite")]
+    G -->|"On-Demand Task"| H("RunAnalyzerActor")
+    H -->|"Constructs Directive"| I["CoachingEngine"]
+    I -->|"System Prompt"| J(("Apple FoundationModels"))
+    J -->|"Structured JSON"| K["DrillRecommendation & Insight"]
     K --> G
-    G -->|@Query| L[SwiftUI Views]
+    G -->|"@Query"| L["SwiftUI Views"]
 ```
 
 ## Core Components
