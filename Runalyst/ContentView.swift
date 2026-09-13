@@ -92,6 +92,15 @@ struct ContentView: View {
             }
 
             let engine = FramboiseEngine()
+            
+            let priorRunData: [HealthKitManager.RunBaselineData] = currentExistingRuns.map {
+                HealthKitManager.RunBaselineData(
+                    date: $0.date,
+                    pace: $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace,
+                    hr: $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate,
+                    cadence: $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence
+                )
+            }
 
             // Repair any existing runs in SwiftData that have missing/zero vertical oscillation or working distance/duration
             let runsNeedingRepair = currentExistingRuns.filter {
@@ -101,7 +110,7 @@ struct ContentView: View {
             }
             for existingRun in runsNeedingRepair {
                 if let workout = workouts.first(where: { $0.uuid == existingRun.hkWorkoutID }) {
-                    if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine) {
+                    if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine, priorRuns: priorRunData) {
                         existingRun.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
                         existingRun.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
                         existingRun.workingDistanceMeters = dto.workingDistanceMeters
@@ -114,19 +123,18 @@ struct ContentView: View {
             // 3. Extract and insert new runs
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
 
-            // Extract all records concurrently using TaskGroup
-            let extractedRunsUnsorted = try await withThrowingTaskGroup(of: RunRecordDTO.self) { group in
-                for workout in sortedNewWorkouts {
-                    group.addTask {
-                        try await healthKitManager.extractRunRecord(from: workout, engine: engine)
-                    }
+            // Extract all records sequentially to prevent HealthKit daemon throttling
+            var extractedRunsUnsorted: [RunRecordDTO] = []
+            for (index, workout) in sortedNewWorkouts.enumerated() {
+                if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine, priorRuns: priorRunData) {
+                    extractedRunsUnsorted.append(dto)
                 }
-
-                var results: [RunRecordDTO] = []
-                for try await result in group {
-                    results.append(result)
+                
+                if (index + 1) % 5 == 0 {
+                    try? await Task.sleep(nanoseconds: 10_000_000_000)
+                } else {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
                 }
-                return results
             }
 
             let extractedRuns = extractedRunsUnsorted.sorted { $0.date < $1.date }
@@ -158,16 +166,11 @@ struct ContentView: View {
             try modelContext.save()
 
             // Preload AI analysis ONLY for runs within the last 7 days or past 5 runs
-            let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+
             let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
 
             if let allRuns = try? modelContext.fetch(descriptor) {
-                let runsToPreload = allRuns.enumerated().compactMap { index, run -> RunRecord? in
-                    if index == 0 {
-                        return run
-                    }
-                    return nil
-                }
+                let runsToPreload = allRuns.filter { $0.insight == nil }
                 let container = modelContext.container
 
                 for run in runsToPreload where run.insight == nil {

@@ -332,8 +332,8 @@ struct DrillPrimerCardView: View {
         let work = template.workString(for: selectedDuration)
         let recovery = template.recoveryString(for: selectedDuration)
         let effort = template.defaultEffort
-        let targetCadence: Int? = baselineCadence.map { template.calculateTargetCadence($0) }
-        let cue = template.generateInstructionalCue(targetCadence ?? 0)
+        let targetCadence: String? = baselineCadence.map { template.calculateTargetCadence($0) }
+        let cue = template.generateInstructionalCue(targetCadence)
         let icon = drillId.iconName
         let iconColor = drillId.iconColor
 
@@ -468,9 +468,8 @@ struct DrillPrimerCardView: View {
                 }
             }
 
-            // Haptic Feedback (on cadence/rhythm drills)
-            if hasCadenceTarget {
-                VStack(alignment: .leading, spacing: 6) {
+            // Haptic Feedback
+            VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         HStack(spacing: 4) {
                             Image(systemName: "waveform")
@@ -493,7 +492,6 @@ struct DrillPrimerCardView: View {
                         .frame(maxWidth: 130)
                     }
                 }
-            }
 
             // Single Action Button: Start Drill
             Button(action: {
@@ -519,7 +517,7 @@ struct DrillPrimerCardView: View {
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
-    private func startDrill(title: String, purpose: String, targetCadence: Int?) {
+    private func startDrill(title: String, purpose: String, targetCadence: String?) {
         let drill = PreRunDrill(
             id: drillId,
             previousCadence: baselineCadence,

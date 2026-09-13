@@ -25,7 +25,7 @@ struct DrillPrescriptionDTO: Sendable, Codable {
     let title: String
     let preRunDrillId: String?
     let purpose: String
-    let targetCadence: Int?
+    let targetCadence: String?
     let previousCadence: Int?
     var durationMinutes: Int? = 15
     var hapticMode: String? = "On"
@@ -220,14 +220,14 @@ extension PreRunDrill {
 struct PreRunDrill: Sendable {
     let id: PreRunDrillId
     let previousCadence: Int?
-    let targetCadence: Int?
+    let targetCadence: String?
     let duration: DrillDuration
     let hapticMode: HapticFeedbackMode
 
     init(
         id: PreRunDrillId,
         previousCadence: Int? = nil,
-        targetCadence: Int? = nil,
+        targetCadence: String? = nil,
         duration: DrillDuration = .fifteenMinutes,
         hapticMode: HapticFeedbackMode = .on
     ) {
@@ -242,7 +242,7 @@ struct PreRunDrill: Sendable {
     private let safeMaxCadence = 185
     private let safeMinCadence = 140
 
-    var effectiveTargetCadence: Int? {
+    var effectiveTargetCadence: ClosedRange<Int>? {
         // Recovery / flush / base builder drills do not use cadence turnover alerts
         switch id {
         case .aerobicFlush, .recoveryJog, .aerobicBaseBuilder, .zone2Run:
@@ -251,18 +251,29 @@ struct PreRunDrill: Sendable {
             break
         }
 
-        if let target = targetCadence, target > 0 {
-            return min(safeMaxCadence, max(safeMinCadence, target))
+        if let target = targetCadence, target.contains("-") {
+            let parts = target.components(separatedBy: "-")
+            if parts.count == 2, let lower = Int(parts[0].trimmingCharacters(in: .whitespaces)), let upper = Int(parts[1].trimmingCharacters(in: .whitespaces)) {
+                let safeLower = min(safeMaxCadence, max(safeMinCadence, lower))
+                let safeUpper = min(safeMaxCadence, max(safeMinCadence, upper))
+                return min(safeLower, safeUpper)...max(safeLower, safeUpper)
+            }
+        } else if let target = targetCadence, let targetInt = Int(target.replacingOccurrences(of: " SPM", with: "").trimmingCharacters(in: .whitespaces)) {
+            let safeTarget = min(safeMaxCadence, max(safeMinCadence, targetInt))
+            return max(safeMinCadence, safeTarget - 3)...min(safeMaxCadence, safeTarget + 3)
         }
+        
         if let prev = previousCadence, prev > 0 {
             let baseTarget = Int(Double(prev) * 1.05)
-            return min(safeMaxCadence, max(prev, baseTarget))
+            let safeTarget = min(safeMaxCadence, max(prev, baseTarget))
+            return max(safeMinCadence, safeTarget - 3)...min(safeMaxCadence, safeTarget + 3)
         }
         return nil
     }
 
-    var computedCadence: Int? {
-        return effectiveTargetCadence
+    var computedCadence: String? {
+        guard let range = effectiveTargetCadence else { return nil }
+        return "\(range.lowerBound)-\(range.upperBound)"
     }
 
     func workString(for customDuration: DrillDuration) -> String {
@@ -412,8 +423,7 @@ struct PreRunDrill: Sendable {
 
         var alert: (any WorkoutAlert)?
         if let target = effectiveTargetCadence {
-            let cadenceValue = Double(target)
-            alert = CadenceThresholdAlert.cadence(cadenceValue)
+            alert = CadenceRangeAlert.cadence(Double(target.lowerBound)...Double(target.upperBound))
         } else if id == .aerobicFlush || id == .recoveryJog {
             alert = HeartRateZoneAlert(zone: 1)
         } else if id == .aerobicBaseBuilder || id == .zone2Run {
@@ -571,11 +581,11 @@ struct DrillTemplate: Sendable {
     let defaultEffort: String
 
     /// Target calculation closures enforcing 30-day user baselines
-    let calculateTargetCadence: @Sendable (_ thirtyDayCadence: Int) -> Int
+    let calculateTargetCadence: @Sendable (_ thirtyDayCadence: Int) -> String
     let calculateTargetPace: @Sendable (_ thirtyDayPace: Double) -> Double
 
     /// Instructional text interpolating the computed target output from the closure
-    let generateInstructionalCue: @Sendable (_ computedTargetCadence: Int) -> String
+    let generateInstructionalCue: @Sendable (_ computedTargetCadence: String?) -> String
 
     func workString(for duration: DrillDuration) -> String {
         PreRunDrill(id: id).workString(for: duration)
@@ -592,9 +602,9 @@ struct DrillTemplate: Sendable {
         defaultWork: String,
         defaultRecovery: String,
         defaultEffort: String,
-        calculateTargetCadence: @escaping @Sendable (Int) -> Int,
+        calculateTargetCadence: @escaping @Sendable (Int) -> String,
         calculateTargetPace: @escaping @Sendable (Double) -> Double = { $0 },
-        generateInstructionalCue: @escaping @Sendable (Int) -> String
+        generateInstructionalCue: @escaping @Sendable (String?) -> String
     ) {
         self.id = id
         self.title = title
@@ -618,7 +628,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "2 min walk recovery",
                 defaultEffort: "Moderate / Zone 3",
                 calculateTargetCadence: { baseline in
-                    min(185, max(150, Int(Double(baseline) * 1.05)))
+                    let target = min(185, max(150, Int(Double(baseline) * 1.05)))
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Toes wide, light footfalls, and quick ground contact. Let your feet kiss the ground and lift quickly."
@@ -633,7 +644,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "90 sec easy jog recovery",
                 defaultEffort: "Moderate / Zone 3",
                 calculateTargetCadence: { baseline in
-                    min(185, max(152, Int(Double(baseline) * 1.06)))
+                    let target = min(185, max(152, Int(Double(baseline) * 1.06)))
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel your rhythm."
@@ -648,7 +660,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "4 min walk recovery",
                 defaultEffort: "Hard / Zone 4",
                 calculateTargetCadence: { baseline in
-                    min(185, max(155, Int(Double(baseline) * 1.08)))
+                    let target = min(185, max(155, Int(Double(baseline) * 1.08)))
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Stay tall with a slight lean from your ankles. Keep hands relaxed and drive smoothly from your hips."
@@ -663,7 +676,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "60 sec walk recovery",
                 defaultEffort: "Sprint / Zone 5",
                 calculateTargetCadence: { baseline in
-                    min(190, max(170, Int(Double(baseline) * 1.10)))
+                    let target = min(190, max(170, Int(Double(baseline) * 1.10)))
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Stand tall, gaze on the horizon, drive your elbows backward, and keep your hands relaxed."
@@ -678,7 +692,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "90 sec walk recovery",
                 defaultEffort: "Sprint / Zone 5",
                 calculateTargetCadence: { baseline in
-                    min(185, max(160, Int(Double(baseline) * 1.07)))
+                    let target = min(185, max(160, Int(Double(baseline) * 1.07)))
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Land softly underneath your hips rather than reaching forward. Focus on springy, quiet steps."
@@ -693,7 +708,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "No intervals",
                 defaultEffort: "Zone 1 Active Recovery",
                 calculateTargetCadence: { baseline in
-                    max(140, baseline)
+                    let target = max(140, baseline)
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Focus on your breathing—deep belly inhales and smooth exhales to let your muscles release tension."
@@ -708,7 +724,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "2 min walk recovery",
                 defaultEffort: "Hard / Zone 4",
                 calculateTargetCadence: { baseline in
-                    min(185, max(155, Int(Double(baseline) * 1.06)))
+                    let target = min(185, max(155, Int(Double(baseline) * 1.06)))
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Shift your speed with your stride rhythm while keeping your upper body quiet and shoulders low."
@@ -723,7 +740,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "90 sec walk recovery",
                 defaultEffort: "Sprint / Zone 5",
                 calculateTargetCadence: { baseline in
-                    max(145, baseline)
+                    let target = max(145, baseline)
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Pump your arms forward and up, driving through your knees and glutes with tall, powerful posture."
@@ -738,7 +756,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "No intervals",
                 defaultEffort: "Zone 1 Active Recovery",
                 calculateTargetCadence: { baseline in
-                    max(140, baseline)
+                    let target = max(140, baseline)
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Focus on your breathing and shake out your hands. Keep your steps small, soft, and effortless."
@@ -753,7 +772,8 @@ struct DrillTemplate: Sendable {
                 defaultRecovery: "No intervals",
                 defaultEffort: "Zone 2 Aerobic",
                 calculateTargetCadence: { baseline in
-                    max(150, baseline)
+                    let target = max(150, baseline)
+                    return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
                     "Focus on calm nasal breathing and a conversational pace, keeping your heart rate steadily locked in Zone 2."

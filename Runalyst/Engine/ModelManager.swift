@@ -18,33 +18,27 @@ actor ModelManager {
 
     /// Predicts the run type using the CoreML model.
     func predictRunType(
-        averagePace: Double,
-        averageHeartRate: Double,
+        paceDelta: Double,
+        hrDelta: Double,
         percentZone4: Double,
-        averageCadence: Double,
+        cadenceDelta: Double,
         verticalOscillation: Double = 9.5,
         runnerStage: Int = 1,
         cv: Double = 0.05,
         slope: Double = 0.0,
-        durationMinutes: Double = 30.0
+        durationMinutes: Double = 30.0,
+        rawAverageHR: Double? = nil
     ) async -> String {
-        // High pace variability (CV > 0.12) indicates an Interval / Fartlek workout,
-        // not a steady-state continuous Tempo run.
-        if cv > 0.15 {
-            return "Intervals"
-        }
-        if cv > 0.10 && percentZone4 < 0.25 {
-            return "Fartlek"
-        }
-
         if let classifier = self.runClassifier {
             do {
                 let input = RunalystClassifierInput(
-                    averagePace: averagePace,
-                    averageHeartRate: averageHeartRate,
+                    paceDelta: paceDelta,
+                    hrDelta: hrDelta,
                     percentZone4: percentZone4,
-                    averageCadence: averageCadence,
+                    cadenceDelta: cadenceDelta,
                     verticalOscillation: verticalOscillation,
+                    cv: cv,
+                    paceSlope: slope,
                     runnerStage: Int64(runnerStage)
                 )
                 let prediction = try await classifier.prediction(input: input)
@@ -55,7 +49,7 @@ actor ModelManager {
         }
 
         let framboise = FramboiseEngine()
-        return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, averageHR: averageHeartRate)
+        return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, averageHR: rawAverageHR)
     }
 
 }

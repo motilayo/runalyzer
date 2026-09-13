@@ -185,16 +185,9 @@ struct RunDetailView: View {
                 .task {
                     if runRecord.insight == nil {
                         isGeneratingInsight = true
-                        let runId = runRecord.persistentModelID
-                        let container = modelContext.container
                         if #available(iOS 26.0, *) {
-                            Task.detached {
-                                let analyzer = RunAnalyzerActor(modelContainer: container)
-                                await analyzer.generateAnalysis(for: runId)
-                                await MainActor.run {
-                                    isGeneratingInsight = false
-                                }
-                            }
+                            await CoachingEngine.shared.requestAnalysis(for: runRecord)
+                            isGeneratingInsight = false
                         } else {
                             isGeneratingInsight = false
                         }
@@ -375,13 +368,8 @@ struct RunDetailView: View {
                 }
 
                 if runRecord.insight == nil {
-                    let container = modelContext.container
-                    let runId = runRecord.persistentModelID
                     if #available(iOS 26.0, *) {
-                        Task.detached {
-                            let analyzer = RunAnalyzerActor(modelContainer: container)
-                            await analyzer.generateAnalysis(for: runId)
-                        }
+                        await CoachingEngine.shared.requestAnalysis(for: runRecord)
                     }
                 }
             }
@@ -389,23 +377,8 @@ struct RunDetailView: View {
         .refreshable {
             if #available(iOS 26.0, *) {
                 isGeneratingInsight = true
-                if let oldInsight = runRecord.insight {
-                    modelContext.delete(oldInsight)
-                    runRecord.insight = nil
-                    try? modelContext.save()
-                }
-                
-                let runId = runRecord.persistentModelID
-                let container = modelContext.container
-                
-                let task = Task.detached {
-                    let analyzer = RunAnalyzerActor(modelContainer: container)
-                    await analyzer.generateAnalysis(for: runId)
-                    await MainActor.run {
-                        isGeneratingInsight = false
-                    }
-                }
-                _ = await task.result
+                await CoachingEngine.shared.requestAnalysis(for: runRecord, force: true)
+                isGeneratingInsight = false
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -536,7 +509,6 @@ struct DrillDeckView: View {
     }
     private func deckCard(_ drill: DrillRecommendation, index: Int, totalDrills: Int) -> some View {
         let relativeIndex = index - activeCardIndex
-        let rotationDegree = relativeIndex == 0 ? 0 : (relativeIndex % 2 == 1 ? -3.0 : 3.0)
         return DrillCardView(
             drill: drill,
             drillIndex: index,
@@ -546,7 +518,7 @@ struct DrillDeckView: View {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15), lineWidth: 1))
         .overlay(RoundedRectangle(cornerRadius: 20).fill(Color.black.opacity(relativeIndex == 0 ? 0 : 0.3)))
         .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
-        .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : rotationDegree))
+        .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : 0))
         .offset(x: relativeIndex == 0 ? offset.width : 0, y: relativeIndex == 0 ? offset.height : 0)
         .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 150))) : 1.0)
         .zIndex(Double(totalDrills - index))
@@ -608,11 +580,39 @@ private struct DrillCardView: View {
 
         VStack(alignment: .leading, spacing: 12) {
             if totalDrills > 1 {
-                HStack(spacing: 4) {
-                    ForEach(0..<totalDrills, id: \.self) { barIndex in
-                        Capsule()
-                            .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
-                            .frame(width: 16, height: 4)
+                HStack {
+                    HStack(spacing: 4) {
+                        ForEach(0..<totalDrills, id: \.self) { barIndex in
+                            Capsule()
+                                .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
+                                .frame(width: 16, height: 4)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                if activeCardIndex > 0 { activeCardIndex -= 1 }
+                            }
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(activeCardIndex > 0 ? .primary : .secondary.opacity(0.3))
+                        }
+                        .disabled(activeCardIndex == 0)
+                        
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                if activeCardIndex < totalDrills - 1 { activeCardIndex += 1 }
+                            }
+                        }) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(activeCardIndex < totalDrills - 1 ? .primary : .secondary.opacity(0.3))
+                        }
+                        .disabled(activeCardIndex == totalDrills - 1)
                     }
                 }
                 .padding(.bottom, 2)
@@ -667,7 +667,7 @@ private struct DrillCardView: View {
                 if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
                     return cueText
                 }
-                let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+                let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
                 let generated = template.generateInstructionalCue(targetInt)
                 return generated.isEmpty ? nil : generated
             }()
@@ -737,7 +737,7 @@ private struct DrillCardView: View {
                 }
             }
 
-            let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+            let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
 
             HStack(spacing: 12) {
                 Button(action: {
