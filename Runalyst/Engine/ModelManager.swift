@@ -36,7 +36,7 @@ actor ModelManager {
                     percentZone4: percentZone4,
                     averageCadence: averageCadence,
                     verticalOscillation: verticalOscillation,
-                    runnerStage: Double(runnerStage)
+                    runnerStage: Int64(runnerStage)
                 )
                 let prediction = try await classifier.prediction(input: input)
                 return prediction.targetClass
