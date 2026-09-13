@@ -326,8 +326,8 @@ final class DrillTemplateTests: XCTestCase {
         let thirtyDayCadence = 151
         let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
 
-        // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158)
-        XCTAssertEqual(computedTarget, 158)
+        // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158), returning a range 155-161
+        XCTAssertEqual(computedTarget, "155-161")
 
         // Instructional cues provide prescriptive biomechanical focus
         let cue = template.generateInstructionalCue(computedTarget)
