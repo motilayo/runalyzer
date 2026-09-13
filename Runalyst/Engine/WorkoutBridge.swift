@@ -262,7 +262,7 @@ struct PreRunDrill: Sendable {
             let safeTarget = min(safeMaxCadence, max(safeMinCadence, targetInt))
             return max(safeMinCadence, safeTarget - 3)...min(safeMaxCadence, safeTarget + 3)
         }
-        
+
         if let prev = previousCadence, prev > 0 {
             let baseTarget = Int(Double(prev) * 1.05)
             let safeTarget = min(safeMaxCadence, max(prev, baseTarget))

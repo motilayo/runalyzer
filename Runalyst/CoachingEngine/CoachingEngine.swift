@@ -84,23 +84,23 @@ class CoachingEngine {
     func requestAnalysis(for runRecord: RunRecord, force: Bool = false) async {
         let runId = runRecord.persistentModelID
         guard let container = runRecord.modelContext?.container else { return }
-        
+
         if let existingTask = inFlightTasks[runId] {
             _ = await existingTask.value
             return
         }
-        
+
         if force, let oldInsight = runRecord.insight {
             runRecord.modelContext?.delete(oldInsight)
             runRecord.insight = nil
             try? runRecord.modelContext?.save()
         }
-        
+
         let task = Task.detached {
             let analyzer = RunAnalyzerActor(modelContainer: container)
             await analyzer.generateAnalysis(for: runId, force: force)
         }
-        
+
         inFlightTasks[runId] = task
         _ = await task.value
         inFlightTasks[runId] = nil
@@ -302,23 +302,23 @@ class CoachingEngine {
     func requestAnalysis(for runRecord: RunRecord, force: Bool = false) async {
         let runId = runRecord.persistentModelID
         guard let container = runRecord.modelContext?.container else { return }
-        
+
         if let existingTask = inFlightTasks[runId] {
             _ = await existingTask.value
             return
         }
-        
+
         if force, let oldInsight = runRecord.insight {
             runRecord.modelContext?.delete(oldInsight)
             runRecord.insight = nil
             try? runRecord.modelContext?.save()
         }
-        
+
         let task = Task.detached {
             let analyzer = RunAnalyzerActor(modelContainer: container)
             await analyzer.generateAnalysis(for: runId, force: force)
         }
-        
+
         inFlightTasks[runId] = task
         _ = await task.value
         inFlightTasks[runId] = nil
@@ -432,7 +432,6 @@ actor RunAnalyzerActor {
 
         // Enforce 30-day baselines in target calculation
         let thirtyDayCadence = Int(baseline?.avgCadence ?? (run.workingAvgCadence > 0 ? run.workingAvgCadence : 155))
-
 
         let defaultTemplate = DrillTemplate.template(for: .cadencePyramids)
         let intervalTarget = defaultTemplate.calculateTargetCadence(thirtyDayCadence)

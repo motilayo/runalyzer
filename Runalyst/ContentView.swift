@@ -92,7 +92,7 @@ struct ContentView: View {
             }
 
             let engine = FramboiseEngine()
-            
+
             let priorRunData: [HealthKitManager.RunBaselineData] = currentExistingRuns.map {
                 HealthKitManager.RunBaselineData(
                     date: $0.date,
@@ -129,7 +129,7 @@ struct ContentView: View {
                 if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine, priorRuns: priorRunData) {
                     extractedRunsUnsorted.append(dto)
                 }
-                
+
                 if (index + 1) % 5 == 0 {
                     try? await Task.sleep(nanoseconds: 10_000_000_000)
                 } else {

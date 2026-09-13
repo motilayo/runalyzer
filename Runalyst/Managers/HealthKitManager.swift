@@ -160,16 +160,16 @@ class HealthKitManager: ObservableObject {
                     continuation.resume(returning: [])
                     return
                 }
-                
+
                 // If not explicitly set, UserDefaults bool defaults to false, but we want our default to be metric if locale is metric
                 let hasMetricKey = UserDefaults.standard.object(forKey: "useMetricSystem") != nil
                 let useMetricSystem = hasMetricKey ? UserDefaults.standard.bool(forKey: "useMetricSystem") : (Locale.current.measurementSystem == .metric)
-                
+
                 let hasMinDistKey = UserDefaults.standard.object(forKey: "minimumRunDistance") != nil
                 let minimumRunDistance = hasMinDistKey ? UserDefaults.standard.double(forKey: "minimumRunDistance") : 1.0
-                
+
                 let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
-                
+
                 let filteredWorkouts = workouts.filter { workout in
                     let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
                     return distance >= minDistanceInMeters
@@ -307,24 +307,24 @@ class HealthKitManager: ObservableObject {
 
         return buckets
     }
-    
+
     func generateOverlappingWindows(from chunks: [BucketData]) -> [BucketData] {
         var windows: [BucketData] = []
         guard !chunks.isEmpty else { return windows }
-        
+
         let chunksPerWindow = 4 // 4 * 15s = 60s window
-        
+
         for i in 0..<chunks.count {
             let windowChunks = Array(chunks[i..<min(i + chunksPerWindow, chunks.count)])
             let totalDuration = windowChunks.reduce(0.0) { $0 + $1.durationSeconds }
             let totalDistance = windowChunks.reduce(0.0) { $0 + $1.distanceMeters }
             let totalSteps = windowChunks.reduce(0.0) { $0 + ($1.meanCadence * ($1.durationSeconds / 60.0)) }
-            
+
             var totalHR = 0.0
             var hrCount = 0.0
             var totalOsc = 0.0
             var oscCount = 0.0
-            
+
             for chunk in windowChunks {
                 if chunk.meanHR > 0 {
                     totalHR += chunk.meanHR * chunk.durationSeconds
@@ -335,12 +335,12 @@ class HealthKitManager: ObservableObject {
                     oscCount += chunk.durationSeconds
                 }
             }
-            
+
             let pace = totalDistance > 0 ? (totalDuration / (totalDistance / 1000.0)) : 0.0
             let cadence = totalDuration > 0 ? (totalSteps / (totalDuration / 60.0)) : 0.0
             let hr = hrCount > 0 ? (totalHR / hrCount) : 0.0
             let osc = oscCount > 0 ? (totalOsc / oscCount) : 0.0
-            
+
             windows.append(BucketData(
                 startTime: windowChunks[0].startTime,
                 distanceMeters: totalDistance,
@@ -429,13 +429,13 @@ struct RunBaselineData: Sendable {
         let rawAvgCadence: Double = duration > 0 ? (totalSteps / (duration / 60.0)) : 0.0
 
         let overlappingWindows = generateOverlappingWindows(from: trimmed)
-        
+
         let paces = overlappingWindows.map { $0.meanPaceSecPerKm }
         let hrs = overlappingWindows.map { $0.meanHR }
 
         let cv = await engine.calculatePaceCV(bucketPaces: paces)
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
-        
+
         let dynamicZone4Threshold: Double = 161.5
         // if #available(iOS 27.0, *) {
         //     if let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
@@ -459,13 +459,13 @@ struct RunBaselineData: Sendable {
 
         let targetDate = workout.startDate
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) ?? Date()
-        
+
         let validPriorRuns = priorRuns.filter { $0.date >= thirtyDaysAgo && $0.date < targetDate }
-        
+
         let classification: String
         let modelManager = ModelManager()
 
-        if validPriorRuns.count > 0 {
+        if !validPriorRuns.isEmpty {
             let baselinePace = validPriorRuns.map { $0.pace }.reduce(0, +) / Double(validPriorRuns.count)
             let baselineHR = validPriorRuns.map { $0.hr }.reduce(0, +) / Double(validPriorRuns.count)
             let baselineCadence = validPriorRuns.map { $0.cadence }.reduce(0, +) / Double(validPriorRuns.count)
@@ -479,7 +479,7 @@ struct RunBaselineData: Sendable {
             } else {
                 calculatedStage = 0
             }
-            
+
             classification = await modelManager.predictRunType(
                 paceDelta: currentPace - baselinePace,
                 hrDelta: currentHR - baselineHR,
@@ -495,10 +495,10 @@ struct RunBaselineData: Sendable {
         } else {
             let framboise = FramboiseEngine()
             classification = await framboise.classifyRun(
-                cv: cv, 
-                slope: slope, 
-                zone4: zone4, 
-                durationMinutes: duration / 60.0, 
+                cv: cv,
+                slope: slope,
+                zone4: zone4,
+                durationMinutes: duration / 60.0,
                 averageHR: currentHR
             )
         }
@@ -1029,7 +1029,7 @@ class HealthKitSeeder {
         let hrShift = 6.0 - (progress * 12.0)
 
         let minuteIndex = chunkIndex / 4
-        
+
         switch profile {
         case .easy:
             if minuteIndex == 15 {

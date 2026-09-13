@@ -69,7 +69,7 @@ struct RunDetailView: View {
                     Text(formattedRunDate)
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
-                    
+
                     if let isIndoor = runRecord.isIndoor {
                         Text(isIndoor ? "Indoor Run" : "Outdoor Run")
                             .font(.caption2.bold())
@@ -588,9 +588,9 @@ private struct DrillCardView: View {
                                 .frame(width: 16, height: 4)
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     HStack(spacing: 16) {
                         Button(action: {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -602,7 +602,7 @@ private struct DrillCardView: View {
                                 .foregroundColor(activeCardIndex > 0 ? .primary : .secondary.opacity(0.3))
                         }
                         .disabled(activeCardIndex == 0)
-                        
+
                         Button(action: {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                 if activeCardIndex < totalDrills - 1 { activeCardIndex += 1 }
