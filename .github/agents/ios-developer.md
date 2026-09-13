@@ -128,22 +128,242 @@ A model achieving "98% accuracy" on a synthetic CSV does **not** mean it will co
 
 ---
 
-## 6. The CoreML Pipeline — Multi-Step Process
+## 6. ML Engineering — CoreML Classifier
 
-Changing anything in the ML classification pipeline involves **all** of the following steps. Never do only one step of a multi-step process:
+This section governs everything related to the `RunalystClassifier.mlmodel` and the data pipeline that produces it. This is the most change-sensitive component in the codebase. Treat it with the highest level of care.
+
+### 6.1 The Hybrid Intelligence Architecture
+
+Runalyst does **not** use a pure ML-only approach. It uses three tiers in a deliberate sequence:
 
 ```
-1. Update generate_seed_runs.py (add/modify features and distributions)
-2. Run generate_seed_runs.py → produces CoreML_Training_Data_v3.csv
-3. Open Create ML in Xcode → train new tabular classifier on the CSV
-4. Export RunalystClassifier.mlmodel → replace in repo
-5. Update RunalystClassifierInput in ModelManager.swift to match new features
-6. Run tests → verify build and all 37+ tests pass
-7. Manually validate against real HealthKit runs
-8. Commit all changed files together in a single conventional commit
+Tier 1 — Deterministic Math (FramboiseEngine):   Always runs first. Computes cv, slope, zone distribution.
+Tier 2 — Offline CoreML Classifier (ModelManager): Classifies run type from feature vector.
+Tier 3 — On-Device Generative AI (FoundationModels): Narrates the insight in natural language.
 ```
 
-If you are an AI agent and Step 3 (Create ML) requires a human action, **stop**, prepare all other steps, and explicitly tell the developer what they need to do and how.
+These tiers must not be collapsed or blurred. In particular:
+- **Tier 1 math must never be replaced by Tier 3 reasoning.**
+- **Tier 1 heuristics must never compensate for Tier 2 missing features.** (This is the `cv` anti-pattern — see §4.3.)
+
+### 6.2 The Feature Vector — Current Schema
+
+The `RunalystClassifier.mlmodel` currently accepts these features:
+
+| Feature | Type | Description |
+|---------|------|-------------|
+| `averagePace` | Double | Working average pace in sec/km (FramboiseEngine output) |
+| `averageHeartRate` | Double | Working average heart rate in BPM |
+| `percentZone4` | Double | Fraction of run time in Zone 4+ (0.0–1.0) |
+| `averageCadence` | Double | Working average cadence in SPM |
+| `verticalOscillation` | Double | Working average vertical oscillation in cm |
+| `runnerStage` | Int64 | 0 = Beginner, 1 = Intermediate, 2 = Advanced |
+
+> **Missing Feature — Known Technical Debt**: `cv` (pace coefficient of variation, computed by `FramboiseEngine`) is **not** currently a model input. This is why a hardcoded `cv > 0.15` Swift guardrail exists in `ModelManager.swift`. The correct fix is §6.4.
+
+### 6.3 The Training Data Pipeline
+
+The training data is produced entirely synthetically by `generate_seed_runs.py`.
+
+**Run classes and their expected real-world distributions:**
+
+| Class | Pace Range | Avg HR | Zone 4 | `cv` (pace) | Notes |
+|-------|-----------|--------|--------|-------------|-------|
+| `Recovery Run` | 7:30–9:00/km | 110–130 | ~0% | < 0.04 | Very low intensity |
+| `Easy Run` | 6:30–7:30/km | 130–145 | < 5% | < 0.05 | Conversational pace |
+| `Steady Effort` | 5:40–6:20/km | 145–160 | 5–25% | < 0.06 | The canonical moderate run |
+| `Progression Run` | 5:00–5:45/km | 160–170 | 25–50% | 0.05–0.10 | Pace decreases each km |
+| `Tempo Run` | 4:15–5:00/km | 170–182 | > 60% | < 0.08 | Sustained threshold |
+| `Fartlek` | varies (avg ~6:00) | 140–165 | < 25% | 0.10–0.15 | Unstructured surges |
+| `Intervals` | varies (avg ~5:30) | 160–188 | > 30% | > 0.15 | Hard efforts + recovery |
+
+> **Data Quality Rule**: Tight standard deviations (σ ≤ 15 sec for pace, σ ≤ 5 BPM for HR) in `generate_seed_runs.py` are intentional. They prevent class boundary bleed. **Do not increase the σ values** to "make the data more realistic" — you will cause misclassifications at class boundaries.
+
+### 6.4 Adding a New Feature to the Model (Full 8-Step Process)
+
+Changing the CoreML model's feature set is a **multi-file, multi-step process**. Doing only some steps will break the build or introduce silent misclassifications.
+
+```
+Step 1: Update generate_seed_runs.py
+         → Add the new feature column to each archetype block
+         → Add realistic per-class distributions (mean, std, clamp bounds)
+         → Add to the `runs.append({})` dict
+         → Add to the `fieldnames` list in export_v3_dataset()
+
+Step 2: Regenerate training data
+         → Run: python3 generate_seed_runs.py
+         → Verify: head CoreML_Training_Data_v3.csv shows new column
+
+Step 3: Retrain in Create ML (HUMAN REQUIRED)
+         → Open Xcode → Open Developer Tool → Create ML
+         → New Tabular Classifier project
+         → Drag CoreML_Training_Data_v3.csv as Training Data
+         → Set Target: targetClass
+         → Verify new feature column appears in Features list
+         → Train → Evaluate → confirm accuracy on Validation set
+         → Output → Export → rename to RunalystClassifier.mlmodel
+         → Replace the existing file in the repo root
+
+Step 4: Update the Swift interface in ModelManager.swift
+         → Add the new parameter to predictRunType(...)
+         → Pass it into RunalystClassifierInput(...)
+         → The compiler will error if the parameter name or type mismatches the .mlmodel
+
+Step 5: Update all call sites
+         → Search the codebase for all calls to predictRunType(...)
+         → Add the new argument everywhere
+
+Step 6: Build
+         → xcodebuild build must exit 0
+
+Step 7: Test
+         → xcodebuild test — all 37+ tests must pass
+
+Step 8: Validate against real runs (HUMAN REQUIRED)
+         → Install on device
+         → Trigger a resync in Settings
+         → Verify ≥ 3 real run types are classified correctly:
+           - An easy aerobic run (should not classify as Tempo)
+           - An interval session (should not classify as Steady Effort)
+           - A tempo/threshold effort (should not classify as Easy)
+
+Step 9: Commit
+         → git add generate_seed_runs.py CoreML_Training_Data_v3.csv
+                   RunalystClassifier.mlmodel Runalyst/Engine/ModelManager.swift
+         → git commit -m "feat(model): add <feature> to CoreML feature vector"
+         → Update docs/AI_PIPELINE.md to reflect the new feature
+```
+
+### 6.5 Class Label Consistency
+
+The `targetClass` string in training data, `FramboiseEngine.classifyRun()`, `ModelManager.predictRunType()` fallback, `classificationOptions` UI picker, mock data seeders, and `RunRecord` storage **must all use the same canonical labels**. Canonical labels are:
+
+```
+"Recovery Run"
+"Easy Run"
+"Steady Effort"       ← NOT "Steady Run"
+"Progression Run"
+"Tempo Run"
+"Fartlek"
+"Intervals"
+```
+
+Mismatches between the model's training labels and the Swift label strings cause silent misclassifications. Verify after any model change.
+
+### 6.6 Model Validation Standards
+
+Synthetic accuracy on the training/test split is **not** a sufficient validation signal. A model is only considered validated when:
+
+1. Accuracy on the synthetic holdout set is ≥ 95%.
+2. Manually tested against ≥ 3 real HealthKit workouts of distinctly different types.
+3. The interval run test **must** pass: a workout with km splits varying by > 60 sec/km must not classify as "Steady Effort".
+
+### 6.7 ModelManager.swift — Swift Integration Rules
+
+- The `ModelManager` actor is the **only** place that calls `RunalystClassifierInput`. No other file should construct this struct.
+- All inputs to the model must come from `FramboiseEngine`'s **working averages** (not raw HealthKit values). Raw values include traffic stop noise.
+- `RunalystClassifier` and `RunalystClassifierOutput` are marked `@unchecked Sendable` to satisfy Swift 6 strict concurrency. Do not remove this.
+- CoreML prediction is `async` (`try await classifier.prediction(input:)`). It must not be called on `@MainActor`.
+- If CoreML prediction fails, fall back to `FramboiseEngine.classifyRun(...)`. Do not hard-return a fixed string like `"Steady Effort"`.
+
+---
+
+## 7. ML Engineering — FoundationModels (Generative AI)
+
+### 7.1 Availability Gate
+
+Every call site that uses `FoundationModels` must be wrapped:
+```swift
+if #available(iOS 26.0, *) {
+    // Use LanguageModelSession, @Generable, @Guide
+}
+```
+This is a hard compile requirement. The CI target is iOS 26+, but the `@available` annotation is still required.
+
+### 7.2 The `@Generable` Contract
+
+We use `@Generable` structs to enforce structured output. Rules:
+- Use **semantically named properties** for distinct fields. Do not use generic arrays.
+- Every field must have a `@Guide(description:)` annotation that constrains the generation space.
+- Do not instruct the model to output raw JSON or YAML strings inside a text field.
+- Define `targetCadence` as `String?` (to accommodate ranges like `"142–146 SPM"`), not `Int?`.
+
+```swift
+// ✅ Correct
+@Generable
+struct DrillRecommendation {
+    @Guide(description: "Exactly one of: Cadence Pyramids, Rhythm Intervals, Tempo Surges, Strides.")
+    var drillTitle: String
+    @Guide(description: "Active work description. Max 1 sentence. Do NOT include recovery.")
+    var drillWork: String
+    @Guide(description: "Rest/recovery instructions only. Separate from drillWork.")
+    var drillRecovery: String
+    var targetCadence: String?
+}
+
+// ❌ Wrong — merges fields, loses semantic structure
+@Generable
+struct DrillRecommendation {
+    var description: String  // vague, model will hallucinate structure
+}
+```
+
+### 7.3 System Prompt Rules
+
+The system prompt is the instruction set for the LLM. Keep it **lean and unambiguous**:
+
+- **≤ 10 rules maximum**. On-device models have limited instruction-following capacity. More rules = lower adherence.
+- **Consolidate redundant rules**. E.g., merge tone + person directives into one: `"conversational, motivational tone; speak directly to the runner"`.
+- **Imperative, not descriptive**. Write `"Do not mention heart rate zones by number"` not `"It would be better if you avoided..."`.
+- **Locale instruction must be last**: `"Respond entirely in \(Locale.current.language.languageCode)"`.
+- **3 paragraphs maximum** for the full system prompt body.
+
+### 7.4 Directive Injection Pattern
+
+The `RunAnalyzerActor` computes a `directiveContext` string that is injected into the prompt alongside the system rules. This string encodes all deterministic math decisions.
+
+```
+// ✅ Correct directive format
+"Current: 148 SPM (BELOW the 150 SPM floor). Osc: 10.6 cm (HIGH). DIRECTIVE: prescribe Cadence Pyramids."
+
+// ❌ Wrong — asks the LLM to reason about numbers
+"Cadence: 148. Oscillation: 10.6. Assess whether these are good values."
+```
+
+Rules for directives:
+- Compute **all deltas, thresholds, and assessments in Swift** before inserting into the directive.
+- Use explicit, labeled strings (e.g., `"BELOW the 150 SPM floor"`) so the model never has to evaluate a number against a threshold.
+- When fatigue is detected (`paceDiff < 0 && hrDelta > 0`), Swift **must strip the training goal** and inject `"PRIORITY: prescribe Easy Aerobic Recovery. Safety overrides any race goal."` The model receives one unambiguous signal.
+- Use data grouping labels in the prompt: `GROUP_A_CARDIO`, `GROUP_B_FORM`, `GROUP_C_PACING` — so the model organizes its observations correctly.
+
+### 7.5 Token Budget
+
+Apple TN3193 enforces a **4,096-token limit** for on-device model sessions. Exceeding this causes silent truncation or session failure. Strategies to stay within budget:
+
+| Strategy | Saving |
+|----------|--------|
+| Use concise `@Generable` property names (`drillWork` not `activeWorkDescription`) | ~5% |
+| Cap array sizes in `@Guide(description:)` string, not via `maximumCount` (causes macro errors) | ~10% |
+| Inject data as comma-separated strings, not JSON objects | ~15% |
+| System prompt ≤ 3 paragraphs, ≤ 10 rules | ~20% |
+| Use `String?` for optional fields rather than always-populated empty strings | ~5% |
+
+### 7.6 Error Handling
+
+Every `LanguageModelSession.respond` call must be wrapped in `do-catch`. Fallback text must use `String(localized:)` for localization compliance:
+
+```swift
+do {
+    let response = try await session.respond(to: prompt, generating: CoachingInsightPayload.self)
+    return response.content
+} catch {
+    return CoachingInsightPayload(
+        insightBody: String(localized: "Unable to generate insight. Please try again."),
+        drillTitle: "Cadence Pyramids",
+        drillWork: String(localized: "4 × 2 min at 155 SPM, 90 sec easy between.")
+    )
+}
+```
 
 ---
 
