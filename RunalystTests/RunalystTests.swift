@@ -618,7 +618,7 @@ final class LiveCoachDTOCodableTests: XCTestCase {
             title: "Cadence Pyramids",
             preRunDrillId: "cadence_pyramids",
             purpose: "Turnover improvement",
-            targetCadence: 172,
+            targetCadence: "172-176",
             previousCadence: 160,
             durationMinutes: 30,
             hapticMode: "On"
@@ -628,7 +628,7 @@ final class LiveCoachDTOCodableTests: XCTestCase {
         let decoded = try JSONDecoder().decode(DrillPrescriptionDTO.self, from: data)
 
         XCTAssertEqual(decoded.title, "Cadence Pyramids")
-        XCTAssertEqual(decoded.targetCadence, 172)
+        XCTAssertEqual(decoded.targetCadence, "172-176")
         XCTAssertEqual(decoded.durationMinutes, 30)
         XCTAssertEqual(decoded.hapticMode, "On")
     }
