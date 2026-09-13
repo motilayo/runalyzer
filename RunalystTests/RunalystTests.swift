@@ -24,7 +24,7 @@ final class RunalystTests: XCTestCase {
     func testZone2RunWorkoutPlanAndTarget() {
         let drill = PreRunDrill(id: .zone2Run, previousCadence: 160)
         XCTAssertNil(drill.effectiveTargetCadence)
-        _ = drill.buildWorkoutPlan()
+        let plan = drill.buildWorkoutPlan()
         XCTAssertNotNil(plan)
         let template = DrillTemplate.template(for: .zone2Run)
         XCTAssertEqual(template.title, "Zone 2 Run")
@@ -34,7 +34,7 @@ final class RunalystTests: XCTestCase {
     func testAerobicFlushWorkoutPlanAndTarget() {
         let drill = PreRunDrill(id: .aerobicFlush, previousCadence: 160)
         XCTAssertNil(drill.effectiveTargetCadence)
-        _ = drill.buildWorkoutPlan()
+        let plan = drill.buildWorkoutPlan()
         XCTAssertNotNil(plan)
         let template = DrillTemplate.template(for: .aerobicFlush)
         XCTAssertEqual(template.title, "Aerobic Flush")
