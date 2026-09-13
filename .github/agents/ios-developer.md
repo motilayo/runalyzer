@@ -217,7 +217,7 @@ Step 6: Build
          → xcodebuild build must exit 0
 
 Step 7: Test
-         → xcodebuild test — all 37+ tests must pass
+         → xcodebuild test — all tests must pass
 
 Step 8: Validate against real runs (HUMAN REQUIRED)
          → Install on device
@@ -372,7 +372,7 @@ do {
 Before committing or submitting any change, confirm all of the following:
 
 - [ ] **Build passes** — `xcodebuild build` exits with code 0.
-- [ ] **Tests pass** — `xcodebuild test` with all 37+ tests passing. No new failures.
+- [ ] **Tests pass** — `xcodebuild test` with all 37+ tests passing locally. No new failures. You MUST run tests locally and ensure they pass before committing code, and especially before opening a PR.
 - [ ] **No regressions** — Run through critical user flows mentally: Health sync, pull-to-refresh, AI insight generation, settings resync.
 - [ ] **Architecture layer respected** — The change does not violate the layered pipeline in `ARCHITECTURE.md`.
 - [ ] **`AGENTS.md` constraints satisfied** — Each relevant rule has been read and adhered to.
