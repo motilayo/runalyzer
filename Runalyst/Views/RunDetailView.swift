@@ -766,6 +766,7 @@ private struct DrillCardView: View {
 
                 Button(action: {
                     drill.isCompleted.toggle()
+                    try? drill.modelContext?.save()
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }) {
                     HStack(spacing: 6) {
