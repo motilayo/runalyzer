@@ -123,15 +123,6 @@ struct DrillsLibraryView: View {
                             .padding(.horizontal)
 
                         DrillPrimerCardView(
-                            drillId: .aerobicFlush,
-                            customTitle: "Recovery Run Prep (Shakeout)",
-                            customTarget: "Target: Zone 1 HR",
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
-
-                        DrillPrimerCardView(
                             drillId: .recoveryJog,
                             customTitle: "Recovery Jog",
                             customTarget: "Target: Zone 1 HR",
