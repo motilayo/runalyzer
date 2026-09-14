@@ -67,6 +67,7 @@ struct ContentView: View {
         }
     }
 
+    @MainActor
     private func syncData(force: Bool = false) async {
         guard !isSyncing else { return }
         isSyncing = true
