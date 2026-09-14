@@ -106,7 +106,8 @@ struct DashboardView: View {
     }
 
     private var workoutDensityTier: String {
-        let count = filteredRunRecords.count
+        let uniqueDays = Set(filteredRunRecords.map { Calendar.current.startOfDay(for: $0.date) })
+        let count = uniqueDays.count
         if count == 0 { return "—" }
         switch timeRange {
         case "7 Days":
@@ -401,7 +402,7 @@ struct DashboardView: View {
                     .foregroundColor(.secondary)
             }
 
-            let cue = template.generateInstructionalCue(computedTarget ?? 0)
+            let cue = template.generateInstructionalCue(computedTarget)
             if !cue.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "lightbulb.fill")
@@ -1103,14 +1104,8 @@ struct HeroCardView: View {
                 .frame(minHeight: 1)
                 .task(id: runRecord.id) {
                     if !isSyncing && runRecord.insight == nil {
-                        let container = modelContext.container
-                        let runId = runRecord.persistentModelID
-
                         if #available(iOS 26.0, *) {
-                            Task.detached {
-                                let analyzer = RunAnalyzerActor(modelContainer: container)
-                                await analyzer.generateAnalysis(for: runId)
-                            }
+                            await CoachingEngine.shared.requestAnalysis(for: runRecord)
                         }
                     }
                 }

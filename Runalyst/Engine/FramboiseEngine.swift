@@ -5,6 +5,7 @@ import HealthKit
 struct BucketData: Sendable {
     let startTime: Date
     let distanceMeters: Double
+    let durationSeconds: Double
     let meanPaceSecPerKm: Double
     let meanCadence: Double
     let meanHR: Double
@@ -13,6 +14,7 @@ struct BucketData: Sendable {
     init(
         startTime: Date,
         distanceMeters: Double,
+        durationSeconds: Double = 60.0,
         meanPaceSecPerKm: Double,
         meanCadence: Double,
         meanHR: Double,
@@ -20,6 +22,7 @@ struct BucketData: Sendable {
     ) {
         self.startTime = startTime
         self.distanceMeters = distanceMeters
+        self.durationSeconds = durationSeconds
         self.meanPaceSecPerKm = meanPaceSecPerKm
         self.meanCadence = meanCadence
         self.meanHR = meanHR
@@ -39,7 +42,7 @@ actor FramboiseEngine {
     /// (e.g., speed > 1.5 m/s or cadence > 130 SPM). Drops everything else.
     func filterRunningSamples(buckets: [BucketData]) -> [BucketData] {
         return buckets.filter { bucket in
-            let speedMetersPerSecond = bucket.distanceMeters / 60.0
+            let speedMetersPerSecond = bucket.durationSeconds > 0 ? (bucket.distanceMeters / bucket.durationSeconds) : 0
             let isRunning = speedMetersPerSecond > 1.5 || bucket.meanCadence > 130.0
             return isRunning
         }
@@ -89,8 +92,9 @@ actor FramboiseEngine {
         // If no buckets were trimmed (no dead stops), Working stats MUST perfectly equal Raw stats
         let isFullyActive = (originalBucketCount != nil) && (trimmed.count == originalBucketCount)
 
-        // Strictly sum the duration of only the kept/filtered samples (60s per bucket)
-        var workingDuration = isFullyActive ? (rawWorkoutDuration ?? Double(trimmed.count * 60)) : Double(trimmed.count * 60)
+        // Strictly sum the duration of only the kept/filtered samples
+        let trimmedDuration = trimmed.reduce(0) { $0 + $1.durationSeconds }
+        var workingDuration = isFullyActive ? (rawWorkoutDuration ?? trimmedDuration) : trimmedDuration
 
         // Hard safety constraint: workingDuration must be <= rawWorkout.duration
         if !isFullyActive, let rawDuration = rawWorkoutDuration, rawDuration > 0 {
@@ -171,16 +175,18 @@ actor FramboiseEngine {
     func classifyRun(cv: Double, slope: Double, zone4: Double, durationMinutes: Double, averageHR: Double? = nil) -> String {
         // Strict cardiac guardrail
         if let hr = averageHR, hr >= 165 || zone4 >= 0.25 {
-            if zone4 > 0.40 || cv > 0.15 {
+            if cv > 0.15 {
                 return "Intervals"
-            } else if slope < -0.3 {
+            } else if slope < -0.225 {
                 return "Progression Run"
-            } else {
+            } else if zone4 > 0.60 {
                 return "Tempo Run"
+            } else {
+                return "Steady Effort"
             }
         }
 
-        if cv > 0.20 && slope > -1.0 && slope < 1.0 {
+        if cv > 0.15 && slope > -0.75 && slope < 0.75 {
             if zone4 < 0.10 {
                 return "urbanTraffic"
             } else if zone4 > 0.40 {
@@ -190,15 +196,15 @@ actor FramboiseEngine {
             }
         }
 
-        if slope < -0.4 {
+        if slope < -0.3 {
             return "Progression Run"
         }
 
-        if durationMinutes > 70 && slope > 0.10 {
+        if durationMinutes > 70 && slope > 0.075 {
             return "Long Run"
         }
 
-        if cv < 0.05 && zone4 > 0.50 {
+        if cv < 0.038 && zone4 > 0.50 {
             return "Tempo Run"
         }
 
@@ -206,7 +212,7 @@ actor FramboiseEngine {
             return "Recovery Run"
         }
 
-        if zone4 > 0.05 && zone4 < 0.20 && cv < 0.06 {
+        if zone4 > 0.05 && zone4 < 0.20 && cv < 0.045 {
             return "Steady Effort"
         }
 
@@ -221,13 +227,13 @@ actor FramboiseEngine {
         if deadStopsCount > 5 {
             tags.append("urbanTraffic")
         }
-        if slope > 0.3 {
+        if slope > 0.225 {
             tags.append("fatigueDrift")
         }
-        if slope < -0.5 {
+        if slope < -0.375 {
             tags.append("progressiveFinish")
         }
-        if cv > 0.25 && deadStopsCount <= 2 {
+        if cv > 0.18 && deadStopsCount <= 2 {
             tags.append("highVolatility")
         }
 

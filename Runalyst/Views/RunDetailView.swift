@@ -11,8 +11,9 @@ struct RunDetailView: View {
 
     @State private var showRawMetrics: Bool = false
     @State private var isForceAnalyzing: Bool = false
-    @State private var showingToggleInfo: Bool = false
-    @State private var showingClassificationExplainer: Bool = false
+    @State private var showingToggleInfo = false
+    @State private var showingClassificationExplainer = false
+    @State private var isGeneratingInsight = false
 
     private var baselineRuns: [RunRecord] {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
@@ -64,11 +65,24 @@ struct RunDetailView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Formatted run date header
-                Text(formattedRunDate)
-                    .font(.subheadline.bold())
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
+                HStack {
+                    Text(formattedRunDate)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+
+                    if let isIndoor = runRecord.isIndoor {
+                        Text(isIndoor ? "Indoor Run" : "Outdoor Run")
+                            .font(.caption2.bold())
+                            .foregroundColor(isIndoor ? .purple : .blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(isIndoor ? Color.purple.opacity(0.15) : Color.blue.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 4)
                     .padding(.top, 4)
 
                 // MARK: Run Classification
@@ -123,16 +137,16 @@ struct RunDetailView: View {
                 }
 
                 // MARK: AI Run Analysis
-                if let insight = runRecord.insight {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.purple)
-                            Text("AI Run Analysis")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.purple)
-                        }
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.purple)
+                        Text("AI Run Analysis")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.purple)
+                    }
 
+                    if let insight = runRecord.insight {
                         if !insight.longitudinalObservation.isEmpty {
                             Text(insight.longitudinalObservation)
                                 .font(.body)
@@ -142,16 +156,42 @@ struct RunDetailView: View {
                                 .font(.body)
                                 .foregroundColor(.primary)
                         }
-
-                        aiDisclaimerFooter
+                    } else if isGeneratingInsight {
+                        AnimatedLoadingView(
+                            text: "Generating AI insight...",
+                            isHorizontal: true,
+                            imageSize: 14,
+                            textFont: .body,
+                            spacing: 8
+                        )
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 8)
+                    } else {
+                        Text("AI insight not available for this run.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .italic()
                     }
-                    .frame(minHeight: 1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                    .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-                    .padding(.horizontal)
+
+                    aiDisclaimerFooter
+                }
+                .frame(minHeight: 1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                .padding(.horizontal)
+                .task {
+                    if runRecord.insight == nil {
+                        isGeneratingInsight = true
+                        if #available(iOS 26.0, *) {
+                            await CoachingEngine.shared.requestAnalysis(for: runRecord)
+                            isGeneratingInsight = false
+                        } else {
+                            isGeneratingInsight = false
+                        }
+                    }
                 }
 
                 // MARK: Data Toggle
@@ -161,9 +201,6 @@ struct RunDetailView: View {
                         Text("Workout Stats").tag(true)
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: showRawMetrics) {
-                        showingToggleInfo = true
-                    }
 
                     Button(action: { showingToggleInfo = true }) {
                         Image(systemName: "info.circle")
@@ -195,11 +232,12 @@ struct RunDetailView: View {
                     let activeDuration = showRawMetrics ? runRecord.duration : runRecord.effectiveWorkingDurationSeconds
                     let minutes = Int(activeDuration) / 60
                     let seconds = Int(activeDuration) % 60
-                    StatBox(title: "Total Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
+                    StatBox(title: showRawMetrics ? "Total Time" : "Moving Time", value: String(format: "%d:%02d", minutes, seconds), unit: "min", isWorkoutStats: showRawMetrics)
 
                     let currentPace: Double = {
                         if showRawMetrics {
-                            return runRecord.rawAvgPace
+                            let totalKm = runRecord.totalDistanceMeters / 1000.0
+                            return totalKm > 0 ? (runRecord.duration / totalKm) : runRecord.rawAvgPace
                         } else {
                             let workingKm = runRecord.effectiveWorkingDistanceMeters / 1000.0
                             return workingKm > 0 ? (runRecord.effectiveWorkingDurationSeconds / workingKm) : runRecord.workingAvgPace
@@ -209,7 +247,7 @@ struct RunDetailView: View {
                     let currentCadence = showRawMetrics ? runRecord.rawAvgCadence : runRecord.workingAvgCadence
 
                     StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace, baselineValue: showRawMetrics ? nil : baselinePace, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
-                    StatBox(title: "Avg HR", value: "\(Int(currentHR))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg HR", value: "\(Int(round(currentHR)))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
                     StatBox(title: "Avg Cadence", value: "\(Int(currentCadence))", unit: "SPM", currentValue: currentCadence, baselineValue: showRawMetrics ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
 
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
@@ -310,6 +348,7 @@ struct RunDetailView: View {
                 }
             }
             .padding(.vertical)
+
             .task(id: runRecord.id) {
                 let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
                    (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
@@ -329,15 +368,17 @@ struct RunDetailView: View {
                 }
 
                 if runRecord.insight == nil {
-                    let container = modelContext.container
-                    let runId = runRecord.persistentModelID
                     if #available(iOS 26.0, *) {
-                        Task.detached {
-                            let analyzer = RunAnalyzerActor(modelContainer: container)
-                            await analyzer.generateAnalysis(for: runId)
-                        }
+                        await CoachingEngine.shared.requestAnalysis(for: runRecord)
                     }
                 }
+            }
+        }
+        .refreshable {
+            if #available(iOS 26.0, *) {
+                isGeneratingInsight = true
+                await CoachingEngine.shared.requestAnalysis(for: runRecord, force: true)
+                isGeneratingInsight = false
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -468,7 +509,6 @@ struct DrillDeckView: View {
     }
     private func deckCard(_ drill: DrillRecommendation, index: Int, totalDrills: Int) -> some View {
         let relativeIndex = index - activeCardIndex
-        let rotationDegree = relativeIndex == 0 ? 0 : (relativeIndex % 2 == 1 ? -3.0 : 3.0)
         return DrillCardView(
             drill: drill,
             drillIndex: index,
@@ -478,7 +518,7 @@ struct DrillDeckView: View {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15), lineWidth: 1))
         .overlay(RoundedRectangle(cornerRadius: 20).fill(Color.black.opacity(relativeIndex == 0 ? 0 : 0.3)))
         .shadow(color: Color.black.opacity(relativeIndex == 0 ? 0.15 : 0.05), radius: relativeIndex == 0 ? 12 : 8, x: 0, y: relativeIndex == 0 ? 8 : 4)
-        .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : rotationDegree))
+        .rotationEffect(.degrees(relativeIndex == 0 ? (Double(offset.width) / 20.0) : 0))
         .offset(x: relativeIndex == 0 ? offset.width : 0, y: relativeIndex == 0 ? offset.height : 0)
         .opacity(relativeIndex == 0 ? (2 - Double(abs(offset.width / 150))) : 1.0)
         .zIndex(Double(totalDrills - index))
@@ -540,11 +580,39 @@ private struct DrillCardView: View {
 
         VStack(alignment: .leading, spacing: 12) {
             if totalDrills > 1 {
-                HStack(spacing: 4) {
-                    ForEach(0..<totalDrills, id: \.self) { barIndex in
-                        Capsule()
-                            .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
-                            .frame(width: 16, height: 4)
+                HStack {
+                    HStack(spacing: 4) {
+                        ForEach(0..<totalDrills, id: \.self) { barIndex in
+                            Capsule()
+                                .fill(barIndex == activeCardIndex ? Color.primary : Color.secondary.opacity(0.3))
+                                .frame(width: 16, height: 4)
+                        }
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                if activeCardIndex > 0 { activeCardIndex -= 1 }
+                            }
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(activeCardIndex > 0 ? .primary : .secondary.opacity(0.3))
+                        }
+                        .disabled(activeCardIndex == 0)
+
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                if activeCardIndex < totalDrills - 1 { activeCardIndex += 1 }
+                            }
+                        }) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(activeCardIndex < totalDrills - 1 ? .primary : .secondary.opacity(0.3))
+                        }
+                        .disabled(activeCardIndex == totalDrills - 1)
                     }
                 }
                 .padding(.bottom, 2)
@@ -561,7 +629,8 @@ private struct DrillCardView: View {
                     Text(displayTitle)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    Text("10–15 min drill")
+                    let drillId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
+                    Text("\(PreRunDrill(id: drillId).duration.title) drill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -598,7 +667,7 @@ private struct DrillCardView: View {
                 if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
                     return cueText
                 }
-                let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+                let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
                 let generated = template.generateInstructionalCue(targetInt)
                 return generated.isEmpty ? nil : generated
             }()
@@ -668,7 +737,7 @@ private struct DrillCardView: View {
                 }
             }
 
-            let targetInt = Int(drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+            let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
 
             HStack(spacing: 12) {
                 Button(action: {

@@ -161,7 +161,21 @@ class HealthKitManager: ObservableObject {
                     return
                 }
 
-                continuation.resume(returning: workouts)
+                // If not explicitly set, UserDefaults bool defaults to false, but we want our default to be metric if locale is metric
+                let hasMetricKey = UserDefaults.standard.object(forKey: "useMetricSystem") != nil
+                let useMetricSystem = hasMetricKey ? UserDefaults.standard.bool(forKey: "useMetricSystem") : (Locale.current.measurementSystem == .metric)
+
+                let hasMinDistKey = UserDefaults.standard.object(forKey: "minimumRunDistance") != nil
+                let minimumRunDistance = hasMinDistKey ? UserDefaults.standard.double(forKey: "minimumRunDistance") : 1.0
+
+                let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+
+                let filteredWorkouts = workouts.filter { workout in
+                    let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
+                    return distance >= minDistanceInMeters
+                }
+
+                continuation.resume(returning: filteredWorkouts)
             }
             healthStore?.execute(query)
         }
@@ -265,27 +279,79 @@ class HealthKitManager: ObservableObject {
         var currentDate = workout.startDate
 
         while currentDate < workout.endDate {
+            let nextDate = currentDate.addingTimeInterval(15)
+            let actualEndDate = min(nextDate, workout.endDate)
+            let durationSeconds = actualEndDate.timeIntervalSince(currentDate)
+            guard durationSeconds > 0 else { break }
+
             let distance = distances[currentDate]?.sumQuantity()?.doubleValue(for: .meter()) ?? 0
             let stepCount = steps[currentDate]?.sumQuantity()?.doubleValue(for: .count()) ?? 0
             let hr = hrs[currentDate]?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())) ?? 0
             let osc = oscs[currentDate]?.averageQuantity()?.doubleValue(for: HKUnit.meterUnit(with: .centi)) ?? 0
 
-            let cadence = stepCount // since bucket is 1 minute
-            let pace = distance > 0 ? (60.0 / (distance / 1000.0)) : 0
+            let cadence = durationSeconds > 0 ? (stepCount / (durationSeconds / 60.0)) : 0
+            let pace = distance > 0 ? (durationSeconds / (distance / 1000.0)) : 0
 
             buckets.append(BucketData(
                 startTime: currentDate,
                 distanceMeters: distance,
+                durationSeconds: durationSeconds,
                 meanPaceSecPerKm: pace,
                 meanCadence: cadence,
                 meanHR: hr,
                 meanVerticalOscillation: osc
             ))
 
-            currentDate = currentDate.addingTimeInterval(60)
+            currentDate = nextDate
         }
 
         return buckets
+    }
+
+    func generateOverlappingWindows(from chunks: [BucketData]) -> [BucketData] {
+        var windows: [BucketData] = []
+        guard !chunks.isEmpty else { return windows }
+
+        let chunksPerWindow = 4 // 4 * 15s = 60s window
+
+        for i in 0..<chunks.count {
+            let windowChunks = Array(chunks[i..<min(i + chunksPerWindow, chunks.count)])
+            let totalDuration = windowChunks.reduce(0.0) { $0 + $1.durationSeconds }
+            let totalDistance = windowChunks.reduce(0.0) { $0 + $1.distanceMeters }
+            let totalSteps = windowChunks.reduce(0.0) { $0 + ($1.meanCadence * ($1.durationSeconds / 60.0)) }
+
+            var totalHR = 0.0
+            var hrCount = 0.0
+            var totalOsc = 0.0
+            var oscCount = 0.0
+
+            for chunk in windowChunks {
+                if chunk.meanHR > 0 {
+                    totalHR += chunk.meanHR * chunk.durationSeconds
+                    hrCount += chunk.durationSeconds
+                }
+                if chunk.meanVerticalOscillation > 0 {
+                    totalOsc += chunk.meanVerticalOscillation * chunk.durationSeconds
+                    oscCount += chunk.durationSeconds
+                }
+            }
+
+            let pace = totalDistance > 0 ? (totalDuration / (totalDistance / 1000.0)) : 0.0
+            let cadence = totalDuration > 0 ? (totalSteps / (totalDuration / 60.0)) : 0.0
+            let hr = hrCount > 0 ? (totalHR / hrCount) : 0.0
+            let osc = oscCount > 0 ? (totalOsc / oscCount) : 0.0
+
+            windows.append(BucketData(
+                startTime: windowChunks[0].startTime,
+                distanceMeters: totalDistance,
+                durationSeconds: totalDuration,
+                meanPaceSecPerKm: pace,
+                meanCadence: cadence,
+                meanHR: hr,
+                meanVerticalOscillation: osc
+            ))
+        }
+        return windows
     }
 
     private func fetchCollection(for workout: HKWorkout, type: HKQuantityType, options: HKStatisticsOptions) async throws -> [Date: HKStatistics] {
@@ -294,7 +360,7 @@ class HealthKitManager: ObservableObject {
             let datePredicate = HKQuery.predicateForSamples(withStart: workout.startDate, end: workout.endDate, options: [])
             let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [workoutPredicate, datePredicate])
             var interval = DateComponents()
-            interval.minute = 1
+            interval.second = 15
 
             // Align to workout start
             let anchor = workout.startDate
@@ -325,7 +391,14 @@ class HealthKitManager: ObservableObject {
         }
     }
 
-    func extractRunRecord(from workout: HKWorkout, engine: FramboiseEngine) async throws -> RunRecordDTO {
+struct RunBaselineData: Sendable {
+    let date: Date
+    let pace: Double
+    let hr: Double
+    let cadence: Double
+}
+
+    func extractRunRecord(from workout: HKWorkout, engine: FramboiseEngine, priorRuns: [RunBaselineData] = []) async throws -> RunRecordDTO {
         let duration = workout.duration
         let distance = workout.totalDistance?.doubleValue(for: .meter()) ?? 0.0
 
@@ -355,31 +428,80 @@ class HealthKitManager: ObservableObject {
         // Raw cadence is total moving steps over the entire elapsed time (including pauses)
         let rawAvgCadence: Double = duration > 0 ? (totalSteps / (duration / 60.0)) : 0.0
 
-        let paces = trimmed.map { $0.meanPaceSecPerKm }
-        let hrs = trimmed.map { $0.meanHR }
+        let overlappingWindows = generateOverlappingWindows(from: trimmed)
+
+        let paces = overlappingWindows.map { $0.meanPaceSecPerKm }
+        let hrs = overlappingWindows.map { $0.meanHR }
 
         let cv = await engine.calculatePaceCV(bucketPaces: paces)
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
-        // Hardcoding maxHR to 190 for now as it's not globally tracked in this context,
-        // or we could use the classic 220 - age if we had DOB.
-        let zone4 = await engine.calculatePercentZone4(bucketHRs: hrs, maxHR: 190)
+
+        let dynamicZone4Threshold: Double = 161.5
+        // if #available(iOS 27.0, *) {
+        //     if let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+        //        let actualStore = healthStore as? HKHealthStore,
+        //        let preferredConfig = try? await actualStore.preferredWorkoutZoneConfiguration(for: hrType) {
+        //         if preferredConfig.zones.count >= 4, let z4Start = preferredConfig.zones[3].minimum?.doubleValue(for: HKUnit(from: "count/min")) {
+        //             dynamicZone4Threshold = z4Start
+        //         }
+        //     }
+        // }
+        let engineMaxHR = dynamicZone4Threshold / 0.85
+        let zone4 = await engine.calculatePercentZone4(bucketHRs: hrs, maxHR: engineMaxHR)
 
         let validRawOsc = (rawAvgOscillation ?? 0) > 0 ? rawAvgOscillation : nil
         let validWorkingOsc = workingOscillation > 0 ? workingOscillation : validRawOsc
         let finalRawOsc = validRawOsc ?? validWorkingOsc
 
+        let currentPace = workingPace > 0 ? workingPace : rawAvgPace
+        let currentHR = workingHR > 0 ? workingHR : rawAvgHeartRate
+        let currentCadence = workingCadence > 0 ? workingCadence : rawAvgCadence
+
+        let targetDate = workout.startDate
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) ?? Date()
+
+        let validPriorRuns = priorRuns.filter { $0.date >= thirtyDaysAgo && $0.date < targetDate }
+
+        let classification: String
         let modelManager = ModelManager()
-        let classification = await modelManager.predictRunType(
-            averagePace: workingPace > 0 ? workingPace : rawAvgPace,
-            averageHeartRate: workingHR > 0 ? workingHR : rawAvgHeartRate,
-            percentZone4: zone4,
-            averageCadence: workingCadence > 0 ? workingCadence : rawAvgCadence,
-            verticalOscillation: validWorkingOsc ?? 9.5,
-            runnerStage: 1,
-            cv: cv,
-            slope: slope,
-            durationMinutes: duration / 60.0
-        )
+
+        if !validPriorRuns.isEmpty {
+            let baselinePace = validPriorRuns.map { $0.pace }.reduce(0, +) / Double(validPriorRuns.count)
+            let baselineHR = validPriorRuns.map { $0.hr }.reduce(0, +) / Double(validPriorRuns.count)
+            let baselineCadence = validPriorRuns.map { $0.cadence }.reduce(0, +) / Double(validPriorRuns.count)
+            let calculatedStage: Int
+            if baselinePace < 240 {
+                calculatedStage = 3
+            } else if baselinePace < 300 {
+                calculatedStage = 2
+            } else if baselinePace < 390 {
+                calculatedStage = 1
+            } else {
+                calculatedStage = 0
+            }
+
+            classification = await modelManager.predictRunType(
+                paceDelta: currentPace - baselinePace,
+                hrDelta: currentHR - baselineHR,
+                percentZone4: zone4,
+                cadenceDelta: currentCadence - baselineCadence,
+                verticalOscillation: validWorkingOsc ?? 9.5,
+                runnerStage: calculatedStage,
+                cv: cv,
+                slope: slope,
+                durationMinutes: duration / 60.0,
+                rawAverageHR: currentHR
+            )
+        } else {
+            let framboise = FramboiseEngine()
+            classification = await framboise.classifyRun(
+                cv: cv,
+                slope: slope,
+                zone4: zone4,
+                durationMinutes: duration / 60.0,
+                averageHR: currentHR
+            )
+        }
         let tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
 
         return RunRecordDTO(
@@ -616,22 +738,19 @@ class HealthKitSeeder {
 
                 var allSamples: [HKSample] = []
 
-                for minute in 0..<totalMinutes {
-                    let chunkStart = workoutStartTime.addingTimeInterval(TimeInterval(minute * 60))
-                    let chunkEnd = chunkStart.addingTimeInterval(60)
+                for chunkIndex in 0..<(totalMinutes * 4) {
+                    let chunkStart = workoutStartTime.addingTimeInterval(TimeInterval(chunkIndex * 15))
+                    let chunkEnd = chunkStart.addingTimeInterval(15)
 
-                    let metrics = generateMinuteMetrics(for: profile, minuteIndex: minute, progress: progress)
+                    let metrics = generate15SecondMetrics(for: profile, chunkIndex: chunkIndex, progress: progress)
 
                     let distanceQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.distanceMeters)
                     let speedQuantity = HKQuantity(
                         unit: HKUnit.meter().unitDivided(by: .second()),
-                        doubleValue: metrics.distanceMeters / 60.0
+                        doubleValue: metrics.distanceMeters / 15.0
                     )
                     let hrQuantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: metrics.heartRate)
                     let stepQuantity = HKQuantity(unit: .count(), doubleValue: metrics.cadence)
-                    let oscQuantity = HKQuantity(unit: HKUnit.meterUnit(with: .centi), doubleValue: metrics.oscillation)
-                    let gctQuantity = HKQuantity(unit: HKUnit.secondUnit(with: .milli), doubleValue: metrics.gct)
-                    let strideQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.stride)
 
                     var chunkSamples: [HKSample] = [
                         HKQuantitySample(type: HKQuantityType(.distanceWalkingRunning), quantity: distanceQuantity, start: chunkStart, end: chunkEnd),
@@ -806,10 +925,10 @@ class HealthKitSeeder {
 
             let paceCV: Double = {
                 switch profile {
-                case .intervals, .fartlek: return 0.18
+                case .intervals: return 0.18
+                case .fartlek, .pyramids: return 0.12
                 case .urbanTraffic: return 0.22
                 case .hillRepeats: return 0.15
-                case .pyramids: return 0.12
                 default: return 0.04
                 }
             }()
@@ -893,9 +1012,9 @@ class HealthKitSeeder {
         print("✅ Successfully seeded \(totalRuns) SwiftData RunRecords directly with 3-month progression and aligned drill IDs!")
     }
 
-    private func generateMinuteMetrics(
+    private func generate15SecondMetrics(
         for profile: MockRunProfile,
-        minuteIndex: Int,
+        chunkIndex: Int,
         progress: Double
     ) -> (distanceMeters: Double, heartRate: Double, cadence: Double, oscillation: Double, gct: Double, stride: Double) {
         var distance: Double = 0
@@ -909,6 +1028,8 @@ class HealthKitSeeder {
         // HR efficiency shift: runs at easy paces cost less cardiac effort as fitness improves
         let hrShift = 6.0 - (progress * 12.0)
 
+        let minuteIndex = chunkIndex / 4
+
         switch profile {
         case .easy:
             if minuteIndex == 15 {
@@ -916,7 +1037,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 125...132)
                 cadence = 0
             } else {
-                distance = Double.random(in: 155...165) * speedFactor
+                distance = (Double.random(in: 155...165) * speedFactor) / 4.0
                 hr = Double.random(in: 135...142) + hrShift
                 cadence = Double.random(in: 158...162) + cadenceShift
             }
@@ -927,7 +1048,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 118...124)
                 cadence = 0
             } else {
-                distance = Double.random(in: 145...155) * speedFactor
+                distance = (Double.random(in: 145...155) * speedFactor) / 4.0
                 hr = Double.random(in: 125...132) + hrShift
                 cadence = Double.random(in: 154...158) + cadenceShift
             }
@@ -938,13 +1059,13 @@ class HealthKitSeeder {
                 hr = Double.random(in: 135...140)
                 cadence = 0
             } else {
-                distance = Double.random(in: 175...185) * speedFactor
+                distance = (Double.random(in: 175...185) * speedFactor) / 4.0
                 hr = Double.random(in: 148...152) + hrShift
                 cadence = Double.random(in: 164...166) + cadenceShift
             }
 
         case .tempo:
-            distance = Double.random(in: 210...220) * speedFactor
+            distance = (Double.random(in: 210...220) * speedFactor) / 4.0
             hr = Double.random(in: 175...182)
             cadence = Double.random(in: 172...176) + (cadenceShift * 0.5)
 
@@ -952,7 +1073,7 @@ class HealthKitSeeder {
             let isWorkInterval = (minuteIndex % 5) < 3
             let isRestStop = minuteIndex == 14 || minuteIndex == 24
             if isWorkInterval {
-                distance = Double.random(in: 220...240) * speedFactor
+                distance = (Double.random(in: 220...240) * speedFactor) / 4.0
                 hr = Double.random(in: 180...190)
                 cadence = Double.random(in: 175...182) + (cadenceShift * 0.5)
             } else if isRestStop {
@@ -960,7 +1081,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 125...135)
                 cadence = 0
             } else {
-                distance = Double.random(in: 110...125) * speedFactor
+                distance = (Double.random(in: 110...125) * speedFactor) / 4.0
                 hr = Double.random(in: 135...145) + hrShift
                 cadence = Double.random(in: 150...156) + cadenceShift
             }
@@ -968,24 +1089,24 @@ class HealthKitSeeder {
         case .fartlek:
             let isFast = (minuteIndex % 4) == 0
             if isFast {
-                distance = Double.random(in: 230...250) * speedFactor
+                distance = (Double.random(in: 230...250) * speedFactor) / 4.0
                 hr = Double.random(in: 175...185)
                 cadence = Double.random(in: 178...184) + (cadenceShift * 0.5)
             } else {
-                distance = Double.random(in: 140...150) * speedFactor
+                distance = (Double.random(in: 140...150) * speedFactor) / 4.0
                 hr = Double.random(in: 135...145) + hrShift
                 cadence = Double.random(in: 155...160) + cadenceShift
             }
 
         case .progression:
             let minuteProgress = Double(minuteIndex) / 45.0
-            distance = (145.0 + (minuteProgress * 65.0) + Double.random(in: -5...5)) * speedFactor
+            distance = ((145.0 + (minuteProgress * 65.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
             hr = 135.0 + (minuteProgress * 45.0) + Double.random(in: -3...3)
             cadence = 155.0 + (minuteProgress * 20.0) + cadenceShift + Double.random(in: -2...2)
 
         case .longRun:
             let minuteProgress = Double(minuteIndex) / 90.0
-            distance = (175.0 - (minuteProgress * 15.0) + Double.random(in: -5...5)) * speedFactor
+            distance = ((175.0 - (minuteProgress * 15.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
             hr = 145.0 + (minuteProgress * 20.0) + Double.random(in: -3...3)
             cadence = 165.0 - (minuteProgress * 5.0) + cadenceShift + Double.random(in: -2...2)
 
@@ -998,13 +1119,13 @@ class HealthKitSeeder {
                 cadence = 0
             } else {
                 let effort = cycle < 4 ? Double(cycle) : Double(7 - cycle)
-                distance = (160.0 + (effort * 25.0)) * speedFactor
+                distance = ((160.0 + (effort * 25.0)) * speedFactor) / 4.0
                 hr = 145.0 + (effort * 12.0)
                 cadence = 162.0 + (effort * 4.0) + (cadenceShift * 0.5)
             }
 
         case .cadenceRun:
-            distance = Double.random(in: 175...185) * speedFactor
+            distance = (Double.random(in: 175...185) * speedFactor) / 4.0
             hr = Double.random(in: 145...152) + hrShift
             cadence = Double.random(in: 172...178) + (cadenceShift * 0.5)
 
@@ -1012,7 +1133,7 @@ class HealthKitSeeder {
             let isUphill = (minuteIndex % 3) == 0
             let isPauseAtBottom = minuteIndex == 14 || minuteIndex == 26
             if isUphill {
-                distance = Double.random(in: 130...145) * speedFactor
+                distance = (Double.random(in: 130...145) * speedFactor) / 4.0
                 hr = Double.random(in: 178...188)
                 cadence = Double.random(in: 156...162) + (cadenceShift * 0.5)
             } else if isPauseAtBottom {
@@ -1020,7 +1141,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 130...140)
                 cadence = 0
             } else {
-                distance = Double.random(in: 120...135) * speedFactor
+                distance = (Double.random(in: 120...135) * speedFactor) / 4.0
                 hr = Double.random(in: 138...148) + hrShift
                 cadence = Double.random(in: 150...155) + cadenceShift
             }
@@ -1032,7 +1153,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 130...140)
                 cadence = 0
             } else {
-                distance = Double.random(in: 170...180) * speedFactor
+                distance = (Double.random(in: 170...180) * speedFactor) / 4.0
                 hr = Double.random(in: 145...155) + hrShift
                 cadence = Double.random(in: 160...165) + cadenceShift
             }

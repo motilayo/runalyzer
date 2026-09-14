@@ -77,7 +77,34 @@ struct RunInsight {
 class CoachingEngine {
     static let shared = CoachingEngine()
 
+    var inFlightTasks: [PersistentIdentifier: Task<Void, Never>] = [:]
+
     private init() {}
+
+    func requestAnalysis(for runRecord: RunRecord, force: Bool = false) async {
+        let runId = runRecord.persistentModelID
+        guard let container = runRecord.modelContext?.container else { return }
+
+        if let existingTask = inFlightTasks[runId] {
+            _ = await existingTask.value
+            return
+        }
+
+        if force, let oldInsight = runRecord.insight {
+            runRecord.modelContext?.delete(oldInsight)
+            runRecord.insight = nil
+            try? runRecord.modelContext?.save()
+        }
+
+        let task = Task.detached {
+            let analyzer = RunAnalyzerActor(modelContainer: container)
+            await analyzer.generateAnalysis(for: runId, force: force)
+        }
+
+        inFlightTasks[runId] = task
+        _ = await task.value
+        inFlightTasks[runId] = nil
+    }
 
     func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
         guard SystemLanguageModel.default.isAvailable else {
@@ -268,7 +295,34 @@ struct RunInsight: Sendable {
 class CoachingEngine {
     static let shared = CoachingEngine()
 
+    var inFlightTasks: [PersistentIdentifier: Task<Void, Never>] = [:]
+
     private init() {}
+
+    func requestAnalysis(for runRecord: RunRecord, force: Bool = false) async {
+        let runId = runRecord.persistentModelID
+        guard let container = runRecord.modelContext?.container else { return }
+
+        if let existingTask = inFlightTasks[runId] {
+            _ = await existingTask.value
+            return
+        }
+
+        if force, let oldInsight = runRecord.insight {
+            runRecord.modelContext?.delete(oldInsight)
+            runRecord.insight = nil
+            try? runRecord.modelContext?.save()
+        }
+
+        let task = Task.detached {
+            let analyzer = RunAnalyzerActor(modelContainer: container)
+            await analyzer.generateAnalysis(for: runId, force: force)
+        }
+
+        inFlightTasks[runId] = task
+        _ = await task.value
+        inFlightTasks[runId] = nil
+    }
 
     func generateInsight(for runData: RunDataForAI) async throws -> RunInsight {
         RunInsight(
@@ -296,10 +350,10 @@ class CoachingEngine {
 @ModelActor
 
 actor RunAnalyzerActor {
-    func generateAnalysis(for runID: PersistentIdentifier) async {
+    func generateAnalysis(for runID: PersistentIdentifier, force: Bool = false) async {
         guard let run = modelContext.model(for: runID) as? RunRecord else { return }
 
-        if run.insight != nil { return } // Already analyzed
+        if !force && run.insight != nil { return } // Already analyzed
 
         let targetDate = run.date
         let targetID = run.id
@@ -331,17 +385,20 @@ actor RunAnalyzerActor {
         if let base = baseline {
             let cadenceDelta = run.workingAvgCadence - base.avgCadence
             let isCadenceImproved = cadenceDelta >= 0 || run.workingAvgCadence >= 170
-            let cadenceImpact = isCadenceImproved ? "This is a GOOD trend for reducing impact." : "This is a BAD trend, increasing injury risk."
+            let cadenceDirection = cadenceDelta > 0 ? "HIGHER (FASTER STEPS)" : (cadenceDelta < 0 ? "LOWER (SLOWER STEPS)" : "UNCHANGED")
+            let cadenceImpact = isCadenceImproved ? "This is a GOOD trend, cadence is \(cadenceDirection), reducing impact." : "This is a BAD trend, cadence is \(cadenceDirection), increasing impact risk."
             cadenceContext = "Current: \(Int(run.workingAvgCadence)) SPM, Baseline: \(Int(base.avgCadence)) SPM, Deltas: \(Int(cadenceDelta)). \(cadenceImpact)"
 
             let runPace = PaceFormatter.formatPace(secondsPerKilometer: run.workingAvgPace)
             let basePace = PaceFormatter.formatPace(secondsPerKilometer: base.avgPace)
             let paceDiff = base.avgPace - run.workingAvgPace // positive diff means faster
-            let paceImpact = paceDiff >= 0 ? "A POSITIVE trend in speed." : "A NEGATIVE trend indicating slower turnover."
+            let paceDirection = paceDiff > 0 ? "FASTER" : (paceDiff < 0 ? "SLOWER" : "UNCHANGED")
+            let paceImpact = paceDiff >= 0 ? "A POSITIVE trend, pace is \(paceDirection)." : "A NEGATIVE trend, pace is \(paceDirection)."
             paceContext = "Current: \(runPace), Baseline: \(basePace), Deltas: \(Int(abs(paceDiff))) sec diff. \(paceImpact)"
 
             let hrDelta = run.workingAvgHeartRate - base.avgHR
-            let hrImpact = hrDelta <= 0 ? "A GOOD trend indicating aerobic efficiency." : "A BAD trend indicating higher cardiovascular strain."
+            let hrDirection = hrDelta > 0 ? "HIGHER" : (hrDelta < 0 ? "LOWER" : "UNCHANGED")
+            let hrImpact = hrDelta <= 0 ? "A GOOD trend, HR is \(hrDirection), indicating aerobic efficiency." : "A BAD trend, HR is \(hrDirection), indicating cardiovascular strain."
             hrContext = "Current: \(Int(run.workingAvgHeartRate)) BPM, Baseline: \(Int(base.avgHR)) BPM, Deltas: \(Int(hrDelta)). \(hrImpact)"
 
             let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
@@ -375,7 +432,6 @@ actor RunAnalyzerActor {
 
         // Enforce 30-day baselines in target calculation
         let thirtyDayCadence = Int(baseline?.avgCadence ?? (run.workingAvgCadence > 0 ? run.workingAvgCadence : 155))
-        let thirtyDayPace = baseline?.avgPace ?? (run.workingAvgPace > 0 ? run.workingAvgPace : 380.0)
 
         let defaultTemplate = DrillTemplate.template(for: .cadencePyramids)
         let intervalTarget = defaultTemplate.calculateTargetCadence(thirtyDayCadence)
@@ -400,6 +456,7 @@ actor RunAnalyzerActor {
                 headline: payload.headline,
                 longitudinalObservation: payload.observation
             )
+            modelContext.insert(insight)
 
             let isOlderThan7Days = (Calendar.current.dateComponents([.day], from: targetDate, to: Date()).day ?? 0) > 7
 
@@ -436,6 +493,7 @@ actor RunAnalyzerActor {
                         isCompleted: false,
                         orderIndex: index
                     )
+                    modelContext.insert(drill)
                     drillRecs.append(drill)
                 }
             }

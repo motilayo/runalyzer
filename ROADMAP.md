@@ -25,7 +25,7 @@
 ### Cloud Model Fallback
 - **Status:** Proposed
 - **Complexity:** High
-- **Description:** For complex edge cases where the on-device model produces low-quality output, optionally route to a cloud model (e.g., GPT-4, Claude) for higher-fidelity coaching.
+- **Description:** For apple users with no on-device models (iphone 14 and below) we can use apple's private cloud compute.
 - **Key Challenges:**
   - Contradicts Runalyst's offline-first, privacy-first philosophy
   - Requires explicit user opt-in and clear data handling disclosures
@@ -36,3 +36,6 @@
 - **Status:** Watching
 - **Complexity:** Unknown (depends on Apple API availability)
 - **Description:** If Apple exposes model adaptation or fine-tuning APIs for on-device Foundation Models, use accumulated `TrainingCorrection` data to personalize the coaching model per user.
+
+
+### Apple Watch companion app

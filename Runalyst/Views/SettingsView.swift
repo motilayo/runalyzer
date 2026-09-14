@@ -96,9 +96,14 @@ struct SettingsView: View {
                     }
                 }
                 .alert("Apple Health Permissions", isPresented: $showHealthSettingsAlert) {
-                    Button("OK", role: .cancel) {}
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("HealthKit permissions are already configured. Runalyst has access to your workouts and running biometrics.")
+                    Text("You have already been prompted for Apple Health permissions. If you are missing data, please go to the iOS Settings app to review your Runalyst Health permissions.")
                 }
 
                 Button(action: {
@@ -400,7 +405,8 @@ struct UserProfileView: View {
         let totalDistanceMeters = recentRuns.reduce(0.0) { $0 + $1.totalDistanceMeters }
         let totalDistanceKm = totalDistanceMeters / 1000.0
         let weeklyAvgKm = totalDistanceKm / 4.28 // approx weeks in 30 days
-        let runsPerWeek = Double(recentRuns.count) / 4.28
+        let uniqueDays = Set(recentRuns.map { Calendar.current.startOfDay(for: $0.date) })
+        let runsPerWeek = Double(uniqueDays.count) / 4.28
 
         let level: String
         if weeklyAvgKm > 60 {

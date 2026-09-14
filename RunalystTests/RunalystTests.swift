@@ -8,7 +8,7 @@ final class RunalystTests: XCTestCase {
     func testDrillWorkoutPlans() {
         for id in PreRunDrillId.allCases {
             let drill = PreRunDrill(id: id, previousCadence: 160)
-            let plan = drill.buildWorkoutPlan()
+            _ = drill.buildWorkoutPlan()
             print("Successfully built plan for \(id.rawValue)")
         }
 
@@ -326,8 +326,8 @@ final class DrillTemplateTests: XCTestCase {
         let thirtyDayCadence = 151
         let computedTarget = template.calculateTargetCadence(thirtyDayCadence)
 
-        // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158)
-        XCTAssertEqual(computedTarget, 158)
+        // Target should be calculated strictly from the 30-day baseline (151 * 1.05 = 158), returning a range 155-161
+        XCTAssertEqual(computedTarget, "155-161")
 
         // Instructional cues provide prescriptive biomechanical focus
         let cue = template.generateInstructionalCue(computedTarget)
@@ -344,7 +344,7 @@ final class CardiacGuardrailTests: XCTestCase {
         let highHRClass = await framboise.classifyRun(cv: 0.04, slope: -0.1, zone4: 0.5, durationMinutes: 30, averageHR: 175)
         XCTAssertNotEqual(highHRClass, "Easy Run")
         XCTAssertNotEqual(highHRClass, "Recovery Run")
-        XCTAssertTrue(highHRClass == "Tempo Run" || highHRClass == "Intervals" || highHRClass == "Progression Run")
+        XCTAssertTrue(highHRClass == "Tempo Run" || highHRClass == "Intervals" || highHRClass == "Progression Run" || highHRClass == "Steady Effort")
 
         // Low HR run (125 BPM, zone 4 = 0.04, duration 45 min) is Easy Run
         let lowHRClass = await framboise.classifyRun(cv: 0.04, slope: -0.1, zone4: 0.04, durationMinutes: 45, averageHR: 125)
@@ -618,7 +618,7 @@ final class LiveCoachDTOCodableTests: XCTestCase {
             title: "Cadence Pyramids",
             preRunDrillId: "cadence_pyramids",
             purpose: "Turnover improvement",
-            targetCadence: 172,
+            targetCadence: "172-176",
             previousCadence: 160,
             durationMinutes: 30,
             hapticMode: "On"
@@ -628,7 +628,7 @@ final class LiveCoachDTOCodableTests: XCTestCase {
         let decoded = try JSONDecoder().decode(DrillPrescriptionDTO.self, from: data)
 
         XCTAssertEqual(decoded.title, "Cadence Pyramids")
-        XCTAssertEqual(decoded.targetCadence, 172)
+        XCTAssertEqual(decoded.targetCadence, "172-176")
         XCTAssertEqual(decoded.durationMinutes, 30)
         XCTAssertEqual(decoded.hapticMode, "On")
     }
