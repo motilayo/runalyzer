@@ -1,8 +1,11 @@
 import Foundation
 import SwiftData
+import OSLog
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
+
+private let logger = Logger(subsystem: "com.runalyzer.Runalyzer", category: "CoachingEngine")
 
 struct BaselineStats: Sendable {
     let avgPace: Double
@@ -115,23 +118,14 @@ class CoachingEngine {
 
         let instructions = """
         persona: elite_running_coach
-        task: synthesize_precomputed_metrics_into_coaching_advice
         rules:
-        - conversational, motivational tone; speak directly to the runner ("You", "Your")
-        - strictly_follow_the_DIRECTIVE_for_tone_and_drill_selection
-        - observation: write exactly ONE qualitative sentence per metric group explaining form and efficiency trends. Zero numbers or specific metrics.
-        - Cadence is ALWAYS SPM. Heart Rate is ALWAYS BPM. Never mix these up.
-        - preRunDrillId MUST be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run
-        - prescribe only short technique drills to perform immediately before the next run, after the user's normal stretches and warm-up
-        - generate exactly 1 targeted drill by default; add exactly 1 second drill only when it directly reinforces the primary DIRECTIVE
-        - make every returned drill highly targeted to the primary DIRECTIVE; never generate unrelated drills
-        - for overstriding or excessive vertical bounce, prefer cadence_pyramids or rhythm_intervals
-        - for aerobic strain or heart-rate control, prefer zone_2_run or rhythm_intervals
-        - for faster pace with lower heart rate, prefer tempo_surges
-        - use strides only as an optional second drill when they directly reinforce the primary DIRECTIVE
-        - prefer one excellent drill over multiple generic drills
-        - drill cues must be prescriptive biomechanical or somatic cues focusing strictly on physical execution, breathing, posture, or arm/foot positioning (e.g., "Focus on your breathing", "Toes wide and quick ground contact", "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel you"). Do NOT repeat cadence numbers, minutes, reps, or workout plan stats in the cue.
-        - do not prescribe stretches, warm-ups, cooldowns, or a full running workout
+        - Conversational, motivational tone speaking directly to runner ("You", "Your").
+        - Strictly follow DIRECTIVE for tone and drill selection.
+        - Observation: exactly ONE qualitative sentence per metric group on form and efficiency. Zero numbers or specific metrics.
+        - Cadence is SPM, Heart Rate is BPM. Never mix them up.
+        - preRunDrillId must be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run.
+        - Prescribe 1 (max 2) short pre-run technique drill directly matching DIRECTIVE. No stretches, warm-ups, or full workouts.
+        - Drill cues: concise somatic/form cue (breathing, posture, arms, foot strike). Zero cadence numbers, reps, or workout stats.
         - respond_entirely_in_\(language)
         """
 
@@ -179,11 +173,16 @@ class CoachingEngine {
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CV_CONTEXT}}", with: runData.cvContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{SLOPE_CONTEXT}}", with: runData.slopeContext)
 
+        let prompt = promptTemplate
+
         do {
-            let generatedInsight = try await session.respond(to: promptTemplate, generating: RunInsight.self)
-            return generatedInsight.content
+            let insightContent = try await ModelInferenceSerializer.shared.run {
+                let response = try await session.respond(to: prompt, generating: RunInsight.self)
+                return response.content
+            }
+            return insightContent
         } catch {
-            print("FoundationModels Generation Error: \(error.localizedDescription)")
+            logger.error("FoundationModels Generation Error: \(error.localizedDescription)")
             return RunInsight(
                 headline: String(localized: "Run Analyzed Successfully"),
                 observation: String(localized: "Your run data has been processed. Stay consistent to build a stronger baseline over the next 30 days."),
@@ -214,13 +213,11 @@ class CoachingEngine {
 
         let instructions = """
         persona: elite_running_coach
-        task: evaluate_macro_physiological_trends_and_provide_conversational_insight
         rules:
-        - Role & Tone: You are an empathetic, expert running coach. Your tone must be warm, encouraging, and conversational. Speak directly to the runner using "you."
-        - Translate physiological data into relatable, everyday language. (e.g., instead of "acute neuromuscular fatigue," say "your legs are carrying some fatigue").
-        - Always frame feedback positively. If their form is breaking down, frame it as an opportunity to recover and bounce back.
-        - Strict Length: Your response must be exactly 1 to 2 short sentences.
-        - Zero Numbers: Do not prescribe specific metrics, target paces, or times. Offer qualitative guidance only.
+        - Empathetic running coach; warm, encouraging, conversational tone speaking directly to runner ("you").
+        - Translate physiological data into relatable language; frame feedback positively.
+        - Strict Length: exactly 1 to 2 short sentences.
+        - Zero Numbers: no specific metrics, target paces, or times.
         - \(focusDirective)
         - respond_entirely_in_\(language)
         """
@@ -256,11 +253,16 @@ class CoachingEngine {
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{CV_CONTEXT}}", with: runData.cvContext)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{SLOPE_CONTEXT}}", with: runData.slopeContext)
 
+        let dashboardPrompt = promptTemplate
+
         do {
-            let generatedInsight = try await session.respond(to: promptTemplate, generating: DashboardFatigueInsight.self)
-            return generatedInsight.content
+            let insightContent = try await ModelInferenceSerializer.shared.run {
+                let response = try await session.respond(to: dashboardPrompt, generating: DashboardFatigueInsight.self)
+                return response.content
+            }
+            return insightContent
         } catch {
-            print("FoundationModels Generation Error: \(error.localizedDescription)")
+            logger.error("FoundationModels Generation Error: \(error.localizedDescription)")
             return DashboardFatigueInsight(
                 headline: String(localized: "Keep It Up"),
                 body: String(localized: "Keep up the consistent training rhythm.")
@@ -268,6 +270,23 @@ class CoachingEngine {
         }
     }
 }
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, *)
+private actor ModelInferenceSerializer {
+    static let shared = ModelInferenceSerializer()
+    private var isExecuting = false
+
+    func run<T: Sendable>(_ work: @Sendable () async throws -> T) async throws -> T {
+        while isExecuting {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        isExecuting = true
+        defer { isExecuting = false }
+        return try await work()
+    }
+}
+#endif
 #else
 @available(iOS 26.0, *)
 struct DashboardFatigueInsight: Sendable {
@@ -427,7 +446,7 @@ actor RunAnalyzerActor {
         if let lastRun = priorRuns.sorted(by: { $0.date > $1.date }).first,
            let lastInsight = lastRun.insight,
            let prescribedDrill = lastInsight.drillRecommendations?.sorted(by: { ($0.orderIndex ?? 0) < ($1.orderIndex ?? 0) }).first {
-            directiveContext += " The user just completed the previously prescribed drill: \(prescribedDrill.drillTitle). Their target cadence was \(prescribedDrill.targetCadence ?? "unknown"), and their actual average cadence on this run was \(Int(run.workingAvgCadence)) SPM. Provide specific feedback on their execution of the drill."
+            directiveContext += " Prior drill completed: \(prescribedDrill.drillTitle) (target: \(prescribedDrill.targetCadence ?? "steady"), actual: \(Int(run.workingAvgCadence)) SPM)."
         }
 
         // Enforce 30-day baselines in target calculation

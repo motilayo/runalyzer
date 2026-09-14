@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import HealthKit
+import OSLog
+
+private let logger = Logger(subsystem: "com.runalyzer.Runalyzer", category: "Sync")
 
 /// The root view of the application that manages the onboarding state and primary HealthKit synchronization loop.
 ///
@@ -103,95 +106,70 @@ struct ContentView: View {
                 )
             }
 
-            // Repair any existing runs in SwiftData that have missing/zero vertical oscillation or working distance/duration
-            let runsNeedingRepair = currentExistingRuns.filter {
-                ($0.rawAvgVerticalOscillation == nil || $0.rawAvgVerticalOscillation == 0) ||
-                ($0.workingAvgVerticalOscillation == nil || $0.workingAvgVerticalOscillation == 0) ||
-                ($0.workingDistanceMeters == nil || $0.workingDurationSeconds == nil)
-            }
-            for existingRun in runsNeedingRepair {
-                if let workout = workouts.first(where: { $0.uuid == existingRun.hkWorkoutID }) {
-                    if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine, priorRuns: priorRunData) {
-                        existingRun.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
-                        existingRun.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
-                        existingRun.workingDistanceMeters = dto.workingDistanceMeters
-                        existingRun.workingDurationSeconds = dto.workingDurationSeconds
-                        existingRun.workingAvgPace = dto.workingAvgPace
-                    }
-                }
-            }
-
-            // 3. Extract and insert new runs
+            // 3. Extract and insert new runs incrementally
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
+            if !sortedNewWorkouts.isEmpty {
+                logger.info("Found \(sortedNewWorkouts.count) new workouts to sync.")
+                for (index, workout) in sortedNewWorkouts.enumerated() {
+                    if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine, priorRuns: priorRunData) {
+                        let newRun = RunRecord(
+                            hkWorkoutID: dto.hkWorkoutID,
+                            date: dto.date,
+                            totalDistanceMeters: dto.totalDistanceMeters,
+                            duration: dto.duration,
+                            rawAvgPace: dto.rawAvgPace,
+                            rawAvgHeartRate: dto.rawAvgHeartRate,
+                            rawAvgCadence: dto.rawAvgCadence,
+                            workingAvgPace: dto.workingAvgPace,
+                            workingAvgCadence: dto.workingAvgCadence,
+                            workingAvgHeartRate: dto.workingAvgHeartRate,
+                            workingAvgVerticalOscillation: dto.workingAvgVerticalOscillation,
+                            rawAvgVerticalOscillation: dto.rawAvgVerticalOscillation,
+                            workingDistanceMeters: dto.workingDistanceMeters,
+                            workingDurationSeconds: dto.workingDurationSeconds,
+                            paceCV: dto.paceCV,
+                            paceSlope: dto.paceSlope,
+                            percentZone4: dto.percentZone4,
+                            detectedTypeRaw: dto.detectedTypeRaw,
+                            framboiseTags: dto.framboiseTags
+                        )
+                        modelContext.insert(newRun)
+                        try? modelContext.save()
+                        logger.info("Persisted run \(index + 1)/\(sortedNewWorkouts.count) (\(dto.date))")
+                    }
 
-            // Extract all records sequentially to prevent HealthKit daemon throttling
-            var extractedRunsUnsorted: [RunRecordDTO] = []
-            for (index, workout) in sortedNewWorkouts.enumerated() {
-                if let dto = try? await healthKitManager.extractRunRecord(from: workout, engine: engine, priorRuns: priorRunData) {
-                    extractedRunsUnsorted.append(dto)
-                }
-
-                if (index + 1) % 5 == 0 {
-                    try? await Task.sleep(nanoseconds: 10_000_000_000)
-                } else {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    // Yield briefly to keep the main runloop and UI responsive
+                    try? await Task.sleep(nanoseconds: 50_000_000)
                 }
             }
 
-            let extractedRuns = extractedRunsUnsorted.sorted { $0.date < $1.date }
-
-            for dto in extractedRuns {
-                let newRun = RunRecord(
-                    hkWorkoutID: dto.hkWorkoutID,
-                    date: dto.date,
-                    totalDistanceMeters: dto.totalDistanceMeters,
-                    duration: dto.duration,
-                    rawAvgPace: dto.rawAvgPace,
-                    rawAvgHeartRate: dto.rawAvgHeartRate,
-                    rawAvgCadence: dto.rawAvgCadence,
-                    workingAvgPace: dto.workingAvgPace,
-                    workingAvgCadence: dto.workingAvgCadence,
-                    workingAvgHeartRate: dto.workingAvgHeartRate,
-                    workingAvgVerticalOscillation: dto.workingAvgVerticalOscillation,
-                    rawAvgVerticalOscillation: dto.rawAvgVerticalOscillation,
-                    workingDistanceMeters: dto.workingDistanceMeters,
-                    workingDurationSeconds: dto.workingDurationSeconds,
-                    paceCV: dto.paceCV,
-                    paceSlope: dto.paceSlope,
-                    percentZone4: dto.percentZone4,
-                    detectedTypeRaw: dto.detectedTypeRaw,
-                    framboiseTags: dto.framboiseTags
-                )
-                modelContext.insert(newRun)
-            }
-            try modelContext.save()
-
-            // Preload AI analysis ONLY for runs within the last 7 days or past 5 runs
-
+            // 4. Preload AI analysis ONLY for runs within the last 7 days or past 5 runs
+            let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
             let descriptor = FetchDescriptor<RunRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
 
             if let allRuns = try? modelContext.fetch(descriptor) {
-                let runsToPreload = allRuns.filter { $0.insight == nil }
+                let runsToPreload = allRuns.prefix(5).filter { run in
+                    run.insight == nil && (run.date >= sevenDaysAgo || (allRuns.firstIndex(where: { $0.id == run.id }) ?? 5) < 5)
+                }
                 let container = modelContext.container
 
                 for run in runsToPreload where run.insight == nil {
                     let runId = run.persistentModelID
                     if #available(iOS 26.0, *) {
-                        Task.detached {
-                            let analyzer = RunAnalyzerActor(modelContainer: container)
-                            await analyzer.generateAnalysis(for: runId)
-                        }
+                        logger.info("Generating AI insight sequentially for run \(run.date)")
+                        let analyzer = RunAnalyzerActor(modelContainer: container)
+                        await analyzer.generateAnalysis(for: runId)
                     }
 
-                    // Delay slightly to avoid overloading device resources
-                    try await Task.sleep(nanoseconds: 2_500_000_000)
+                    // Throttle sequentially to avoid on-device model rate limits and thermal overload
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
                 }
             }
 
         } catch is CancellationError {
-            print("Sync data task cancelled.")
+            logger.info("Sync data task cancelled.")
         } catch {
-            print("Failed to sync data: \(error.localizedDescription)")
+            logger.error("Failed to sync data: \(error.localizedDescription)")
             await MainActor.run {
                 self.syncError = error.localizedDescription
                 self.showError = true

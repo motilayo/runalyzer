@@ -1,27 +1,28 @@
 import SwiftUI
 import SwiftData
+import OSLog
+
+private let logger = Logger(subsystem: "com.runalyzer.Runalyzer", category: "SwiftData")
 
 @main
 struct RunalystApp: App {
 
     let container: ModelContainer = {
-        print("DEBUG: Starting ModelContainer initialization with RunalystMigrationPlan")
+        logger.info("Starting ModelContainer initialization with RunalystMigrationPlan")
         let schema = Schema(versionedSchema: RunalystSchemaV1.self)
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            print("DEBUG: Attempting to create container with migration plan")
             let modelContainer = try ModelContainer(
                 for: schema,
                 migrationPlan: RunalystMigrationPlan.self,
                 configurations: [modelConfiguration]
             )
-            print("DEBUG: Created container successfully with migration plan")
+            logger.info("Created container successfully with migration plan")
             return modelContainer
         } catch {
-            print("ERROR: Failed to load persistent ModelContainer with migration plan: \(error)")
-
-            print("Schema mismatch or unrecoverable error - recreating store: \(error)")
+            logger.error("Failed to load persistent ModelContainer with migration plan: \(error.localizedDescription)")
+            logger.warning("Attempting recovery by recreating store...")
             let storeURL = modelConfiguration.url
             let storePath = storeURL.path
             let shmPath = storePath + "-shm"
@@ -36,11 +37,11 @@ struct RunalystApp: App {
                 migrationPlan: RunalystMigrationPlan.self,
                 configurations: [modelConfiguration]
             ) {
-                print("Re-created container successfully after recovery")
+                logger.info("Re-created container successfully after recovery")
                 return fallbackContainer
             }
 
-            print("WARNING: Falling back to in-memory ModelContainer to prevent user data crash")
+            logger.error("Falling back to in-memory ModelContainer to prevent user data crash")
             let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             if let inMemoryContainer = try? ModelContainer(for: schema, configurations: [inMemoryConfig]) {
                 return inMemoryContainer
