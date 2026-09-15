@@ -91,13 +91,14 @@ struct ContentView: View {
 
             // 2. Cross-reference with SwiftData to find new workouts
             let currentExistingRuns = try modelContext.fetch(FetchDescriptor<RunRecord>())
+            let existingWorkoutIDs = Set(currentExistingRuns.map(\.hkWorkoutID))
             let newWorkouts = workouts.filter { workout in
-                !currentExistingRuns.contains(where: { $0.hkWorkoutID == workout.uuid })
+                !existingWorkoutIDs.contains(workout.uuid)
             }
 
             let engine = FramboiseEngine()
 
-            let priorRunData: [HealthKitManager.RunBaselineData] = currentExistingRuns.map {
+            var priorRunData: [HealthKitManager.RunBaselineData] = currentExistingRuns.map {
                 HealthKitManager.RunBaselineData(
                     date: $0.date,
                     pace: $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace,
@@ -106,8 +107,8 @@ struct ContentView: View {
                 )
             }
 
-            // 3. Extract and insert new runs incrementally
-            let sortedNewWorkouts = newWorkouts.sorted { $0.startDate < $1.startDate }
+            // 3. Extract and insert new runs incrementally (newest first)
+            let sortedNewWorkouts = newWorkouts.sorted { $0.startDate > $1.startDate }
             if !sortedNewWorkouts.isEmpty {
                 logger.info("Found \(sortedNewWorkouts.count) new workouts to sync.")
                 for (index, workout) in sortedNewWorkouts.enumerated() {
@@ -134,7 +135,17 @@ struct ContentView: View {
                             framboiseTags: dto.framboiseTags
                         )
                         modelContext.insert(newRun)
-                        try? modelContext.save()
+                        if (index + 1) % 25 == 0 || (index + 1) == sortedNewWorkouts.count {
+                            try? modelContext.save()
+                        }
+                        priorRunData.append(
+                            HealthKitManager.RunBaselineData(
+                                date: dto.date,
+                                pace: dto.workingAvgPace > 0 ? dto.workingAvgPace : dto.rawAvgPace,
+                                hr: dto.workingAvgHeartRate > 0 ? dto.workingAvgHeartRate : dto.rawAvgHeartRate,
+                                cadence: dto.workingAvgCadence > 0 ? dto.workingAvgCadence : dto.rawAvgCadence
+                            )
+                        )
                         logger.info("Persisted run \(index + 1)/\(sortedNewWorkouts.count) (\(dto.date))")
                     }
 

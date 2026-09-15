@@ -121,6 +121,7 @@ class CoachingEngine {
         rules:
         - Conversational, motivational tone speaking directly to runner ("You", "Your").
         - Strictly follow DIRECTIVE for tone and drill selection.
+        - Strict Length: Maximum 3 sentences for the entire response. Keep it concise.
         - Observation: exactly ONE qualitative sentence per metric group on form and efficiency. Zero numbers or specific metrics.
         - Cadence is SPM, Heart Rate is BPM. Never mix them up.
         - preRunDrillId must be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog, zone_2_run.
@@ -275,14 +276,23 @@ class CoachingEngine {
 @available(iOS 26.0, *)
 private actor ModelInferenceSerializer {
     static let shared = ModelInferenceSerializer()
+    private var queue: [(CheckedContinuation<Void, Never>)] = []
     private var isExecuting = false
 
     func run<T: Sendable>(_ work: @Sendable () async throws -> T) async throws -> T {
-        while isExecuting {
-            try await Task.sleep(nanoseconds: 100_000_000)
+        if isExecuting {
+            await withCheckedContinuation { continuation in
+                queue.append(continuation)
+            }
         }
         isExecuting = true
-        defer { isExecuting = false }
+        defer {
+            isExecuting = false
+            if !queue.isEmpty {
+                let next = queue.removeFirst()
+                next.resume()
+            }
+        }
         return try await work()
     }
 }

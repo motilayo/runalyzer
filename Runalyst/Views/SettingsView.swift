@@ -348,7 +348,7 @@ struct SettingsView: View {
 struct UserProfileView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
-    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = true
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("trainingGoal") private var trainingGoal: String = "Base Building"
 
     let goalOptions = [

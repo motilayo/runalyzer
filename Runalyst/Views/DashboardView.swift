@@ -1185,6 +1185,7 @@ struct MetricView: View {
 
 struct RunListRowView: View {
     var runRecord: RunRecord
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     var body: some View {
         VStack(spacing: 8) {
@@ -1205,7 +1206,6 @@ struct RunListRowView: View {
             }
 
             HStack {
-                let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
                 let distanceConverted = useMetricSystem ? (runRecord.totalDistanceMeters / 1000.0) : (runRecord.totalDistanceMeters / 1609.344)
                 let distanceUnit = useMetricSystem ? "km" : "mi"
                 let pace = PaceFormatter.formatPace(secondsPerKilometer: runRecord.workingAvgPace)

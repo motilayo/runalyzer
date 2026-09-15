@@ -47,3 +47,33 @@ graph TD
 ### 6. Presentation (SwiftUI)
 **Role**: Declarative UI binding directly to the local SwiftData cache via `@Query`.
 **Future Code Context**: Do not trigger data processing tasks implicitly within `var body`. Use explicit user intents (Pull to Refresh, Button Taps) combined with `.task` or unstructured `Task {}` blocks.
+
+## Concurrency & Actor Isolation
+
+To ensure thread safety and respect Apple's on-device AI rate limits, Runalyst V2 strictly partitions work across actors:
+
+```mermaid
+graph TD
+    A["HealthKit (Daemon)"] -->|"HKObserverQuery"| B["@MainActor (UI Thread)"]
+    C["WCSession (Daemon)"] -->|"WatchConnectivityManager"| B
+    
+    subgraph UI & Ingestion
+    B -->|"ContentView.syncData()"| D[("SwiftData (Main Context)")]
+    end
+    
+    subgraph Background Analytics
+    E["@ModelActor (RunAnalyzerActor)"] -->|"Private Background Context"| F[("SwiftData (Background Context)")]
+    end
+    
+    subgraph AI Safety & Queueing
+    G["actor ModelInferenceSerializer"] -->|"LanguageModelSession"| H(("Apple Neural Engine"))
+    end
+    
+    B -.->|"Passes PersistentIdentifier (Sendable)"| E
+    E -->|"Queues Request"| G
+```
+
+1. **`@MainActor`**: Handles SwiftUI views, the view-level SwiftData `ModelContext`, and the newest-first incremental ingestion loop (`ContentView.syncData()`).
+2. **`@ModelActor`**: `RunAnalyzerActor` runs on a background executor with its own private `ModelContext`. It is responsible for calculating 30-day relative baselines without blocking the UI. You must never pass a `PersistentModel` to it; only pass `PersistentIdentifier` (which is `Sendable`).
+3. **`actor ModelInferenceSerializer`**: Acts as a FIFO queue (using `CheckedContinuation`) to protect Apple's on-device `LanguageModelSession`. Apple's `SensitiveContentAnalysisML` safety filter enforces single-client limits; concurrent calls crash with `Client rate limit exceeded`. This actor serializes all requests.
+4. **Background Signals**: `HKObserverQuery` and `WCSessionDelegate` receive events on background daemon threads and dispatch them back to the `@MainActor`.
