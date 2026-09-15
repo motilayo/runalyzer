@@ -91,8 +91,9 @@ struct ContentView: View {
 
             // 2. Cross-reference with SwiftData to find new workouts
             let currentExistingRuns = try modelContext.fetch(FetchDescriptor<RunRecord>())
+            let existingWorkoutIDs = Set(currentExistingRuns.map(\.hkWorkoutID))
             let newWorkouts = workouts.filter { workout in
-                !currentExistingRuns.contains(where: { $0.hkWorkoutID == workout.uuid })
+                !existingWorkoutIDs.contains(workout.uuid)
             }
 
             let engine = FramboiseEngine()
@@ -134,7 +135,9 @@ struct ContentView: View {
                             framboiseTags: dto.framboiseTags
                         )
                         modelContext.insert(newRun)
-                        try? modelContext.save()
+                        if (index + 1) % 25 == 0 || (index + 1) == sortedNewWorkouts.count {
+                            try? modelContext.save()
+                        }
                         priorRunData.append(
                             HealthKitManager.RunBaselineData(
                                 date: dto.date,

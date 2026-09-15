@@ -118,14 +118,12 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
             return "figure.run"
         case .neuromuscularPrimer:
             return "brain.head.profile"
-        case .aerobicFlush:
+        case .aerobicFlush, .recoveryJog:
             return "lungs.fill"
         case .fartlekPrimer:
             return "waveform.path.ecg"
         case .hillBounds:
             return "mountain.2.fill"
-        case .recoveryJog:
-            return "figure.walk"
         case .aerobicBaseBuilder, .zone2Run:
             return "heart.fill"
         }

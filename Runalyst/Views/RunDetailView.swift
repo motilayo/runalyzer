@@ -5,6 +5,7 @@ import WorkoutKit
 
 struct RunDetailView: View {
     @Bindable var runRecord: RunRecord
+    @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @Environment(\.modelContext) private var modelContext
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Query private var existingRuns: [RunRecord]
@@ -46,6 +47,7 @@ struct RunDetailView: View {
 
     private var formattedRunDate: String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEEE, MMM d, yyyy 'at' hh:mm a"
         return formatter.string(from: runRecord.date)
     }
@@ -223,7 +225,6 @@ struct RunDetailView: View {
                     : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
                 LazyVGrid(columns: columns, spacing: 16) {
-                    let useMetricSystem = UserDefaults.standard.object(forKey: "useMetricSystem") as? Bool ?? (Locale.current.measurementSystem == .metric)
                     let activeDistanceMeters = showRawMetrics ? runRecord.totalDistanceMeters : runRecord.effectiveWorkingDistanceMeters
                     let distanceConverted = useMetricSystem ? (activeDistanceMeters / 1000.0) : (activeDistanceMeters / 1609.344)
                     let distanceUnit = useMetricSystem ? "km" : "mi"
