@@ -131,6 +131,22 @@ actor FramboiseEngine {
         return sigma / mu
     }
 
+    /// Calculates the Coefficient of Variation (CV = sigma / mu) for cadence across buckets.
+    func calculateCadenceCV(bucketCadences: [Double]) -> Double {
+        guard bucketCadences.count > 1 else { return 0 }
+        let validCadences = bucketCadences.filter { $0 > 0 && $0.isFinite }
+        guard validCadences.count > 1 else { return 0 }
+
+        let mu = validCadences.reduce(0, +) / Double(validCadences.count)
+        guard mu > 0 else { return 0 }
+
+        let sumSquaredDiff = validCadences.reduce(0) { $0 + pow($1 - mu, 2) }
+        let variance = sumSquaredDiff / Double(validCadences.count - 1)
+        let sigma = sqrt(variance)
+
+        return sigma / mu
+    }
+
     /// Calculates the linear regression slope of pace over time (least-squares).
     /// Negative slope = speeding up (progression). Positive slope = slowing down (fatigue).
     func calculatePaceSlope(bucketPaces: [Double]) -> Double {
@@ -172,7 +188,7 @@ actor FramboiseEngine {
 
     /// Rule-based fallback classifier used until a CoreML model is available or as fallback.
     /// Enforces strict cardiac guardrails (runs with high HR or high Zone 4 are never easy/recovery).
-    func classifyRun(cv: Double, slope: Double, zone4: Double, durationMinutes: Double, averageHR: Double? = nil) -> String {
+    func classifyRun(cv: Double, slope: Double, zone4: Double, durationMinutes: Double, cadenceCV: Double = 0.0, averageHR: Double? = nil) -> String {
         // Strict cardiac guardrail
         if let hr = averageHR, hr >= 165 || zone4 >= 0.25 {
             if cv > 0.15 {
@@ -180,6 +196,9 @@ actor FramboiseEngine {
             } else if slope < -0.225 {
                 return "Progression Run"
             } else if zone4 > 0.60 {
+                if durationMinutes < 25.0 || cv > 0.08 || cadenceCV > 0.035 {
+                    return "Intervals"
+                }
                 return "Tempo Run"
             } else {
                 return "Steady Effort"

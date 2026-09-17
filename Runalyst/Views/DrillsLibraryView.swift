@@ -262,16 +262,15 @@ struct DrillsLibraryView: View {
     }
 
     private func autoSyncStaleExportIfNeeded() async {
-        guard !lastExportedDrillId.isEmpty || lastWatchExportTimestamp > 0 else { return }
+        guard !lastExportedDrillId.isEmpty else { return }
         guard #available(iOS 17.0, *) else { return }
         guard let baseline = baselineCadence else { return }
+        guard let preRunId = PreRunDrillId(rawValue: lastExportedDrillId) else { return }
 
         await MainActor.run {
             self.isAutoSyncing = true
         }
 
-        let drillIdToSync = !lastExportedDrillId.isEmpty ? lastExportedDrillId : "cadence_pyramids"
-        let preRunId = PreRunDrillId(rawValue: drillIdToSync) ?? .strides
         let template = DrillTemplate.template(for: preRunId)
         let newTarget = template.calculateTargetCadence(baseline)
 
@@ -329,7 +328,7 @@ struct DrillPrimerCardView: View {
         let iconColor = drillId.iconColor
 
         let isZone1 = drillId == .aerobicFlush || drillId == .recoveryJog
-        let isZone2 = drillId == .aerobicBaseBuilder || drillId == .zone2Run
+        let isZone2 = drillId == .zone2Run
         let hasCadenceTarget = !isZone1 && !isZone2
 
         let displayTargetText: String? = {

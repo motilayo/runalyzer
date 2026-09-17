@@ -27,6 +27,7 @@ actor ModelManager {
         cv: Double = 0.05,
         slope: Double = 0.0,
         durationMinutes: Double = 30.0,
+        cadenceCV: Double = 0.0,
         rawAverageHR: Double? = nil
     ) async -> String {
         if let classifier = self.runClassifier {
@@ -39,7 +40,9 @@ actor ModelManager {
                     verticalOscillation: verticalOscillation,
                     cv: cv,
                     paceSlope: slope,
-                    runnerStage: Int64(runnerStage)
+                    runnerStage: Double(runnerStage),
+                    durationMinutes: durationMinutes,
+                    cadenceCV: cadenceCV
                 )
                 let prediction = try await classifier.prediction(input: input)
                 return prediction.targetClass
@@ -49,7 +52,7 @@ actor ModelManager {
         }
 
         let framboise = FramboiseEngine()
-        return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, averageHR: rawAverageHR)
+        return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, cadenceCV: cadenceCV, averageHR: rawAverageHR)
     }
 
 }

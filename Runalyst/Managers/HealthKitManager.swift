@@ -312,7 +312,7 @@ class HealthKitManager: ObservableObject {
         var windows: [BucketData] = []
         guard !chunks.isEmpty else { return windows }
 
-        let chunksPerWindow = 4 // 4 * 15s = 60s window
+        let chunksPerWindow = 2 // 2 * 15s = 30s window
 
         for i in 0..<chunks.count {
             let windowChunks = Array(chunks[i..<min(i + chunksPerWindow, chunks.count)])
@@ -396,6 +396,8 @@ struct RunBaselineData: Sendable {
     let pace: Double
     let hr: Double
     let cadence: Double
+    var duration: Double = 0.0
+    var isPrescribedDrill: Bool = false
 }
 
     func extractRunRecord(from workout: HKWorkout, engine: FramboiseEngine, priorRuns: [RunBaselineData] = []) async throws -> RunRecordDTO {
@@ -432,9 +434,11 @@ struct RunBaselineData: Sendable {
 
         let paces = overlappingWindows.map { $0.meanPaceSecPerKm }
         let hrs = overlappingWindows.map { $0.meanHR }
+        let cadences = overlappingWindows.map { $0.meanCadence }
 
         let cv = await engine.calculatePaceCV(bucketPaces: paces)
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
+        let cadenceCV = await engine.calculateCadenceCV(bucketCadences: cadences)
 
         let dynamicZone4Threshold: Double = 161.5
         // if #available(iOS 27.0, *) {
@@ -460,15 +464,48 @@ struct RunBaselineData: Sendable {
         let targetDate = workout.startDate
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) ?? Date()
 
-        let validPriorRuns = priorRuns.filter { $0.date >= thirtyDaysAgo && $0.date < targetDate }
+        // Filter prior runs to rolling 30-day window (every run counts)
+        let validPriorRuns = priorRuns.filter {
+            $0.date >= thirtyDaysAgo &&
+            $0.date < targetDate
+        }
+
+        // Check if workout matches a prescribed Runalyst drill (via WorkoutKit metadata or scheduled intent)
+        let matchedDrillIntent = WorkoutBridge.matchDrill(
+            workout: workout,
+            durationSeconds: duration
+        )
 
         let classification: String
         let modelManager = ModelManager()
 
-        if !validPriorRuns.isEmpty {
-            let baselinePace = validPriorRuns.map { $0.pace }.reduce(0, +) / Double(validPriorRuns.count)
-            let baselineHR = validPriorRuns.map { $0.hr }.reduce(0, +) / Double(validPriorRuns.count)
-            let baselineCadence = validPriorRuns.map { $0.cadence }.reduce(0, +) / Double(validPriorRuns.count)
+        if let matchedDrill = matchedDrillIntent {
+            classification = PreRunDrillId.correspondingClassification(for: matchedDrill.drillTitle)
+                ?? PreRunDrillId.correspondingClassification(for: matchedDrill.preRunDrillId ?? "")
+                ?? "Intervals"
+        } else if !validPriorRuns.isEmpty {
+            let aerobicPriorRuns = validPriorRuns.filter { !($0.duration < 1200 && $0.isPrescribedDrill) }
+
+            let totalAerobicDuration = aerobicPriorRuns.map(\.duration).reduce(0, +)
+            let totalCadenceDuration = validPriorRuns.map(\.duration).reduce(0, +)
+
+            let baselinePace: Double
+            let baselineHR: Double
+            let baselineCadence: Double
+
+            if totalAerobicDuration > 0 {
+                baselinePace = aerobicPriorRuns.map { $0.pace * $0.duration }.reduce(0, +) / totalAerobicDuration
+                baselineHR = aerobicPriorRuns.map { $0.hr * $0.duration }.reduce(0, +) / totalAerobicDuration
+            } else {
+                baselinePace = aerobicPriorRuns.isEmpty ? (validPriorRuns.map(\.pace).reduce(0, +) / Double(validPriorRuns.count)) : (aerobicPriorRuns.map(\.pace).reduce(0, +) / Double(aerobicPriorRuns.count))
+                baselineHR = aerobicPriorRuns.isEmpty ? (validPriorRuns.map(\.hr).reduce(0, +) / Double(validPriorRuns.count)) : (aerobicPriorRuns.map(\.hr).reduce(0, +) / Double(aerobicPriorRuns.count))
+            }
+
+            if totalCadenceDuration > 0 {
+                baselineCadence = validPriorRuns.map { $0.cadence * $0.duration }.reduce(0, +) / totalCadenceDuration
+            } else {
+                baselineCadence = validPriorRuns.map(\.cadence).reduce(0, +) / Double(validPriorRuns.count)
+            }
             let calculatedStage: Int
             if baselinePace < 240 {
                 calculatedStage = 3
@@ -490,6 +527,7 @@ struct RunBaselineData: Sendable {
                 cv: cv,
                 slope: slope,
                 durationMinutes: duration / 60.0,
+                cadenceCV: cadenceCV,
                 rawAverageHR: currentHR
             )
         } else {
@@ -499,10 +537,23 @@ struct RunBaselineData: Sendable {
                 slope: slope,
                 zone4: zone4,
                 durationMinutes: duration / 60.0,
+                cadenceCV: cadenceCV,
                 averageHR: currentHR
             )
         }
-        let tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
+        var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
+        if let matchedDrill = matchedDrillIntent {
+            if !tags.contains("prescribedDrill") {
+                tags.append("prescribedDrill")
+            }
+            if let preRunId = matchedDrill.preRunDrillId, !tags.contains(preRunId) {
+                tags.append(preRunId)
+                let drillTag = "drill:\(preRunId)"
+                if !tags.contains(drillTag) {
+                    tags.append(drillTag)
+                }
+            }
+        }
 
         return RunRecordDTO(
             hkWorkoutID: workout.uuid,
@@ -790,6 +841,16 @@ class HealthKitSeeder {
                     }
                 }
 
+                if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
+                    let drill = Self.recommendedDrillId(for: profile, progress: progress)
+                    let meta: [String: Any] = [
+                        HKMetadataKeyWorkoutBrandName: "Runalyst",
+                        "WorkoutPlan": drill.title,
+                        "PreRunDrillId": drill.rawValue
+                    ]
+                    try? await builder.addMetadata(meta)
+                }
+
                 try await builder.endCollection(at: workoutEndTime)
                 if let finished = try await builder.finishWorkout() {
                     savedWorkouts.append(finished)
@@ -1001,7 +1062,17 @@ class HealthKitSeeder {
                 paceSlope: paceSlope,
                 percentZone4: percentZone4,
                 detectedTypeRaw: profile.rawValue,
-                framboiseTags: [profile.rawValue],
+                framboiseTags: {
+                    var tags = [profile.rawValue]
+                    if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
+                        let drill = Self.recommendedDrillId(for: profile, progress: progress)
+                        tags.append("prescribedDrill")
+                        tags.append(drill.rawValue)
+                        tags.append("drill:\(drill.rawValue)")
+                        tags.append("drill:\(drill.title)")
+                    }
+                    return tags
+                }(),
                 insight: insight
             )
 

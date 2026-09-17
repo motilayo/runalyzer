@@ -14,35 +14,58 @@ struct RunDetailView: View {
     @State private var isForceAnalyzing: Bool = false
     @State private var showingToggleInfo = false
     @State private var showingClassificationExplainer = false
+    @State private var showingDrillExplainer = false
     @State private var isGeneratingInsight = false
 
     private var baselineRuns: [RunRecord] {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
-        return existingRuns.filter { $0.date < runRecord.date && $0.date >= thirtyDaysAgo }
+        return existingRuns.filter {
+            $0.date < runRecord.date &&
+            $0.date >= thirtyDaysAgo
+        }
     }
 
     private var baselinePace: Double? {
         let runs = baselineRuns.filter { $0.workingAvgPace > 0 }
         guard !runs.isEmpty else { return nil }
-        return runs.map(\.workingAvgPace).reduce(0, +) / Double(runs.count)
+        let totalDuration = runs.map(\.duration).reduce(0, +)
+        guard totalDuration > 0 else {
+            return runs.map(\.workingAvgPace).reduce(0, +) / Double(runs.count)
+        }
+        return runs.map { $0.workingAvgPace * $0.duration }.reduce(0, +) / totalDuration
     }
 
     private var baselineHR: Double? {
         let runs = baselineRuns.filter { $0.workingAvgHeartRate > 0 }
         guard !runs.isEmpty else { return nil }
-        return Double(runs.map(\.workingAvgHeartRate).reduce(0, +)) / Double(runs.count)
+        let totalDuration = runs.map(\.duration).reduce(0, +)
+        guard totalDuration > 0 else {
+            return Double(runs.map(\.workingAvgHeartRate).reduce(0, +)) / Double(runs.count)
+        }
+        return runs.map { Double($0.workingAvgHeartRate) * $0.duration }.reduce(0, +) / totalDuration
     }
 
     private var baselineCadence: Double? {
         let runs = baselineRuns.filter { $0.workingAvgCadence > 0 }
         guard !runs.isEmpty else { return nil }
-        return Double(runs.map(\.workingAvgCadence).reduce(0, +)) / Double(runs.count)
+        let totalDuration = runs.map(\.duration).reduce(0, +)
+        guard totalDuration > 0 else {
+            return Double(runs.map(\.workingAvgCadence).reduce(0, +)) / Double(runs.count)
+        }
+        return runs.map { Double($0.workingAvgCadence) * $0.duration }.reduce(0, +) / totalDuration
     }
 
     private var baselineOscillation: Double? {
-        let runs = baselineRuns.compactMap { $0.workingAvgVerticalOscillation ?? $0.rawAvgVerticalOscillation }.filter { $0 > 0 }
+        let runs = baselineRuns.compactMap { run -> (val: Double, dur: Double)? in
+            guard let osc = run.workingAvgVerticalOscillation ?? run.rawAvgVerticalOscillation, osc > 0 else { return nil }
+            return (osc, run.duration)
+        }
         guard !runs.isEmpty else { return nil }
-        return runs.reduce(0, +) / Double(runs.count)
+        let totalDuration = runs.map(\.dur).reduce(0, +)
+        guard totalDuration > 0 else {
+            return runs.map(\.val).reduce(0, +) / Double(runs.count)
+        }
+        return runs.map { $0.val * $0.dur }.reduce(0, +) / totalDuration
     }
 
     private var formattedRunDate: String {
@@ -58,9 +81,159 @@ struct RunDetailView: View {
         "Long Run", "Fartlek", "Urban Traffic"
     ]
 
+    private var prescribedDrillName: String? {
+        // 1. Explicit tag "drill:<title>"
+        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
+            let candidate = String(tag.dropFirst(6))
+            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
+                return canonical
+            }
+        }
+        // 2. PreRunDrillId rawValue in framboiseTags
+        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) }) {
+            return drill.title
+        }
+        // 3. PreRunDrillId title in framboiseTags
+        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.title) }) {
+            return drill.title
+        }
+        // 4. If detectedTypeRaw is itself a legacy specific drill title (e.g. "Rhythm Intervals")
+        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
+            return canonical
+        }
+        // 5. Associated completed drill recommendation from insight
+        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
+           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
+            return canonical
+        }
+        return nil
+    }
+
+    private var drillPillText: String {
+        if let name = prescribedDrillName {
+            return "Drill: \(name)"
+        }
+        return "Prescribed Drill"
+    }
+
+    private func normalizeDrillClassification() {
+        // Clean up any invalid drill tags on runs that are not genuine drills
+        cleanUpInvalidDrillTagsIfNeeded()
+
+        // Only normalize if detectedTypeRaw is an ACTUAL drill title (e.g. "Rhythm Intervals"), never a standard classification like "Intervals"
+        guard let canonicalDrill = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw),
+              let parentClass = PreRunDrillId.correspondingClassification(for: runRecord.detectedTypeRaw) else {
+            return
+        }
+
+        if !runRecord.framboiseTags.contains("prescribedDrill") {
+            runRecord.framboiseTags.append("prescribedDrill")
+        }
+        let drillTag = "drill:\(canonicalDrill)"
+        if !runRecord.framboiseTags.contains(drillTag) {
+            runRecord.framboiseTags.append(drillTag)
+        }
+        if runRecord.detectedTypeRaw != parentClass {
+            runRecord.detectedTypeRaw = parentClass
+            try? modelContext.save()
+        }
+    }
+
+    private func cleanUpInvalidDrillTagsIfNeeded() {
+        // A run is only a prescribed drill if it has a confirmed authentic drill name
+        if runRecord.framboiseTags.contains("prescribedDrill") && prescribedDrillName == nil {
+            runRecord.framboiseTags.removeAll { tag in
+                tag == "prescribedDrill" || tag.hasPrefix("drill:")
+            }
+            try? modelContext.save()
+        }
+    }
+
     @ViewBuilder
     private var aiDisclaimerFooter: some View {
         AIDisclaimerFooter()
+    }
+
+    @ViewBuilder
+    private var drillControl: some View {
+        if let drillName = prescribedDrillName {
+            Menu {
+                Menu {
+                    ForEach(PreRunDrillId.allCases, id: \.self) { drill in
+                        Button {
+                            WorkoutBridge.linkDrill(to: runRecord, drillId: drill)
+                            try? modelContext.save()
+                        } label: {
+                            if drill.title == drillName {
+                                Label(drill.title, systemImage: "checkmark")
+                            } else {
+                                Label(drill.title, systemImage: drill.iconName)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Change Drill", systemImage: "arrow.triangle.2.circlepath")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    WorkoutBridge.unlinkDrill(from: runRecord)
+                    try? modelContext.save()
+                } label: {
+                    Label("Unlink Drill", systemImage: "xmark.circle")
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                    Text(drillName)
+                        .font(.caption.bold())
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .opacity(0.8)
+                }
+                .foregroundColor(.purple)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.purple.opacity(0.12))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                )
+            }
+        } else {
+            Menu {
+                ForEach(PreRunDrillId.allCases, id: \.self) { drill in
+                    Button {
+                        WorkoutBridge.linkDrill(to: runRecord, drillId: drill)
+                        try? modelContext.save()
+                    } label: {
+                        Label(drill.title, systemImage: drill.iconName)
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "plus")
+                        .font(.caption2.bold())
+                    Text("Link Drill")
+                        .font(.caption.bold())
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .opacity(0.7)
+                }
+                .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(red: 0.05, green: 0.45, blue: 0.5).opacity(0.1))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color(red: 0.05, green: 0.45, blue: 0.5).opacity(0.25), lineWidth: 1)
+                )
+            }
+        }
     }
 
     var body: some View {
@@ -85,10 +258,10 @@ struct RunDetailView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
-                    .padding(.top, 4)
 
-                // MARK: Run Classification
-                VStack(alignment: .leading, spacing: 4) {
+                // MARK: Run Classification & Drill
+                VStack(alignment: .leading, spacing: 8) {
+                    // Row 1: Classification
                     HStack {
                         HStack(spacing: 5) {
                             Text("Classification:")
@@ -118,6 +291,28 @@ struct RunDetailView: View {
                         }
                     }
 
+                    // Row 2: Drill
+                    HStack {
+                        HStack(spacing: 5) {
+                            Text("Drill:")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.primary)
+
+                            Image(systemName: "info.circle")
+                                .font(.caption)
+                                .foregroundColor(.secondary.opacity(0.8))
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showingDrillExplainer = true
+                        }
+
+                        Spacer()
+
+                        drillControl
+                    }
+
+                    // Row 3: Subtitle / Calculation link
                     HStack(spacing: 4) {
                         Text("CoreML & Biometrics")
                             .font(.caption2)
@@ -137,18 +332,42 @@ struct RunDetailView: View {
                 .sheet(isPresented: $showingClassificationExplainer) {
                     RunClassificationExplainerSheet()
                 }
+                .alert("Drill Tracking", isPresented: $showingDrillExplainer) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text("Link this workout to a drill (like Cadence Pyramids, Strides, or Zone 2 Run) to track your form adherence against coaching targets on the Drill Execution Scorecard.")
+                }
+
+                // MARK: Drill Scorecard
+                if let drillName = prescribedDrillName, let drillId = PreRunDrillId.allCases.first(where: { $0.title == drillName || $0.rawValue == drillName }) {
+                    DrillExecutionScorecard(runRecord: runRecord, drillId: drillId, baselineCadence: baselineCadence, baselineOscillation: baselineOscillation)
+                        .padding(.horizontal)
+                }
+
+                let hasBiometrics = runRecord.workingAvgCadence > 0 || runRecord.workingAvgHeartRate > 0
 
                 // MARK: AI Run Analysis
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "sparkles")
-                            .foregroundColor(.purple)
-                        Text("AI Run Analysis")
+                            .foregroundColor(hasBiometrics ? .purple : .secondary)
+                        Text(hasBiometrics ? "AI Run Analysis" : "Sensor Data Limited")
                             .font(.subheadline.bold())
-                            .foregroundColor(.purple)
+                            .foregroundColor(hasBiometrics ? .purple : .secondary)
                     }
 
-                    if let insight = runRecord.insight {
+                    if !hasBiometrics {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Biometric Analysis Unavailable")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.primary)
+                            Text("This workout was recorded without an Apple Watch and has no cadence or heart rate sensor data. Runalyst requires continuous biometric telemetry to analyze form, cadence rhythm, and cardiac strain without hallucinating.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineSpacing(2)
+                        }
+                        .padding(.vertical, 2)
+                    } else if let insight = runRecord.insight {
                         if !insight.longitudinalObservation.isEmpty {
                             Text(insight.longitudinalObservation)
                                 .font(.body)
@@ -175,7 +394,9 @@ struct RunDetailView: View {
                             .italic()
                     }
 
-                    aiDisclaimerFooter
+                    if hasBiometrics {
+                        aiDisclaimerFooter
+                    }
                 }
                 .frame(minHeight: 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -185,7 +406,11 @@ struct RunDetailView: View {
                 .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                 .padding(.horizontal)
                 .task {
-                    if runRecord.insight == nil {
+                    if !hasBiometrics, let oldInsight = runRecord.insight {
+                        modelContext.delete(oldInsight)
+                        runRecord.insight = nil
+                        try? modelContext.save()
+                    } else if hasBiometrics && runRecord.insight == nil {
                         isGeneratingInsight = true
                         if #available(iOS 26.0, *) {
                             await CoachingEngine.shared.requestAnalysis(for: runRecord)
@@ -247,9 +472,9 @@ struct RunDetailView: View {
                     let currentHR = showRawMetrics ? runRecord.rawAvgHeartRate : runRecord.workingAvgHeartRate
                     let currentCadence = showRawMetrics ? runRecord.rawAvgCadence : runRecord.workingAvgCadence
 
-                    StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace, baselineValue: showRawMetrics ? nil : baselinePace, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
-                    StatBox(title: "Avg HR", value: "\(Int(round(currentHR)))", unit: "BPM", currentValue: currentHR, baselineValue: showRawMetrics ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
-                    StatBox(title: "Avg Cadence", value: "\(Int(currentCadence))", unit: "SPM", currentValue: currentCadence, baselineValue: showRawMetrics ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace > 0 ? currentPace : nil, baselineValue: (showRawMetrics || currentPace <= 0) ? nil : baselinePace, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg HR", value: currentHR > 0 ? "\(Int(round(currentHR)))" : "--", unit: currentHR > 0 ? "BPM" : "", currentValue: currentHR > 0 ? currentHR : nil, baselineValue: (showRawMetrics || currentHR <= 0) ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+                    StatBox(title: "Avg Cadence", value: currentCadence > 0 ? "\(Int(currentCadence))" : "--", unit: currentCadence > 0 ? "SPM" : "", currentValue: currentCadence > 0 ? currentCadence : nil, baselineValue: (showRawMetrics || currentCadence <= 0) ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
 
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
                     StatBox(
@@ -351,6 +576,29 @@ struct RunDetailView: View {
             .padding(.vertical)
 
             .task(id: runRecord.id) {
+                // Auto-resolve or reconcile drill recognition against authentic HealthKit workout metadata / scheduled intent
+                if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
+                    let matched = WorkoutBridge.matchDrill(workout: workout, durationSeconds: runRecord.duration)
+                    if let matched = matched {
+                        let drillTag = "drill:\(matched.drillTitle)"
+                        if !runRecord.framboiseTags.contains(drillTag) {
+                            runRecord.framboiseTags.removeAll { $0.hasPrefix("drill:") || PreRunDrillId.allCases.map(\.rawValue).contains($0) }
+                            if !runRecord.framboiseTags.contains("prescribedDrill") {
+                                runRecord.framboiseTags.append("prescribedDrill")
+                            }
+                            if let preRunId = matched.preRunDrillId {
+                                runRecord.framboiseTags.append(preRunId)
+                            }
+                            runRecord.framboiseTags.append(drillTag)
+                        }
+                        if let parentClass = PreRunDrillId.correspondingClassification(for: matched.drillTitle),
+                           runRecord.detectedTypeRaw != parentClass {
+                            runRecord.detectedTypeRaw = parentClass
+                        }
+                        try? modelContext.save()
+                    }
+                }
+
                 let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
                    (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
                 let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
@@ -386,8 +634,11 @@ struct RunDetailView: View {
             Color.clear.frame(height: 80)
         }
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle(runRecord.date.formatted(date: .abbreviated, time: .shortened))
+        .navigationTitle("Run Details")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            normalizeDrillClassification()
+        }
     }
 
     private func updateClassification(to newType: String, from oldType: String? = nil) {
@@ -690,7 +941,7 @@ private struct DrillCardView: View {
             }
 
             let isZone1 = preRunId == .aerobicFlush || preRunId == .recoveryJog
-            let isZone2 = preRunId == .aerobicBaseBuilder || preRunId == .zone2Run
+            let isZone2 = preRunId == .zone2Run
             let targetText: String? = {
                 if isZone1 {
                     return "Target: Zone 1 HR"
@@ -813,5 +1064,321 @@ private struct DrillCardView: View {
                 }
             }
         }
+    }
+}
+
+enum DrillAdherenceTier {
+    case exceeded
+    case met
+    case partiallyMet
+    case notMet
+
+    var badgeText: String {
+        switch self {
+        case .exceeded: return "Exceeded"
+        case .met: return "Met"
+        case .partiallyMet: return "Partially Met"
+        case .notMet: return "Not Met"
+        }
+    }
+
+    var badgeIcon: String {
+        switch self {
+        case .exceeded: return "star.fill"
+        case .met: return "checkmark"
+        case .partiallyMet: return "minus"
+        case .notMet: return "xmark"
+        }
+    }
+
+    var tintColor: Color {
+        switch self {
+        case .exceeded: return Color(red: 0.0, green: 0.75, blue: 0.65)
+        case .met: return .green
+        case .partiallyMet: return .orange
+        case .notMet: return .red
+        }
+    }
+}
+
+struct DrillExecutionScorecard: View {
+    let runRecord: RunRecord
+    let drillId: PreRunDrillId
+    let baselineCadence: Double?
+    let baselineOscillation: Double?
+
+    var body: some View {
+        let template = DrillTemplate.template(for: drillId)
+        let thirtyDayCadence = Int(baselineCadence ?? (runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155))
+        let targetCadence = template.calculateTargetCadence(thirtyDayCadence)
+        let drillObj = PreRunDrill(id: drillId, previousCadence: thirtyDayCadence, targetCadence: targetCadence)
+        let actualCadence = Int(runRecord.workingAvgCadence)
+        let actualHR = Int(runRecord.workingAvgHeartRate)
+
+        let isHRTarget = drillId.isHeartRateTargeted
+        let isDualTarget = (drillId == .tempoSurges)
+        let targetCadenceStr = drillObj.computedCadence ?? "Steady"
+
+        let currentOsc = runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation ?? 9.5
+        let baseOsc = baselineOscillation ?? 9.5
+        let oscDelta = currentOsc - baseOsc
+
+        let tier: DrillAdherenceTier
+        let tierDescription: String
+
+        if isDualTarget {
+            // Tempo Surges: Cadence + Zone 4 Threshold
+            let cadenceExact: Bool = {
+                if let range = drillObj.effectiveTargetCadence {
+                    return range.contains(actualCadence)
+                }
+                return true
+            }()
+            let cadenceClose: Bool = {
+                if let range = drillObj.effectiveTargetCadence {
+                    return actualCadence >= range.lowerBound - 2 && actualCadence <= range.upperBound + 2
+                }
+                return true
+            }()
+            let zone4Percent = runRecord.percentZone4
+
+            if cadenceExact && zone4Percent >= 0.35 {
+                tier = .exceeded
+                tierDescription = "Held target turnover with high threshold capacity (≥35% Zone 4)."
+            } else if (cadenceExact || cadenceClose) && zone4Percent >= 0.20 {
+                tier = .met
+                tierDescription = "Landed in target cadence band with sustained threshold effort."
+            } else if cadenceExact || zone4Percent >= 0.15 {
+                tier = .partiallyMet
+                tierDescription = cadenceExact ? "Hit turnover target, but effort remained sub-threshold." : "Reached threshold intensity, but cadence was off target."
+            } else {
+                tier = .notMet
+                tierDescription = "Missed both target cadence and threshold intensity goals."
+            }
+        } else if isHRTarget {
+            if let zone = drillId.targetHeartRateZone {
+                if zone == 2 {
+                    if actualHR > 0 {
+                        if runRecord.percentZone4 <= 0.04 && actualCadence >= 155 {
+                            tier = .exceeded
+                            tierDescription = "Preserved Zone 2 ceiling with crisp turnover (≥155 SPM)."
+                        } else if runRecord.percentZone4 <= 0.08 {
+                            tier = .met
+                            tierDescription = "Successfully maintained steady Zone 2 aerobic intensity."
+                        } else if runRecord.percentZone4 <= 0.20 {
+                            tier = .partiallyMet
+                            tierDescription = "Moderate intensity drift; spent partial duration above Zone 2."
+                        } else {
+                            tier = .notMet
+                            tierDescription = "Cardiac drift exceeded aerobic threshold into Zones 3 and 4."
+                        }
+                    } else {
+                        tier = .met
+                        tierDescription = "Completed steady aerobic effort."
+                    }
+                } else { // zone 1
+                    if actualHR > 0 {
+                        if runRecord.percentZone4 == 0 && actualHR <= 125 {
+                            tier = .exceeded
+                            tierDescription = "Flawless active recovery with zero cardiac strain."
+                        } else if runRecord.percentZone4 <= 0.03 && actualHR <= 135 {
+                            tier = .met
+                            tierDescription = "Controlled intensity within the Zone 1 recovery envelope."
+                        } else if runRecord.percentZone4 <= 0.10 {
+                            tier = .partiallyMet
+                            tierDescription = "Effort drifted slightly higher than target recovery ceiling."
+                        } else {
+                            tier = .notMet
+                            tierDescription = "Intensity was too elevated for an active recovery run."
+                        }
+                    } else {
+                        tier = .met
+                        tierDescription = "Completed gentle recovery effort."
+                    }
+                }
+            } else {
+                tier = .met
+                tierDescription = "Completed aerobic session."
+            }
+        } else if let range = drillObj.effectiveTargetCadence {
+            let zeroSpike = runRecord.percentZone4 <= 0.05
+            let formImproved = oscDelta <= 0
+            if range.contains(actualCadence) && zeroSpike && formImproved {
+                tier = .exceeded
+                tierDescription = "Target turnover held with effortless aerobic stability and form control."
+            } else if range.contains(actualCadence) {
+                tier = .met
+                tierDescription = "Cadence landed precisely within the target \(targetCadenceStr) SPM band."
+            } else if actualCadence >= range.lowerBound - 2 && actualCadence <= range.upperBound + 2 {
+                tier = .partiallyMet
+                tierDescription = "Turnover was close to target (within 2 SPM of target band)."
+            } else {
+                tier = .notMet
+                tierDescription = "Turnover missed the target cadence band by more than 2 SPM."
+            }
+        } else {
+            tier = .met
+            tierDescription = "Completed steady effort drill."
+        }
+
+        return VStack(spacing: 12) {
+            HStack {
+                Image(systemName: drillId.iconName)
+                    .foregroundColor(drillId.iconColor)
+                    .font(.title2)
+                Text("Drill Execution Scorecard")
+                    .font(.headline)
+                    .foregroundColor(drillId.iconColor)
+                Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: tier.badgeIcon)
+                        .font(.caption2.bold())
+                    Text(tier.badgeText)
+                        .font(.caption.bold())
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(tier.tintColor.opacity(0.15))
+                .foregroundColor(tier.tintColor)
+                .clipShape(Capsule())
+            }
+
+            Divider()
+
+            if isDualTarget {
+                // Dual Target layout: Cadence + Zone 4 Lactate Threshold
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Target Cadence")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(targetCadenceStr) SPM")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Actual Cadence")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(actualCadence) SPM")
+                            .font(.subheadline.bold())
+                            .foregroundColor(tier == .notMet ? .orange : .green)
+                    }
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Threshold Intensity")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("Zone 4 Target (≥20%)")
+                            .font(.caption.bold())
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Zone 4 Time")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%.0f%%", runRecord.percentZone4 * 100))
+                            .font(.caption.bold())
+                            .foregroundColor(runRecord.percentZone4 >= 0.20 ? .green : .orange)
+                    }
+                }
+            } else if isHRTarget {
+                // Heart Rate Hero Metric + Cadence Guardrail
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Target HR Zone")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(drillId.targetHeartRateZoneName ?? "Zone 2")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Actual Heart Rate")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(actualHR > 0 ? "\(actualHR) BPM" : "--")
+                            .font(.subheadline.bold())
+                            .foregroundColor(tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green))
+                    }
+                }
+
+                HStack {
+                    if actualCadence > 0 {
+                        Text("Turnover Guardrail: \(actualCadence) SPM")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    if runRecord.percentZone4 > 0 {
+                        Text(String(format: "High Intensity: %.0f%%", runRecord.percentZone4 * 100))
+                            .font(.caption.bold())
+                            .foregroundColor(runRecord.percentZone4 <= 0.08 ? .secondary : .orange)
+                    }
+                }
+            } else {
+                // Cadence Hero Metric + Intensity Guardrail
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Target Cadence")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(targetCadenceStr) SPM")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Actual Cadence")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(actualCadence) SPM")
+                            .font(.subheadline.bold())
+                            .foregroundColor(tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green))
+                    }
+                }
+
+                if runRecord.percentZone4 > 0.15 {
+                    HStack {
+                        Text("Intensity Guardrail")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(String(format: "Zone 4 Spike: %.0f%%", runRecord.percentZone4 * 100))
+                            .font(.caption.bold())
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
+
+            if abs(oscDelta) > 0.01 && runRecord.workingAvgVerticalOscillation != nil {
+                HStack {
+                    Text("Vertical Form Delta")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(String(format: "%+.1f cm", oscDelta))
+                        .font(.caption.bold())
+                        .foregroundColor(oscDelta < 0 ? .green : .orange)
+                }
+            }
+
+            Text(tierDescription)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding()
+        .background(drillId.iconColor.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(drillId.iconColor.opacity(0.2), lineWidth: 1)
+        )
     }
 }

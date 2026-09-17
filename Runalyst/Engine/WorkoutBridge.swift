@@ -3,6 +3,11 @@ import SwiftUI
 @preconcurrency import WorkoutKit
 import HealthKit
 
+#if canImport(WorkoutKit)
+@available(iOS 17.0, macCatalyst 18.0, macOS 15.0, watchOS 10.0, *)
+extension WorkoutScheduler.AuthorizationState: @retroactive @unchecked Sendable {}
+#endif
+
 /// A lightweight, Sendable Data Transfer Object used to pass AI recommendations
 public enum DrillDuration: Int, CaseIterable, Sendable, Codable {
     case tenMinutes = 10
@@ -46,11 +51,188 @@ enum SafeTargetCalculator {
     }
 }
 
+/// Represents an active or recent intent to execute a prescribed drill on Apple Watch.
+public struct ScheduledDrillIntent: Codable, Sendable, Equatable {
+    public let drillTitle: String
+    public let preRunDrillId: String?
+    public let scheduledDate: Date
+    public let durationMinutes: Int
+    public let targetCadence: String?
+    public var matchedWorkoutID: UUID?
+
+    public init(
+        drillTitle: String,
+        preRunDrillId: String? = nil,
+        scheduledDate: Date = Date(),
+        durationMinutes: Int = 15,
+        targetCadence: String? = nil,
+        matchedWorkoutID: UUID? = nil
+    ) {
+        self.drillTitle = drillTitle
+        self.preRunDrillId = preRunDrillId
+        self.scheduledDate = scheduledDate
+        self.durationMinutes = durationMinutes
+        self.targetCadence = targetCadence
+        self.matchedWorkoutID = matchedWorkoutID
+    }
+}
+
 /// The bridge between Runalyst's CoreML/AI outputs and Apple's WorkoutKit.
 /// Translates `DrillPrescriptionDTO` into a native `WorkoutPlan`.
 @available(iOS 17.0, *)
 @MainActor
 final class WorkoutBridge {
+
+    nonisolated private static let drillIntentsKey = "recentDrillIntents"
+
+    nonisolated public static func clearIntents() {
+        UserDefaults.standard.removeObject(forKey: drillIntentsKey)
+    }
+
+    nonisolated public static func saveDrillIntent(_ intent: ScheduledDrillIntent) {
+        var intents = recentIntents()
+        // If updating an intent (like marking as matched), replace the old one
+        if let index = intents.firstIndex(where: { $0.scheduledDate == intent.scheduledDate && $0.drillTitle == intent.drillTitle }) {
+            intents[index] = intent
+        } else {
+            intents.append(intent)
+        }
+        let cutoff = Date().addingTimeInterval(-30 * 24 * 3600) // Retain 30 days of intents
+        intents = intents.filter { $0.scheduledDate >= cutoff }
+        if let data = try? JSONEncoder().encode(intents) {
+            UserDefaults.standard.set(data, forKey: drillIntentsKey)
+        }
+    }
+
+    nonisolated public static func recentIntents() -> [ScheduledDrillIntent] {
+        guard let data = UserDefaults.standard.data(forKey: drillIntentsKey),
+              let intents = try? JSONDecoder().decode([ScheduledDrillIntent].self, from: data) else {
+            return []
+        }
+        let cutoff = Date().addingTimeInterval(-30 * 24 * 3600) // Retain 30 days of intents
+        return intents.filter { $0.scheduledDate >= cutoff }
+    }
+
+    nonisolated private static func extractAllStrings(from dict: [String: Any]?) -> [String] {
+        guard let dict = dict else { return [] }
+        var result: [String] = []
+        for (k, val) in dict {
+            result.append(k)
+            if let s = val as? String {
+                result.append(s)
+            } else if let arr = val as? [String] {
+                result.append(contentsOf: arr)
+            } else if let arrOfDict = val as? [[String: Any]] {
+                for d in arrOfDict {
+                    result.append(contentsOf: extractAllStrings(from: d))
+                }
+            } else if let subDict = val as? [String: Any] {
+                result.append(contentsOf: extractAllStrings(from: subDict))
+            }
+        }
+        return result
+    }
+
+    nonisolated public static func matchDrill(
+        workout: HKWorkout,
+        durationSeconds: Double
+    ) -> ScheduledDrillIntent? {
+        let workoutDate = workout.startDate
+        var allMetadataStrings: [String] = []
+
+        // Extract metadata strings recursively from workout
+        allMetadataStrings.append(contentsOf: extractAllStrings(from: workout.metadata))
+
+        // Extract metadata strings from workout activities
+        for activity in workout.workoutActivities {
+            allMetadataStrings.append(contentsOf: extractAllStrings(from: activity.metadata))
+        }
+
+        // Extract metadata strings from workout events
+        if let events = workout.workoutEvents {
+            for event in events {
+                allMetadataStrings.append(contentsOf: extractAllStrings(from: event.metadata))
+            }
+        }
+
+        // 1. Direct Metadata Check (highest priority: authentic HealthKit/WorkoutKit workout title)
+        for text in allMetadataStrings {
+            for candidate in PreRunDrillId.allCases {
+                if text.localizedCaseInsensitiveContains(candidate.title) ||
+                   (!candidate.rawValue.isEmpty && text.localizedCaseInsensitiveContains(candidate.rawValue)) {
+                    return ScheduledDrillIntent(
+                        drillTitle: candidate.title,
+                        preRunDrillId: candidate.rawValue,
+                        scheduledDate: workoutDate,
+                        durationMinutes: max(1, Int(round(durationSeconds / 60.0)))
+                    )
+                }
+            }
+        }
+
+        // 2. Intent Heuristic Fallback (scheduled drill within 48h of workout)
+        let intents = recentIntents()
+        let matchingIntents = intents.filter { intent in
+            if let matchedID = intent.matchedWorkoutID, matchedID != workout.uuid { return false }
+            let timeDiff = workoutDate.timeIntervalSince(intent.scheduledDate)
+            guard timeDiff >= -3600 && timeDiff <= 48 * 3600 else { return false }
+
+            let expectedDuration = Double(intent.durationMinutes * 60)
+            if durationSeconds > 0 {
+                let tolerance = max(expectedDuration * 0.60, 600.0)
+                let durationDiff = abs(durationSeconds - expectedDuration)
+                guard durationDiff <= tolerance else { return false }
+            }
+            return true
+        }
+
+        return matchingIntents.min(by: {
+            abs(workoutDate.timeIntervalSince($0.scheduledDate)) < abs(workoutDate.timeIntervalSince($1.scheduledDate))
+        })
+    }
+
+    nonisolated public static func matchDrill(
+        workoutDate: Date,
+        durationSeconds: Double,
+        metadata: [String: Any]? = nil
+    ) -> ScheduledDrillIntent? {
+        let allMetadataStrings: [String] = extractAllStrings(from: metadata)
+
+        // 1. Direct Metadata Check
+        for text in allMetadataStrings {
+            for candidate in PreRunDrillId.allCases {
+                if text.localizedCaseInsensitiveContains(candidate.title) ||
+                   (!candidate.rawValue.isEmpty && text.localizedCaseInsensitiveContains(candidate.rawValue)) {
+                    return ScheduledDrillIntent(
+                        drillTitle: candidate.title,
+                        preRunDrillId: candidate.rawValue,
+                        scheduledDate: workoutDate,
+                        durationMinutes: max(1, Int(round(durationSeconds / 60.0)))
+                    )
+                }
+            }
+        }
+
+        // 2. Intent Heuristic Fallback
+        let intents = recentIntents()
+        let matchingIntents = intents.filter { intent in
+            if intent.matchedWorkoutID != nil { return false }
+            let timeDiff = workoutDate.timeIntervalSince(intent.scheduledDate)
+            guard timeDiff >= -3600 && timeDiff <= 48 * 3600 else { return false }
+
+            let expectedDuration = Double(intent.durationMinutes * 60)
+            if durationSeconds > 0 {
+                let tolerance = max(expectedDuration * 0.60, 600.0)
+                let durationDiff = abs(durationSeconds - expectedDuration)
+                guard durationDiff <= tolerance else { return false }
+            }
+            return true
+        }
+
+        return matchingIntents.min(by: {
+            abs(workoutDate.timeIntervalSince($0.scheduledDate)) < abs(workoutDate.timeIntervalSince($1.scheduledDate))
+        })
+    }
 
     /// Translates a DTO into a scheduled WorkoutKit plan for Apple Watch.
     func scheduleDrill(dto: DrillPrescriptionDTO) async throws {
@@ -75,6 +257,50 @@ final class WorkoutBridge {
 
         let now = Calendar.current.dateComponents([.calendar, .timeZone, .year, .month, .day, .hour, .minute], from: Date())
         await WorkoutScheduler.shared.schedule(plan, at: now)
+
+        let intent = ScheduledDrillIntent(
+            drillTitle: drill.id.title,
+            preRunDrillId: drill.id.rawValue,
+            scheduledDate: Date(),
+            durationMinutes: duration.rawValue,
+            targetCadence: dto.targetCadence,
+            matchedWorkoutID: nil
+        )
+        Self.saveDrillIntent(intent)
+    }
+
+    /// Links a drill to a run record without overriding its native classification
+    @MainActor public static func linkDrill(to runRecord: RunRecord, drillId: PreRunDrillId) {
+        let allIds = PreRunDrillId.allCases.map(\.rawValue)
+        let allTitles = PreRunDrillId.allCases.map(\.title)
+        runRecord.framboiseTags.removeAll {
+            $0.hasPrefix("drill:") || $0 == "prescribedDrill" || allIds.contains($0) || allTitles.contains($0) || $0.isEmpty
+        }
+        runRecord.framboiseTags.append("prescribedDrill")
+        runRecord.framboiseTags.append(drillId.rawValue)
+        runRecord.framboiseTags.append("drill:\(drillId.rawValue)")
+        runRecord.framboiseTags.append("drill:\(drillId.title)")
+        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.drillTitle == drillId.title || $0.preRunDrillId == drillId.rawValue }) {
+            rec.isCompleted = true
+        }
+        runRecord.detectedTypeRaw = runRecord.detectedTypeRaw
+        try? runRecord.modelContext?.save()
+    }
+
+    /// Unlinks a drill from a run record, restoring standard classification properties
+    @MainActor public static func unlinkDrill(from runRecord: RunRecord) {
+        let allIds = PreRunDrillId.allCases.map(\.rawValue)
+        let allTitles = PreRunDrillId.allCases.map(\.title)
+        runRecord.framboiseTags.removeAll {
+            $0.hasPrefix("drill:") || $0 == "prescribedDrill" || allIds.contains($0) || allTitles.contains($0) || $0.isEmpty
+        }
+        if let recs = runRecord.insight?.drillRecommendations {
+            for rec in recs {
+                rec.isCompleted = false
+            }
+        }
+        runRecord.detectedTypeRaw = runRecord.detectedTypeRaw
+        try? runRecord.modelContext?.save()
     }
 }
 
@@ -88,8 +314,23 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
     case fartlekPrimer = "fartlek_primer"
     case hillBounds = "hill_bounds"
     case recoveryJog = "recovery_jog"
-    case aerobicBaseBuilder = "aerobic_base_builder"
     case zone2Run = "zone_2_run"
+
+    init?(rawValue: String) {
+        switch rawValue {
+        case "cadence_pyramids": self = .cadencePyramids
+        case "rhythm_intervals": self = .rhythmIntervals
+        case "tempo_surges": self = .tempoSurges
+        case "strides": self = .strides
+        case "neuromuscular_primer": self = .neuromuscularPrimer
+        case "aerobic_flush": self = .aerobicFlush
+        case "fartlek_primer": self = .fartlekPrimer
+        case "hill_bounds": self = .hillBounds
+        case "recovery_jog": self = .recoveryJog
+        case "zone_2_run", "aerobic_base_builder": self = .zone2Run
+        default: return nil
+        }
+    }
 
     var title: String {
         switch self {
@@ -102,8 +343,114 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         case .fartlekPrimer: return "Fartlek Primer"
         case .hillBounds: return "Hill Bounds"
         case .recoveryJog: return "Recovery Jog"
-        case .aerobicBaseBuilder, .zone2Run: return "Zone 2 Run"
+        case .zone2Run: return "Zone 2 Run"
         }
+    }
+
+    /// The standard run classification this drill belongs to.
+    var correspondingClassification: String {
+        switch self {
+        case .rhythmIntervals, .cadencePyramids, .strides:
+            return "Intervals"
+        case .tempoSurges:
+            return "Tempo Run"
+        case .recoveryJog, .aerobicFlush:
+            return "Recovery Run"
+        case .fartlekPrimer:
+            return "Fartlek"
+        case .hillBounds:
+            return "Hill Repeats"
+        case .zone2Run:
+            return "Easy Run"
+        case .neuromuscularPrimer:
+            return "Cadence Run"
+        }
+    }
+
+    /// Whether this drill's primary coaching target is heart rate zone rather than cadence
+    var isHeartRateTargeted: Bool {
+        switch self {
+        case .zone2Run, .aerobicFlush, .recoveryJog:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The target heart rate zone (e.g. Zone 1 or Zone 2)
+    var targetHeartRateZone: Int? {
+        switch self {
+        case .zone2Run:
+            return 2
+        case .aerobicFlush, .recoveryJog:
+            return 1
+        default:
+            return nil
+        }
+    }
+
+    /// User-facing name for the target heart rate zone
+    var targetHeartRateZoneName: String? {
+        switch self {
+        case .zone2Run:
+            return "Zone 2 (Aerobic)"
+        case .aerobicFlush, .recoveryJog:
+            return "Zone 1 (Recovery)"
+        default:
+            return nil
+        }
+    }
+
+    /// Resolves a specific drill name or raw identifier into an existing standard run classification.
+    /// Standard run classifications (e.g. "Intervals", "Tempo Run") return nil because they are classifications, not drills.
+    static func correspondingClassification(for drillNameOrId: String) -> String? {
+        let clean = drillNameOrId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let standardClassifications: Set<String> = [
+            "Intervals", "Pyramids", "Tempo Run", "Progression Run", "Recovery Run",
+            "Steady Effort", "Easy Run", "Long Run", "Fartlek", "Hill Repeats",
+            "Cadence Run", "Urban Traffic"
+        ]
+        if standardClassifications.contains(where: { $0.localizedCaseInsensitiveCompare(clean) == .orderedSame }) {
+            return nil
+        }
+
+        for drill in PreRunDrillId.allCases {
+            if drill.rawValue.localizedCaseInsensitiveCompare(clean) == .orderedSame ||
+               drill.title.localizedCaseInsensitiveCompare(clean) == .orderedSame {
+                return drill.correspondingClassification
+            }
+        }
+        if clean.localizedCaseInsensitiveCompare("aerobic_base_builder") == .orderedSame ||
+           clean.localizedCaseInsensitiveCompare("Aerobic Base Builder") == .orderedSame {
+            return PreRunDrillId.zone2Run.correspondingClassification
+        }
+        return nil
+    }
+
+    /// Normalizes a specific drill identifier or title into its canonical user-facing drill title (e.g. "rhythm_intervals" -> "Rhythm Intervals").
+    /// Standard run classifications return nil.
+    static func canonicalDrillTitle(for drillNameOrId: String) -> String? {
+        let clean = drillNameOrId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let standardClassifications: Set<String> = [
+            "Intervals", "Pyramids", "Tempo Run", "Progression Run", "Recovery Run",
+            "Steady Effort", "Easy Run", "Long Run", "Fartlek", "Hill Repeats",
+            "Cadence Run", "Urban Traffic"
+        ]
+        if standardClassifications.contains(where: { $0.localizedCaseInsensitiveCompare(clean) == .orderedSame }) {
+            return nil
+        }
+
+        for drill in PreRunDrillId.allCases {
+            if drill.rawValue.localizedCaseInsensitiveCompare(clean) == .orderedSame ||
+               drill.title.localizedCaseInsensitiveCompare(clean) == .orderedSame {
+                return drill.title
+            }
+        }
+        if clean.localizedCaseInsensitiveCompare("aerobic_base_builder") == .orderedSame ||
+           clean.localizedCaseInsensitiveCompare("Aerobic Base Builder") == .orderedSame {
+            return PreRunDrillId.zone2Run.title
+        }
+        return nil
     }
 
     var iconName: String {
@@ -124,7 +471,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
             return "waveform.path.ecg"
         case .hillBounds:
             return "mountain.2.fill"
-        case .aerobicBaseBuilder, .zone2Run:
+        case .zone2Run:
             return "heart.fill"
         }
     }
@@ -149,7 +496,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
             return .brown
         case .recoveryJog:
             return .mint
-        case .aerobicBaseBuilder, .zone2Run:
+        case .zone2Run:
             return .red
         }
     }
@@ -243,7 +590,7 @@ struct PreRunDrill: Sendable {
     var effectiveTargetCadence: ClosedRange<Int>? {
         // Recovery / flush / base builder drills do not use cadence turnover alerts
         switch id {
-        case .aerobicFlush, .recoveryJog, .aerobicBaseBuilder, .zone2Run:
+        case .aerobicFlush, .recoveryJog, .zone2Run:
             return nil
         default:
             break
@@ -322,7 +669,7 @@ struct PreRunDrill: Sendable {
             }
         case .recoveryJog:
             return "\(customDuration.rawValue) min easy"
-        case .aerobicBaseBuilder, .zone2Run:
+        case .zone2Run:
             return "\(customDuration.rawValue) min Zone 2 steady"
         }
     }
@@ -375,7 +722,7 @@ struct PreRunDrill: Sendable {
             }
         case .recoveryJog:
             return "No intervals"
-        case .aerobicBaseBuilder, .zone2Run:
+        case .zone2Run:
             return "No intervals"
         }
     }
@@ -391,7 +738,7 @@ struct PreRunDrill: Sendable {
     var defaultEffortString: String {
         switch id {
         case .recoveryJog, .aerobicFlush: return "Zone 1 Active Recovery"
-        case .aerobicBaseBuilder, .zone2Run: return "Zone 2 Aerobic"
+        case .zone2Run: return "Zone 2 Aerobic"
         case .cadencePyramids, .rhythmIntervals: return "Moderate / Zone 3"
         case .tempoSurges, .fartlekPrimer: return "Hard / Zone 4"
         case .strides, .neuromuscularPrimer, .hillBounds: return "Sprint / Zone 5"
@@ -405,7 +752,7 @@ struct PreRunDrill: Sendable {
         let warmUpDuration: Double
         let coolDownDuration: Double
 
-        if id == .aerobicBaseBuilder || id == .zone2Run {
+        if id == .zone2Run {
             warmUpDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0)
             coolDownDuration = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
         } else if id == .aerobicFlush || id == .recoveryJog {
@@ -424,7 +771,7 @@ struct PreRunDrill: Sendable {
             alert = CadenceRangeAlert.cadence(Double(target.lowerBound)...Double(target.upperBound))
         } else if id == .aerobicFlush || id == .recoveryJog {
             alert = HeartRateZoneAlert(zone: 1)
-        } else if id == .aerobicBaseBuilder || id == .zone2Run {
+        } else if id == .zone2Run {
             alert = HeartRateZoneAlert(zone: 2)
         }
 
@@ -546,7 +893,7 @@ struct PreRunDrill: Sendable {
             iterations = 1
             workGoal = .time(Double(duration.rawValue), .minutes)
             recoveryGoal = nil
-        case .aerobicBaseBuilder, .zone2Run:
+        case .zone2Run:
             iterations = 1
             workGoal = .time(Double(duration.rawValue), .minutes)
             recoveryGoal = nil
@@ -761,7 +1108,7 @@ struct DrillTemplate: Sendable {
                     "Focus on your breathing and shake out your hands. Keep your steps small, soft, and effortless."
                 }
             )
-        case .aerobicBaseBuilder, .zone2Run:
+        case .zone2Run:
             return DrillTemplate(
                 id: id,
                 title: "Zone 2 Run",
