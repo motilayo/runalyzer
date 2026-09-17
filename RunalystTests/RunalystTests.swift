@@ -511,9 +511,12 @@ final class RunRecordModelAndSchemaTests: XCTestCase {
     }
 }
 
+@MainActor
 final class CoachingEngineDataTests: XCTestCase {
     func testRunDataForAIInitialization() {
         let runData = RunDataForAI(
+            workoutType: "Tempo Run",
+            runnerGoal: "Sub-20 5K",
             directiveContext: "The runner is overstriding (low cadence).",
             paceContext: "Current: 5:00/km, Baseline: 5:15/km",
             hrContext: "Current: 155 BPM, Baseline: 150 BPM",
@@ -525,9 +528,17 @@ final class CoachingEngineDataTests: XCTestCase {
             recoveryCadence: "150"
         )
 
+        XCTAssertEqual(runData.workoutType, "Tempo Run")
+        XCTAssertEqual(runData.runnerGoal, "Sub-20 5K")
         XCTAssertEqual(runData.intervalCadence, "162")
         XCTAssertEqual(runData.recoveryCadence, "150")
         XCTAssertTrue(runData.directiveContext.contains("overstriding"))
+        XCTAssertTrue(runData.paceContext.contains("5:00/km"))
+        XCTAssertTrue(runData.hrContext.contains("155 BPM"))
+        XCTAssertTrue(runData.cadenceContext.contains("148 SPM"))
+        XCTAssertTrue(runData.zone4Context.contains("20%"))
+        XCTAssertTrue(runData.cvContext.contains("0.045"))
+        XCTAssertTrue(runData.slopeContext.contains("0.012"))
     }
 
     func testAggregateRunDataForAIInitialization() {
@@ -544,11 +555,54 @@ final class CoachingEngineDataTests: XCTestCase {
         XCTAssertEqual(aggData.stageContext, "Stage 2: Aerobic Expansion")
     }
 
-    func testBaselineStats() {
-        let stats = BaselineStats(avgPace: 300, avgCadence: 165, avgHR: 145)
+    func testBaselineStatsInitialization() {
+        let stats = BaselineStats(avgPace: 300, avgCadence: 165, avgHR: 145, avgOscillation: 9.5)
         XCTAssertEqual(stats.avgPace, 300)
         XCTAssertEqual(stats.avgCadence, 165)
         XCTAssertEqual(stats.avgHR, 145)
+        XCTAssertEqual(stats.avgOscillation, 9.5)
+    }
+
+    func testSparseRunBiometricGuardrail() async throws {
+        if #available(iOS 26.0, *) {
+            let schema = Schema([RunRecord.self, CoachingInsight.self, DrillRecommendation.self, TrainingCorrection.self])
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            let container = try ModelContainer(for: schema, configurations: [config])
+
+            let runId: PersistentIdentifier = {
+                let context = container.mainContext
+                let sparseRun = RunRecord(
+                    hkWorkoutID: UUID(),
+                    date: Date(),
+                    totalDistanceMeters: 5000,
+                    duration: 2700,
+                    rawAvgPace: 540,
+                    rawAvgHeartRate: 0,
+                    rawAvgCadence: 0,
+                    workingAvgPace: 540,
+                    workingAvgCadence: 0,
+                    workingAvgHeartRate: 0,
+                    workingAvgVerticalOscillation: nil,
+                    rawAvgVerticalOscillation: nil,
+                    workingDistanceMeters: 5000,
+                    workingDurationSeconds: 2700,
+                    paceCV: 0.04,
+                    paceSlope: 0.0,
+                    percentZone4: 0.0,
+                    detectedTypeRaw: "Easy Run",
+                    framboiseTags: []
+                )
+                context.insert(sparseRun)
+                try? context.save()
+                return sparseRun.persistentModelID
+            }()
+
+            let analyzer = RunAnalyzerActor(modelContainer: container)
+            await analyzer.generateAnalysis(for: runId)
+
+            let fetched = container.mainContext.model(for: runId) as? RunRecord
+            XCTAssertNil(fetched?.insight, "Runs lacking cadence and heart rate should not generate an AI insight")
+        }
     }
 }
 
@@ -772,5 +826,295 @@ final class LiveCoachDTOCodableTests: XCTestCase {
 
         XCTAssertFalse(recentDays > 7, "Recent run should be <= 7 days")
         XCTAssertTrue(oldDays > 7, "Old run should be > 7 days")
+    }
+}
+
+@MainActor
+final class PrescribedDrillRecognitionTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        WorkoutBridge.clearIntents()
+    }
+
+    override func tearDown() {
+        WorkoutBridge.clearIntents()
+        super.tearDown()
+    }
+
+    func testScheduledDrillIntentPersistence() {
+        let intent = ScheduledDrillIntent(
+            drillTitle: "Cadence Pyramids",
+            preRunDrillId: "cadence_pyramids",
+            scheduledDate: Date(),
+            durationMinutes: 15,
+            targetCadence: "170-174"
+        )
+        WorkoutBridge.saveDrillIntent(intent)
+
+        let recent = WorkoutBridge.recentIntents()
+        XCTAssertTrue(recent.contains(where: { $0.drillTitle == "Cadence Pyramids" && $0.durationMinutes == 15 }))
+    }
+
+    func testWorkoutBridgeMatchDrillDirectMetadata() {
+        let workoutDate = Date()
+        let metadata: [String: Any] = [
+            "HKWorkoutPlanDisplayName": "Cadence Pyramids"
+        ]
+
+        let matched = WorkoutBridge.matchDrill(
+            workoutDate: workoutDate,
+            durationSeconds: 900,
+            metadata: metadata
+        )
+
+        XCTAssertNotNil(matched)
+        XCTAssertEqual(matched?.drillTitle, "Cadence Pyramids")
+        XCTAssertEqual(matched?.preRunDrillId, "cadence_pyramids")
+    }
+
+    func testWorkoutBridgeMatchDrillIntentWindow() {
+        let scheduledDate = Date().addingTimeInterval(-600) // 10 mins ago
+        let intent = ScheduledDrillIntent(
+            drillTitle: "Rhythm Intervals",
+            preRunDrillId: "rhythm_intervals",
+            scheduledDate: scheduledDate,
+            durationMinutes: 15,
+            targetCadence: "165"
+        )
+        WorkoutBridge.saveDrillIntent(intent)
+
+        // Incoming workout completed 2 minutes ago with matching duration (~15 mins = 920 sec)
+        let workoutDate = Date().addingTimeInterval(-120)
+        let matched = WorkoutBridge.matchDrill(
+            workoutDate: workoutDate,
+            durationSeconds: 920,
+            metadata: nil
+        )
+
+        XCTAssertNotNil(matched)
+        XCTAssertEqual(matched?.drillTitle, "Rhythm Intervals")
+    }
+
+    func testWorkoutBridgeMatchDrillHistoricalIntentWindow() {
+        // Scheduled 7 days ago (like the user's run from Sept 10)
+        let scheduledDate = Date().addingTimeInterval(-7 * 24 * 3600)
+        let intent = ScheduledDrillIntent(
+            drillTitle: "Cadence Pyramids",
+            preRunDrillId: "cadence_pyramids",
+            scheduledDate: scheduledDate,
+            durationMinutes: 15,
+            targetCadence: "160"
+        )
+        WorkoutBridge.saveDrillIntent(intent)
+
+        // Workout completed 5 minutes after scheduled time
+        let workoutDate = scheduledDate.addingTimeInterval(300)
+        let matched = WorkoutBridge.matchDrill(
+            workoutDate: workoutDate,
+            durationSeconds: 904, // 15:04
+            metadata: nil
+        )
+
+        XCTAssertNotNil(matched)
+        XCTAssertEqual(matched?.drillTitle, "Cadence Pyramids")
+        XCTAssertEqual(matched?.preRunDrillId, "cadence_pyramids")
+    }
+
+    func testWorkoutBridgeMatchNestedMetadata() {
+        let workoutDate = Date()
+        let metadata: [String: Any] = [
+            "customData": [
+                "subKey": "Outdoor Run - Cadence Pyramids"
+            ]
+        ]
+
+        let matched = WorkoutBridge.matchDrill(
+            workoutDate: workoutDate,
+            durationSeconds: 900,
+            metadata: metadata
+        )
+
+        XCTAssertNotNil(matched)
+        XCTAssertEqual(matched?.drillTitle, "Cadence Pyramids")
+    }
+
+    func testWorkoutBridgeMatchesDistinctDrillTitlesWithoutCollidingToCadencePyramids() {
+        let date = Date()
+
+        // 1. Rhythm Intervals metadata
+        let rhythmMatched = WorkoutBridge.matchDrill(
+            workoutDate: date,
+            durationSeconds: 900,
+            metadata: ["HKWorkoutPlanDisplayName": "Rhythm Intervals"]
+        )
+        XCTAssertEqual(rhythmMatched?.drillTitle, "Rhythm Intervals")
+        XCTAssertEqual(rhythmMatched?.preRunDrillId, "rhythm_intervals")
+
+        // 2. Strides metadata
+        let stridesMatched = WorkoutBridge.matchDrill(
+            workoutDate: date,
+            durationSeconds: 900,
+            metadata: ["HKWorkoutPlanDisplayName": "Strides"]
+        )
+        XCTAssertEqual(stridesMatched?.drillTitle, "Strides")
+        XCTAssertEqual(stridesMatched?.preRunDrillId, "strides")
+
+        // 3. Tempo Surges metadata
+        let surgesMatched = WorkoutBridge.matchDrill(
+            workoutDate: date,
+            durationSeconds: 900,
+            metadata: ["HKWorkoutPlanDisplayName": "Tempo Surges"]
+        )
+        XCTAssertEqual(surgesMatched?.drillTitle, "Tempo Surges")
+        XCTAssertEqual(surgesMatched?.preRunDrillId, "tempo_surges")
+
+        // 4. Form Primer metadata
+        let primerMatched = WorkoutBridge.matchDrill(
+            workoutDate: date,
+            durationSeconds: 600,
+            metadata: ["HKWorkoutPlanDisplayName": "Form Primer"]
+        )
+        XCTAssertEqual(primerMatched?.drillTitle, "Form Primer")
+        XCTAssertEqual(primerMatched?.preRunDrillId, "neuromuscular_primer")
+
+        // 5. Unscheduled workout with no drill metadata must NOT match any drill (even if 900 seconds)
+        let unprescribed = WorkoutBridge.matchDrill(
+            workoutDate: date,
+            durationSeconds: 900,
+            metadata: ["HKMetadataKeyWorkoutBrandName": "Apple Workout"]
+        )
+        XCTAssertNil(unprescribed, "Unscheduled runs with no drill metadata must not match as a drill")
+    }
+
+    func testRunBaselineDataIncludesAllRunsWeighted() {
+        let now = Date()
+        let allRuns = [
+            HealthKitManager.RunBaselineData(date: now.addingTimeInterval(-86400 * 2), pace: 300, hr: 150, cadence: 165, duration: 2400, isPrescribedDrill: false),
+            HealthKitManager.RunBaselineData(date: now.addingTimeInterval(-86400 * 4), pace: 310, hr: 152, cadence: 164, duration: 2700, isPrescribedDrill: false),
+            HealthKitManager.RunBaselineData(date: now.addingTimeInterval(-86400 * 6), pace: 295, hr: 148, cadence: 166, duration: 2500, isPrescribedDrill: false),
+            // Short 15-min drill with sprint pace/cadence
+            HealthKitManager.RunBaselineData(date: now.addingTimeInterval(-86400 * 1), pace: 220, hr: 175, cadence: 185, duration: 900, isPrescribedDrill: true)
+        ]
+
+        // All runs are included (every run counts)
+        XCTAssertEqual(allRuns.count, 4)
+
+        // Duration-weighted baseline calculation
+        let totalDuration = allRuns.map(\.duration).reduce(0, +)
+        let weightedCadence = allRuns.map { $0.cadence * $0.duration }.reduce(0, +) / totalDuration
+
+        // With duration weighting: (165*2400 + 164*2700 + 166*2500 + 185*900) / 8500 = ~167.1
+        // The 15-min drill contributes proportionally (only 900s out of 8500s) without being discarded
+        XCTAssertEqual(weightedCadence, 167.1, accuracy: 0.2)
+    }
+
+    func testDrillAutoCompletionAndTrainingCorrection() throws {
+        let schema = Schema([RunRecord.self, CoachingInsight.self, DrillRecommendation.self, TrainingCorrection.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = container.mainContext
+
+        let drill = DrillRecommendation(
+            drillTitle: "Cadence Pyramids",
+            preRunDrillId: "cadence_pyramids",
+            drillPurpose: "Turnover improvement",
+            isCompleted: false
+        )
+        context.insert(drill)
+        try context.save()
+
+        XCTAssertFalse(drill.isCompleted)
+
+        // Simulate incoming recognized drill
+        let newRunID = UUID()
+        let drillTitle = "Cadence Pyramids"
+        let framboiseTags = ["prescribedDrill", "cadence_pyramids"]
+
+        let openDrillsDescriptor = FetchDescriptor<DrillRecommendation>(
+            predicate: #Predicate<DrillRecommendation> { item in
+                !item.isCompleted
+            }
+        )
+        if let openDrills = try? context.fetch(openDrillsDescriptor) {
+            for item in openDrills {
+                let matchesId = item.preRunDrillId.map { framboiseTags.contains($0) } ?? false
+                let matchesTitle = item.drillTitle.localizedCaseInsensitiveCompare(drillTitle) == .orderedSame
+                if matchesTitle || matchesId {
+                    item.isCompleted = true
+                }
+            }
+        }
+
+        // Insert ground-truth TrainingCorrection
+        let correction = TrainingCorrection(
+            runRecordID: newRunID,
+            originalLabel: "Prescribed Drill",
+            correctedLabel: drillTitle,
+            featureVector: [280.0, 0.12, -0.02, 0.25, 15.0],
+            createdAt: Date(),
+            isProcessed: false
+        )
+        context.insert(correction)
+        try context.save()
+
+        XCTAssertTrue(drill.isCompleted, "Matching drill recommendation should be marked as completed")
+
+        let fetchedCorrections = try context.fetch(FetchDescriptor<TrainingCorrection>())
+        XCTAssertEqual(fetchedCorrections.count, 1)
+        XCTAssertEqual(fetchedCorrections.first?.correctedLabel, "Cadence Pyramids")
+        XCTAssertEqual(fetchedCorrections.first?.featureVector.count, 5)
+    }
+
+    func testDrillToRunClassificationMapping() {
+        // Explicit user requirement cases
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "Rhythm Intervals"), "Intervals")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "rhythm_intervals"), "Intervals")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "Recovery Jog"), "Recovery Run")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "recovery_jog"), "Recovery Run")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "Cadence Pyramids"), "Intervals")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "Tempo Surges"), "Tempo Run")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "Strides"), "Intervals")
+
+        // Canonical drill titles
+        XCTAssertEqual(PreRunDrillId.canonicalDrillTitle(for: "rhythm_intervals"), "Rhythm Intervals")
+        XCTAssertEqual(PreRunDrillId.canonicalDrillTitle(for: "recovery_jog"), "Recovery Jog")
+
+        // Standard run classifications must NEVER be treated as drills or map to drills
+        XCTAssertNil(PreRunDrillId.canonicalDrillTitle(for: "Intervals"))
+        XCTAssertNil(PreRunDrillId.canonicalDrillTitle(for: "Tempo Run"))
+        XCTAssertNil(PreRunDrillId.canonicalDrillTitle(for: "Recovery Run"))
+        XCTAssertNil(PreRunDrillId.canonicalDrillTitle(for: "Steady Effort"))
+        XCTAssertNil(PreRunDrillId.canonicalDrillTitle(for: "Long Run"))
+        XCTAssertNil(PreRunDrillId.canonicalDrillTitle(for: "intervals"))
+
+        XCTAssertNil(PreRunDrillId.correspondingClassification(for: "Intervals"))
+        XCTAssertNil(PreRunDrillId.correspondingClassification(for: "Tempo Run"))
+        XCTAssertNil(PreRunDrillId.correspondingClassification(for: "Recovery Run"))
+    }
+
+    func testDrillAdherenceTierProperties() {
+        XCTAssertEqual(DrillAdherenceTier.exceeded.badgeText, "Exceeded")
+        XCTAssertEqual(DrillAdherenceTier.met.badgeText, "Met")
+        XCTAssertEqual(DrillAdherenceTier.partiallyMet.badgeText, "Partially Met")
+        XCTAssertEqual(DrillAdherenceTier.notMet.badgeText, "Not Met")
+
+        XCTAssertEqual(DrillAdherenceTier.exceeded.badgeIcon, "star.fill")
+        XCTAssertEqual(DrillAdherenceTier.met.badgeIcon, "checkmark")
+        XCTAssertEqual(DrillAdherenceTier.partiallyMet.badgeIcon, "minus")
+        XCTAssertEqual(DrillAdherenceTier.notMet.badgeIcon, "xmark")
+    }
+
+    func testDrillTitlesAreUniqueAndZone2RunAppearsOnce() {
+        let titles = PreRunDrillId.allCases.map(\.title)
+        let uniqueTitles = Set(titles)
+        XCTAssertEqual(titles.count, uniqueTitles.count, "All drill titles in PreRunDrillId.allCases must be unique without duplicates")
+
+        let zone2Occurrences = titles.filter { $0 == "Zone 2 Run" }
+        XCTAssertEqual(zone2Occurrences.count, 1, "Zone 2 Run must only appear once in allCases")
+
+        // Verify legacy mapping
+        XCTAssertEqual(PreRunDrillId(rawValue: "aerobic_base_builder"), .zone2Run)
+        XCTAssertEqual(PreRunDrillId.canonicalDrillTitle(for: "aerobic_base_builder"), "Zone 2 Run")
+        XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "aerobic_base_builder"), "Easy Run")
     }
 }
