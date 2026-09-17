@@ -77,7 +77,7 @@ struct RunDetailView: View {
 
     private let classificationOptions = [
         "Steady Effort", "Easy Run", "Tempo Run", "Intervals", "Pyramids",
-        "Progression Run", "Recovery Run", "Cadence Run", "Hill Repeats",
+        "Progression Run", "Recovery Run", "Hill Repeats",
         "Long Run", "Fartlek", "Urban Traffic"
     ]
 
@@ -310,22 +310,6 @@ struct RunDetailView: View {
                         Spacer()
 
                         drillControl
-                    }
-
-                    // Row 3: Subtitle / Calculation link
-                    HStack(spacing: 4) {
-                        Text("CoreML & Biometrics")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.5))
-                        Button(action: { showingClassificationExplainer = true }) {
-                            Text("How this is calculated")
-                                .font(.caption2)
-                                .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.5))
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal)

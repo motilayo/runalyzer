@@ -363,7 +363,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         case .zone2Run:
             return "Easy Run"
         case .neuromuscularPrimer:
-            return "Cadence Run"
+            return "Intervals"
         }
     }
 
@@ -408,7 +408,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         let standardClassifications: Set<String> = [
             "Intervals", "Pyramids", "Tempo Run", "Progression Run", "Recovery Run",
             "Steady Effort", "Easy Run", "Long Run", "Fartlek", "Hill Repeats",
-            "Cadence Run", "Urban Traffic"
+            "Urban Traffic"
         ]
         if standardClassifications.contains(where: { $0.localizedCaseInsensitiveCompare(clean) == .orderedSame }) {
             return nil
@@ -434,7 +434,7 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         let standardClassifications: Set<String> = [
             "Intervals", "Pyramids", "Tempo Run", "Progression Run", "Recovery Run",
             "Steady Effort", "Easy Run", "Long Run", "Fartlek", "Hill Repeats",
-            "Cadence Run", "Urban Traffic"
+            "Urban Traffic"
         ]
         if standardClassifications.contains(where: { $0.localizedCaseInsensitiveCompare(clean) == .orderedSame }) {
             return nil

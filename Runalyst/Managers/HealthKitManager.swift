@@ -1061,9 +1061,9 @@ class HealthKitSeeder {
                 paceCV: paceCV,
                 paceSlope: paceSlope,
                 percentZone4: percentZone4,
-                detectedTypeRaw: profile.rawValue,
+                detectedTypeRaw: (profile == .cadenceRun) ? "Intervals" : profile.rawValue,
                 framboiseTags: {
-                    var tags = [profile.rawValue]
+                    var tags = [(profile == .cadenceRun) ? "Intervals" : profile.rawValue]
                     if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
                         let drill = Self.recommendedDrillId(for: profile, progress: progress)
                         tags.append("prescribedDrill")
