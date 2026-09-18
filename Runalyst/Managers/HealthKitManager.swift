@@ -553,6 +553,10 @@ struct RunBaselineData: Sendable {
                     tags.append(drillTag)
                 }
             }
+            let titleTag = "drill:\(matchedDrill.drillTitle)"
+            if !tags.contains(titleTag) {
+                tags.append(titleTag)
+            }
         }
 
         return RunRecordDTO(
@@ -652,7 +656,6 @@ enum MockRunProfile: String, CaseIterable {
     case pyramids = "Pyramids"
     case fartlek = "Fartlek"
     case progression = "Progression Run"
-    case cadenceRun = "Cadence Run"
     case hillRepeats = "Hill Repeats"
     case longRun = "Long Run"
     case urbanTraffic = "Urban Traffic"
@@ -676,16 +679,16 @@ class HealthKitSeeder {
     static func profile(forIndex index: Int) -> MockRunProfile {
         let phase1: [MockRunProfile] = [
             .recovery, .easy, .urbanTraffic, .easy,
-            .recovery, .cadenceRun, .urbanTraffic, .easy,
-            .recovery, .cadenceRun, .easy, .recovery
+            .recovery, .pyramids, .urbanTraffic, .easy,
+            .recovery, .recovery, .easy, .recovery
         ]
         let phase2: [MockRunProfile] = [
-            .easy, .steady, .cadenceRun, .steady,
+            .easy, .steady, .pyramids, .steady,
             .fartlek, .easy, .progression, .steady,
-            .cadenceRun, .easy, .steady, .fartlek, .progression
+            .pyramids, .easy, .steady, .fartlek, .progression
         ]
         let phase3: [MockRunProfile] = [
-            .steady, .tempo, .longRun, .cadenceRun,
+            .steady, .tempo, .longRun, .pyramids,
             .intervals, .steady, .pyramids, .tempo,
             .hillRepeats, .progression, .intervals, .longRun, .tempo
         ]
@@ -699,9 +702,39 @@ class HealthKitSeeder {
         }
     }
 
+    /// Designates realistic prescribed drills across the 38-run schedule to test all V2 drill families
+    static func prescribedDrill(forIndex index: Int, profile: MockRunProfile, progress: Double) -> PreRunDrillId? {
+        switch index {
+        case 1:  // Early Easy Run -> Zone 2 Run
+            return .zone2Run
+        case 4:  // Early Recovery Run -> Recovery Jog (Controlled)
+            return .recoveryJog
+        case 5:  // Phase 1 Pyramids -> Cadence Pyramids (Beginner form)
+            return .cadencePyramids
+        case 9:  // Phase 1 Recovery Run -> Recovery Jog (High Cardiac Drift -> Not Met)
+            return .recoveryJog
+        case 13: // Phase 2 Steady Effort -> Rhythm Intervals
+            return .rhythmIntervals
+        case 17: // Phase 2 Easy Run -> Zone 2 Run (Higher turnover -> Exceeded)
+            return .zone2Run
+        case 20: // Phase 2 Pyramids -> Cadence Pyramids (Met)
+            return .cadencePyramids
+        case 26: // Phase 3 Tempo -> Tempo Surges (Met)
+            return .tempoSurges
+        case 28: // Phase 3 Pyramids -> Cadence Pyramids (Exceeded)
+            return .cadencePyramids
+        case 35: // Phase 3 Intervals -> Strides (Exceeded)
+            return .strides
+        case 37: // Phase 3 Tempo -> Tempo Surges (Exceeded)
+            return .tempoSurges
+        default:
+            return nil
+        }
+    }
+
     static func recommendedDrillId(for profile: MockRunProfile, progress: Double) -> PreRunDrillId {
         switch profile {
-        case .cadenceRun, .pyramids:
+        case .pyramids:
             return .cadencePyramids
         case .recovery:
             return progress < 0.5 ? .recoveryJog : .aerobicFlush
@@ -793,7 +826,7 @@ class HealthKitSeeder {
                     let chunkStart = workoutStartTime.addingTimeInterval(TimeInterval(chunkIndex * 15))
                     let chunkEnd = chunkStart.addingTimeInterval(15)
 
-                    let metrics = generate15SecondMetrics(for: profile, chunkIndex: chunkIndex, progress: progress)
+                    let metrics = generate15SecondMetrics(for: profile, workoutIndex: index, chunkIndex: chunkIndex, progress: progress)
 
                     let distanceQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.distanceMeters)
                     let speedQuantity = HKQuantity(
@@ -841,8 +874,7 @@ class HealthKitSeeder {
                     }
                 }
 
-                if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
-                    let drill = Self.recommendedDrillId(for: profile, progress: progress)
+                if let drill = Self.prescribedDrill(forIndex: index, profile: profile, progress: progress) {
                     let meta: [String: Any] = [
                         HKMetadataKeyWorkoutBrandName: "Runalyst",
                         "WorkoutPlan": drill.title,
@@ -896,7 +928,7 @@ class HealthKitSeeder {
                 case .hillRepeats: return Double.random(in: 30...60) // walking back down hill
                 case .fartlek, .recovery: return Double.random(in: 20...45) // gentle breathers
                 case .easy, .steady, .longRun: return Double.random(in: 15...35) // street crossings
-                case .tempo, .cadenceRun, .progression: return Double.random(in: 10...25) // quick crossings/watch start
+                case .tempo, .progression: return Double.random(in: 10...25) // quick crossings/watch start
                 }
             }()
 
@@ -915,7 +947,6 @@ class HealthKitSeeder {
                 case .pyramids: return -5.0
                 case .fartlek: return -5.0
                 case .progression: return -10.0
-                case .cadenceRun: return 10.0
                 case .hillRepeats: return 15.0 // Hills are slow going up and jogging down
                 case .longRun: return 15.0
                 case .urbanTraffic: return 20.0
@@ -933,7 +964,6 @@ class HealthKitSeeder {
             let baseCadence = 148.0 + (progress * 20.0)
             let profileCadenceOffset: Double = {
                 switch profile {
-                case .cadenceRun: return 6.0
                 case .intervals: return 2.0
                 case .pyramids: return 1.0
                 case .tempo: return 4.0
@@ -952,7 +982,7 @@ class HealthKitSeeder {
             let baseOsc = 10.4 - (progress * 2.4)
             let profileOscOffset: Double = {
                 switch profile {
-                case .cadenceRun, .pyramids: return -0.4
+                case .pyramids: return -0.4
                 case .recovery: return 0.3
                 case .urbanTraffic: return 0.4
                 default: return 0.0
@@ -977,10 +1007,14 @@ class HealthKitSeeder {
                 case .pyramids: return 5.0
                 case .longRun: return 5.0
                 case .urbanTraffic: return -5.0
-                case .cadenceRun: return -4.0
                 }
             }()
-            let workingHR = max(115.0, min(192.0, baseHR + profileHROffset + Double.random(in: -2...2)))
+            let workingHR: Double = {
+                if index == 9 {
+                    return 166.0 // Elevated HR on recovery run -> Not Met
+                }
+                return max(115.0, min(192.0, baseHR + profileHROffset + Double.random(in: -2...2)))
+            }()
             // Raw HR includes pauses where heart rate drops (assuming rest HR around 110 for recovery)
             let rawHR = ((workingHR * workingSec) + (110.0 * pauseSec)) / rawDurationSec
 
@@ -995,6 +1029,24 @@ class HealthKitSeeder {
             }()
             let paceSlope = profile == .progression ? -0.45 : (profile == .longRun ? 0.35 : 0.0)
             let percentZone4: Double = {
+                if index == 9 {
+                    return 0.22 // High drift on recovery jog -> Not Met adherence
+                }
+                if index == 1 {
+                    return 0.05 // Zone 2 Run -> Met
+                }
+                if index == 17 {
+                    return 0.02 // Zone 2 Run -> Exceeded
+                }
+                if index == 4 {
+                    return 0.00 // Recovery Jog -> Met
+                }
+                if index == 26 {
+                    return 0.25 // Tempo Surges -> Met
+                }
+                if index == 37 {
+                    return 0.45 // Tempo Surges -> Exceeded
+                }
                 switch profile {
                 case .tempo: return 0.65
                 case .intervals: return 0.45
@@ -1006,7 +1058,8 @@ class HealthKitSeeder {
             }()
 
             // Aligned Drill Recommendation
-            let drillId = Self.recommendedDrillId(for: profile, progress: progress)
+            let prescribed = Self.prescribedDrill(forIndex: index, profile: profile, progress: progress)
+            let drillId = prescribed ?? Self.recommendedDrillId(for: profile, progress: progress)
             let template = DrillTemplate.template(for: drillId)
             let targetCadenceInt = template.calculateTargetCadence(Int(workingCadence))
 
@@ -1019,7 +1072,8 @@ class HealthKitSeeder {
                 drillEffort: template.defaultEffort,
                 drillRecovery: template.defaultRecovery,
                 targetCadence: "\(targetCadenceInt) SPM",
-                previousCadence: Int(workingCadence)
+                previousCadence: Int(workingCadence),
+                isCompleted: prescribed != nil
             )
 
             // Dynamic Coaching Insight tailored to the runner's 3-month progression
@@ -1043,6 +1097,7 @@ class HealthKitSeeder {
                 drillRecommendations: [drill]
             )
 
+            let effectiveClassification = prescribed?.correspondingClassification ?? profile.rawValue
             let record = RunRecord(
                 hkWorkoutID: UUID(),
                 date: date,
@@ -1061,11 +1116,10 @@ class HealthKitSeeder {
                 paceCV: paceCV,
                 paceSlope: paceSlope,
                 percentZone4: percentZone4,
-                detectedTypeRaw: (profile == .cadenceRun) ? "Intervals" : profile.rawValue,
+                detectedTypeRaw: effectiveClassification,
                 framboiseTags: {
-                    var tags = [(profile == .cadenceRun) ? "Intervals" : profile.rawValue]
-                    if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
-                        let drill = Self.recommendedDrillId(for: profile, progress: progress)
+                    var tags = [effectiveClassification]
+                    if let drill = prescribed {
                         tags.append("prescribedDrill")
                         tags.append(drill.rawValue)
                         tags.append("drill:\(drill.rawValue)")
@@ -1085,6 +1139,7 @@ class HealthKitSeeder {
 
     private func generate15SecondMetrics(
         for profile: MockRunProfile,
+        workoutIndex: Int,
         chunkIndex: Int,
         progress: Double
     ) -> (distanceMeters: Double, heartRate: Double, cadence: Double, oscillation: Double, gct: Double, stride: Double) {
@@ -1114,13 +1169,18 @@ class HealthKitSeeder {
             }
 
         case .recovery:
-            if minuteIndex == 12 {
+            if workoutIndex == 9 {
+                // Flawed recovery workout for testing Not Met adherence (runner pushed into tempo effort)
+                distance = (Double.random(in: 175...185) * speedFactor) / 4.0
+                hr = Double.random(in: 165...175)
+                cadence = Double.random(in: 164...168)
+            } else if minuteIndex == 12 {
                 distance = 0
                 hr = Double.random(in: 118...124)
                 cadence = 0
             } else {
                 distance = (Double.random(in: 145...155) * speedFactor) / 4.0
-                hr = Double.random(in: 125...132) + hrShift
+                hr = Double.random(in: 122...130) + hrShift
                 cadence = Double.random(in: 154...158) + cadenceShift
             }
 
@@ -1194,11 +1254,6 @@ class HealthKitSeeder {
                 hr = 145.0 + (effort * 12.0)
                 cadence = 162.0 + (effort * 4.0) + (cadenceShift * 0.5)
             }
-
-        case .cadenceRun:
-            distance = (Double.random(in: 175...185) * speedFactor) / 4.0
-            hr = Double.random(in: 145...152) + hrShift
-            cadence = Double.random(in: 172...178) + (cadenceShift * 0.5)
 
         case .hillRepeats:
             let isUphill = (minuteIndex % 3) == 0

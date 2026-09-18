@@ -652,6 +652,26 @@ final class HealthKitManagerSeedingTests: XCTestCase {
             XCTAssertGreaterThan(oldestOsc, newestOsc, "Vertical oscillation should reduce over 3 months")
         }
     }
+
+    func testHealthKitSeederPrescribedDrillDistribution() {
+        var seededDrillIds = Set<PreRunDrillId>()
+        for index in 0..<HealthKitSeeder.totalProgressionRuns {
+            let profile = HealthKitSeeder.profile(forIndex: index)
+            let progress = Double(index) / Double(max(1, HealthKitSeeder.totalProgressionRuns - 1))
+            XCTAssertNotEqual(profile.rawValue, "Cadence Run", "Profile rawValue should never be Cadence Run")
+            if let drill = HealthKitSeeder.prescribedDrill(forIndex: index, profile: profile, progress: progress) {
+                seededDrillIds.insert(drill)
+            }
+        }
+
+        // Verify that all core V2 drill archetypes are present in the seeder schedule
+        XCTAssertTrue(seededDrillIds.contains(.zone2Run), "Should seed Zone 2 Run")
+        XCTAssertTrue(seededDrillIds.contains(.recoveryJog), "Should seed Recovery Jog")
+        XCTAssertTrue(seededDrillIds.contains(.cadencePyramids), "Should seed Cadence Pyramids")
+        XCTAssertTrue(seededDrillIds.contains(.rhythmIntervals), "Should seed Rhythm Intervals")
+        XCTAssertTrue(seededDrillIds.contains(.tempoSurges), "Should seed Tempo Surges")
+        XCTAssertTrue(seededDrillIds.contains(.strides), "Should seed Strides")
+    }
 }
 
 final class TrainingCorrectionModelTests: XCTestCase {
