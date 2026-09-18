@@ -542,7 +542,10 @@ struct RunBaselineData: Sendable {
             )
         }
         var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
-        if let matchedDrill = matchedDrillIntent {
+        if var matchedDrill = matchedDrillIntent {
+            matchedDrill.matchedWorkoutID = workout.uuid
+            WorkoutBridge.saveDrillIntent(matchedDrill)
+
             if !tags.contains("prescribedDrill") {
                 tags.append("prescribedDrill")
             }

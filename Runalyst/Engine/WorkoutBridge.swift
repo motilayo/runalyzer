@@ -95,6 +95,9 @@ final class WorkoutBridge {
         if let index = intents.firstIndex(where: { $0.scheduledDate == intent.scheduledDate && $0.drillTitle == intent.drillTitle }) {
             intents[index] = intent
         } else {
+            // Supersede any pending (unmatched) intents scheduled within the last 30 minutes.
+            // A newly scheduled drill overrides any accidental previous drill taps.
+            intents.removeAll { $0.matchedWorkoutID == nil && abs($0.scheduledDate.timeIntervalSince(intent.scheduledDate)) < 1800 }
             intents.append(intent)
         }
         let cutoff = Date().addingTimeInterval(-30 * 24 * 3600) // Retain 30 days of intents
@@ -186,9 +189,8 @@ final class WorkoutBridge {
             return true
         }
 
-        return matchingIntents.min(by: {
-            abs(workoutDate.timeIntervalSince($0.scheduledDate)) < abs(workoutDate.timeIntervalSince($1.scheduledDate))
-        })
+        // Prefer the most recently scheduled matching intent (user's latest intended drill)
+        return matchingIntents.max(by: { $0.scheduledDate < $1.scheduledDate })
     }
 
     nonisolated public static func matchDrill(
