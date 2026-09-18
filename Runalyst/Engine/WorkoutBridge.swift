@@ -92,6 +92,14 @@ final class WorkoutBridge {
         UserDefaults.standard.removeObject(forKey: drillIntentsKey)
     }
 
+    nonisolated public static func persistIntents(_ intents: [ScheduledDrillIntent]) {
+        let cutoff = Date().addingTimeInterval(-30 * 24 * 3600) // Retain 30 days of intents
+        let filtered = intents.filter { $0.scheduledDate >= cutoff }
+        if let data = try? JSONEncoder().encode(filtered) {
+            UserDefaults.standard.set(data, forKey: drillIntentsKey)
+        }
+    }
+
     nonisolated public static func saveDrillIntent(_ intent: ScheduledDrillIntent) {
         var intents = recentIntents()
         // If updating an intent (like marking as matched), replace the old one
@@ -103,11 +111,7 @@ final class WorkoutBridge {
             intents.removeAll { $0.matchedWorkoutID == nil && abs($0.scheduledDate.timeIntervalSince(intent.scheduledDate)) < 1800 }
             intents.append(intent)
         }
-        let cutoff = Date().addingTimeInterval(-30 * 24 * 3600) // Retain 30 days of intents
-        intents = intents.filter { $0.scheduledDate >= cutoff }
-        if let data = try? JSONEncoder().encode(intents) {
-            UserDefaults.standard.set(data, forKey: drillIntentsKey)
-        }
+        persistIntents(intents)
     }
 
     nonisolated public static func recentIntents() -> [ScheduledDrillIntent] {
@@ -279,16 +283,99 @@ final class WorkoutBridge {
         let allIds = PreRunDrillId.allCases.map(\.rawValue)
         let allTitles = PreRunDrillId.allCases.map(\.title)
         runRecord.framboiseTags.removeAll {
-            $0.hasPrefix("drill:") || $0 == "prescribedDrill" || allIds.contains($0) || allTitles.contains($0) || $0.isEmpty
+            $0.hasPrefix("drill:") ||
+            $0.hasPrefix("drillIntervals:") ||
+            $0.hasPrefix("drillWorkCadence:") ||
+            $0.hasPrefix("drillRecCadence:") ||
+            $0.hasPrefix("drillReps:") ||
+            $0 == "prescribedDrill" ||
+            $0 == "userLinkedDrill" ||
+            $0 == "userUnlinkedDrill" ||
+            allIds.contains($0) ||
+            allTitles.contains($0) ||
+            $0.isEmpty
         }
         runRecord.framboiseTags.append("prescribedDrill")
+        runRecord.framboiseTags.append("userLinkedDrill")
         runRecord.framboiseTags.append(drillId.rawValue)
-        runRecord.framboiseTags.append("drill:\(drillId.rawValue)")
         runRecord.framboiseTags.append("drill:\(drillId.title)")
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.drillTitle == drillId.title || $0.preRunDrillId == drillId.rawValue }) {
-            rec.isCompleted = true
+
+        // Purge any stale intent matching this workout and bind the new drill intent
+        var intents = recentIntents()
+        intents.removeAll { $0.matchedWorkoutID == runRecord.hkWorkoutID }
+        let newIntent = ScheduledDrillIntent(
+            drillTitle: drillId.title,
+            preRunDrillId: drillId.rawValue,
+            scheduledDate: runRecord.date,
+            durationMinutes: max(1, Int(round(runRecord.duration / 60.0))),
+            matchedWorkoutID: runRecord.hkWorkoutID
+        )
+        intents.append(newIntent)
+        persistIntents(intents)
+
+        // Update insight drill recommendations
+        let template = DrillTemplate.template(for: drillId)
+        let targetCadenceInt = template.calculateTargetCadence(Int(runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155))
+        if let recs = runRecord.insight?.drillRecommendations, !recs.isEmpty {
+            var found = false
+            for rec in recs {
+                if rec.drillTitle == drillId.title || rec.preRunDrillId == drillId.rawValue {
+                    rec.isCompleted = true
+                    found = true
+                } else {
+                    rec.isCompleted = false
+                }
+            }
+            if !found {
+                let newRec = DrillRecommendation(
+                    drillTitle: template.title,
+                    preRunDrillId: template.id.rawValue,
+                    drillPurpose: template.defaultPurpose,
+                    drillWork: template.defaultWork,
+                    drillCues: template.generateInstructionalCue(targetCadenceInt),
+                    drillEffort: template.defaultEffort,
+                    drillRecovery: template.defaultRecovery,
+                    targetCadence: "\(targetCadenceInt) SPM",
+                    previousCadence: Int(runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155),
+                    isCompleted: true
+                )
+                runRecord.insight?.drillRecommendations?.insert(newRec, at: 0)
+            }
         }
-        runRecord.detectedTypeRaw = runRecord.detectedTypeRaw
+        if let rec = runRecord.insight?.drillRecommendation {
+            if rec.drillTitle == drillId.title || rec.preRunDrillId == drillId.rawValue {
+                rec.isCompleted = true
+            } else {
+                rec.isCompleted = false
+            }
+        }
+
+        if let parentClass = PreRunDrillId.correspondingClassification(for: drillId.title),
+           runRecord.detectedTypeRaw != parentClass {
+            runRecord.detectedTypeRaw = parentClass
+        }
+
+        // Recalculate interval scorecard for the newly linked drill
+        Task {
+            if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID),
+               let buckets = try? await HealthKitManager.shared.fetchBucketedSamples(for: workout),
+               !buckets.isEmpty {
+                let oscDelta = (runRecord.workingAvgVerticalOscillation ?? 9.5) - 9.5
+                let baselineCadence = Int(runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155)
+                let summary = DrillIntervalEvaluator.evaluate(
+                    buckets: buckets,
+                    drillId: drillId,
+                    baselineCadence: baselineCadence,
+                    workoutDuration: runRecord.duration,
+                    oscDelta: oscDelta
+                )
+                for tag in summary.framboiseTags where !runRecord.framboiseTags.contains(tag) {
+                    runRecord.framboiseTags.append(tag)
+                }
+                try? runRecord.modelContext?.save()
+            }
+        }
+
         try? runRecord.modelContext?.save()
     }
 
@@ -297,14 +384,32 @@ final class WorkoutBridge {
         let allIds = PreRunDrillId.allCases.map(\.rawValue)
         let allTitles = PreRunDrillId.allCases.map(\.title)
         runRecord.framboiseTags.removeAll {
-            $0.hasPrefix("drill:") || $0 == "prescribedDrill" || allIds.contains($0) || allTitles.contains($0) || $0.isEmpty
+            $0.hasPrefix("drill:") ||
+            $0.hasPrefix("drillIntervals:") ||
+            $0.hasPrefix("drillWorkCadence:") ||
+            $0.hasPrefix("drillRecCadence:") ||
+            $0.hasPrefix("drillReps:") ||
+            $0 == "prescribedDrill" ||
+            $0 == "userLinkedDrill" ||
+            $0 == "userUnlinkedDrill" ||
+            allIds.contains($0) ||
+            allTitles.contains($0) ||
+            $0.isEmpty
         }
+        runRecord.framboiseTags.append("userUnlinkedDrill")
+
+        var intents = recentIntents()
+        intents.removeAll { $0.matchedWorkoutID == runRecord.hkWorkoutID }
+        persistIntents(intents)
+
         if let recs = runRecord.insight?.drillRecommendations {
             for rec in recs {
                 rec.isCompleted = false
             }
         }
-        runRecord.detectedTypeRaw = runRecord.detectedTypeRaw
+        if let rec = runRecord.insight?.drillRecommendation {
+            rec.isCompleted = false
+        }
         try? runRecord.modelContext?.save()
     }
 }

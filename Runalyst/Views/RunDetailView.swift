@@ -562,25 +562,29 @@ struct RunDetailView: View {
 
             .task(id: runRecord.id) {
                 // Auto-resolve or reconcile drill recognition against authentic HealthKit workout metadata / scheduled intent
-                if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
-                    let matched = WorkoutBridge.matchDrill(workout: workout, durationSeconds: runRecord.duration)
-                    if let matched = matched {
-                        let drillTag = "drill:\(matched.drillTitle)"
-                        if !runRecord.framboiseTags.contains(drillTag) {
-                            runRecord.framboiseTags.removeAll { $0.hasPrefix("drill:") || PreRunDrillId.allCases.map(\.rawValue).contains($0) }
-                            if !runRecord.framboiseTags.contains("prescribedDrill") {
-                                runRecord.framboiseTags.append("prescribedDrill")
+                // ONLY if the run has NO drill assigned yet and user hasn't manually linked or unlinked one
+                if prescribedDrillName == nil && !runRecord.framboiseTags.contains("userLinkedDrill") && !runRecord.framboiseTags.contains("userUnlinkedDrill") {
+                    if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
+                        let matched = WorkoutBridge.matchDrill(workout: workout, durationSeconds: runRecord.duration)
+                        if let matched = matched {
+                            let canonical = PreRunDrillId.canonicalDrillTitle(for: matched.drillTitle) ?? matched.drillTitle
+                            let drillTag = "drill:\(canonical)"
+                            if !runRecord.framboiseTags.contains(drillTag) {
+                                runRecord.framboiseTags.removeAll { $0.hasPrefix("drill:") || PreRunDrillId.allCases.map(\.rawValue).contains($0) }
+                                if !runRecord.framboiseTags.contains("prescribedDrill") {
+                                    runRecord.framboiseTags.append("prescribedDrill")
+                                }
+                                if let preRunId = matched.preRunDrillId {
+                                    runRecord.framboiseTags.append(preRunId)
+                                }
+                                runRecord.framboiseTags.append(drillTag)
                             }
-                            if let preRunId = matched.preRunDrillId {
-                                runRecord.framboiseTags.append(preRunId)
+                            if let parentClass = PreRunDrillId.correspondingClassification(for: canonical),
+                               runRecord.detectedTypeRaw != parentClass {
+                                runRecord.detectedTypeRaw = parentClass
                             }
-                            runRecord.framboiseTags.append(drillTag)
+                            try? modelContext.save()
                         }
-                        if let parentClass = PreRunDrillId.correspondingClassification(for: matched.drillTitle),
-                           runRecord.detectedTypeRaw != parentClass {
-                            runRecord.detectedTypeRaw = parentClass
-                        }
-                        try? modelContext.save()
                     }
                 }
 

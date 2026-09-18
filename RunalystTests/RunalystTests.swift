@@ -1308,4 +1308,60 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
             XCTAssertEqual(resolved, drill.title)
         }
     }
+
+    @MainActor
+    func testUserLinkedDrillNeverOverriddenByAutoMatch() {
+        let workoutID = UUID()
+        let initialRecord = RunRecord(
+            hkWorkoutID: workoutID,
+            date: Date(),
+            totalDistanceMeters: 4000,
+            duration: 1200,
+            rawAvgPace: 300,
+            rawAvgHeartRate: 155,
+            rawAvgCadence: 162,
+            workingAvgPace: 300,
+            workingAvgCadence: 162,
+            workingAvgHeartRate: 155,
+            paceCV: 0.05,
+            paceSlope: 0.0,
+            percentZone4: 0.20,
+            detectedTypeRaw: "Intervals",
+            framboiseTags: ["prescribedDrill", "cadence_pyramids", "drill:Cadence Pyramids", "drillIntervals:3/4"]
+        )
+
+        // Seed old matched intent for Cadence Pyramids
+        let oldIntent = ScheduledDrillIntent(
+            drillTitle: "Cadence Pyramids",
+            preRunDrillId: "cadence_pyramids",
+            scheduledDate: initialRecord.date,
+            durationMinutes: 20,
+            matchedWorkoutID: workoutID
+        )
+        WorkoutBridge.saveDrillIntent(oldIntent)
+
+        // User updates drill to Rhythm Intervals
+        WorkoutBridge.linkDrill(to: initialRecord, drillId: .rhythmIntervals)
+
+        // Verify tags updated and user intent tagged
+        XCTAssertTrue(initialRecord.framboiseTags.contains("userLinkedDrill"), "Must be tagged as userLinkedDrill")
+        XCTAssertTrue(initialRecord.framboiseTags.contains("prescribedDrill"))
+        XCTAssertTrue(initialRecord.framboiseTags.contains("drill:Rhythm Intervals"))
+        XCTAssertFalse(initialRecord.framboiseTags.contains("drill:Cadence Pyramids"))
+        XCTAssertFalse(initialRecord.framboiseTags.contains("cadence_pyramids"))
+        XCTAssertFalse(initialRecord.framboiseTags.contains("drillIntervals:3/4"), "Old drill interval scorecard tags must be cleared")
+
+        // Verify old intent was replaced in recentIntents()
+        let recent = WorkoutBridge.recentIntents()
+        let matchingIntents = recent.filter { $0.matchedWorkoutID == workoutID }
+        XCTAssertEqual(matchingIntents.count, 1)
+        XCTAssertEqual(matchingIntents.first?.drillTitle, "Rhythm Intervals")
+
+        // User unlinks the drill
+        WorkoutBridge.unlinkDrill(from: initialRecord)
+        XCTAssertTrue(initialRecord.framboiseTags.contains("userUnlinkedDrill"), "Must be tagged as userUnlinkedDrill")
+        XCTAssertFalse(initialRecord.framboiseTags.contains("prescribedDrill"))
+        XCTAssertFalse(initialRecord.framboiseTags.contains("drill:Rhythm Intervals"))
+        XCTAssertFalse(WorkoutBridge.recentIntents().contains { $0.matchedWorkoutID == workoutID })
+    }
 }
