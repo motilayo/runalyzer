@@ -528,7 +528,7 @@ actor RunAnalyzerActor {
                 directiveContext = "The runner is overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence." + goalSuffix
             } else if paceDiff < 0 && hrDelta > 0 {
                 // GUARDRAIL: fatigue detected — Swift overrides goal with recovery priority
-                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue or aerobic strain. PRIORITY: prescribe Easy Aerobic Recovery and HR control. Safety overrides any race goal."
+                directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue. PRIORITY: prescribe Easy Aerobic Recovery and HR control. Recovery overrides any race goal."
             } else if paceDiff > 0 && hrDelta < 0 {
                 directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill." + goalSuffix
             } else {
