@@ -479,6 +479,16 @@ struct RunBaselineData: Sendable {
         let classification: String
         let modelManager = ModelManager()
 
+        let computedBaselineCadence: Double? = {
+            guard !validPriorRuns.isEmpty else { return nil }
+            let totalCadenceDuration = validPriorRuns.map(\.duration).reduce(0, +)
+            if totalCadenceDuration > 0 {
+                return validPriorRuns.map { $0.cadence * $0.duration }.reduce(0, +) / totalCadenceDuration
+            } else {
+                return validPriorRuns.map(\.cadence).reduce(0, +) / Double(validPriorRuns.count)
+            }
+        }()
+
         if let matchedDrill = matchedDrillIntent {
             classification = PreRunDrillId.correspondingClassification(for: matchedDrill.drillTitle)
                 ?? PreRunDrillId.correspondingClassification(for: matchedDrill.preRunDrillId ?? "")
@@ -559,6 +569,24 @@ struct RunBaselineData: Sendable {
             let titleTag = "drill:\(matchedDrill.drillTitle)"
             if !tags.contains(titleTag) {
                 tags.append(titleTag)
+            }
+
+            // Interval-by-interval drill evaluation
+            let drillId = PreRunDrillId(rawValue: matchedDrill.preRunDrillId ?? "")
+                ?? PreRunDrillId.allCases.first(where: { $0.title == matchedDrill.drillTitle })
+            if let drillId = drillId {
+                let thirtyDayCadence = Int(computedBaselineCadence ?? (currentCadence > 0 ? currentCadence : 155))
+                let oscDelta = (validWorkingOsc ?? 9.5) - 9.5
+                let intervalSummary = DrillIntervalEvaluator.evaluate(
+                    buckets: buckets,
+                    drillId: drillId,
+                    baselineCadence: thirtyDayCadence,
+                    workoutDuration: duration,
+                    oscDelta: oscDelta
+                )
+                for tag in intervalSummary.framboiseTags where !tags.contains(tag) {
+                    tags.append(tag)
+                }
             }
         }
 

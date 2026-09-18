@@ -1137,4 +1137,149 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
         XCTAssertEqual(PreRunDrillId.canonicalDrillTitle(for: "aerobic_base_builder"), "Zone 2 Run")
         XCTAssertEqual(PreRunDrillId.correspondingClassification(for: "aerobic_base_builder"), "Easy Run")
     }
+
+    func testCadenceStabilitySteadyEffortClassification() async {
+        let modelManager = ModelManager()
+        let framboise = FramboiseEngine()
+
+        // Reproduces the exact user's run:
+        // High HR (170 BPM), high Zone 4 (0.85), pace CV = 0.09, duration = 27 min
+        // BUT cadenceCV = 0.012 (rock-solid turnover at 161-162 SPM)
+        let classification = await modelManager.predictRunType(
+            paceDelta: 0.0,
+            hrDelta: 20.0,
+            percentZone4: 0.85,
+            cadenceDelta: 1.0,
+            verticalOscillation: 9.9,
+            runnerStage: 1,
+            cv: 0.09,
+            slope: -0.05,
+            durationMinutes: 27.0,
+            cadenceCV: 0.012,
+            rawAverageHR: 170.0
+        )
+
+        // Must classify as Steady Effort (or Tempo Run), NEVER Fartlek or Intervals!
+        XCTAssertNotEqual(classification, "Fartlek", "Rock-solid cadence (cadenceCV < 0.025) must never be classified as Fartlek")
+        XCTAssertNotEqual(classification, "Intervals", "Rock-solid cadence (cadenceCV < 0.025) must never be classified as Intervals")
+        XCTAssertTrue(classification == "Steady Effort" || classification == "Tempo Run")
+
+        // Direct test on FramboiseEngine weighted scoring
+        let directClass = await framboise.classifyRun(
+            cv: 0.09,
+            slope: -0.05,
+            zone4: 0.85,
+            durationMinutes: 27.0,
+            cadenceCV: 0.012,
+            averageHR: 170.0,
+            paceDelta: 0.0,
+            hrDelta: 20.0
+        )
+        XCTAssertEqual(directClass, "Steady Effort")
+    }
+
+    func testIntermittentIntervalClassification() async {
+        let framboise = FramboiseEngine()
+
+        // Intermittent workout: high cadence volatility (cadenceCV = 0.042) and high pace CV (0.14)
+        let intervalClass = await framboise.classifyRun(
+            cv: 0.14,
+            slope: 0.0,
+            zone4: 0.50,
+            durationMinutes: 25.0,
+            cadenceCV: 0.042,
+            averageHR: 165.0
+        )
+        XCTAssertEqual(intervalClass, "Intervals")
+    }
+
+    func testDrillIntervalEvaluatorRepScoring() {
+        // Construct synthetic 15-second buckets for a 15-minute Cadence Pyramids drill
+        // 180s warmup, 4 reps of (60s work, 90s recovery), 120s cooldown
+        // Target: 166-172 SPM for 160 baseline
+        let now = Date()
+        var buckets: [BucketData] = []
+        var currentTime = now
+
+        // Warmup: 12 buckets (180s) at 150 SPM
+        for _ in 0..<12 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 40, durationSeconds: 15, meanPaceSecPerKm: 375, meanCadence: 150, meanHR: 140))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+
+        // Rep 1: 4 buckets (60s) at 170 SPM (HIT)
+        for _ in 0..<4 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 45, durationSeconds: 15, meanPaceSecPerKm: 333, meanCadence: 170, meanHR: 160))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+        // Rec 1: 6 buckets (90s) at 135 SPM
+        for _ in 0..<6 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 30, durationSeconds: 15, meanPaceSecPerKm: 500, meanCadence: 135, meanHR: 145))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+
+        // Rep 2: 4 buckets (60s) at 168 SPM (HIT)
+        for _ in 0..<4 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 45, durationSeconds: 15, meanPaceSecPerKm: 333, meanCadence: 168, meanHR: 162))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+        // Rec 2: 6 buckets (90s) at 135 SPM
+        for _ in 0..<6 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 30, durationSeconds: 15, meanPaceSecPerKm: 500, meanCadence: 135, meanHR: 145))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+
+        // Rep 3: 4 buckets (60s) at 155 SPM (MISSED - too low)
+        for _ in 0..<4 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 40, durationSeconds: 15, meanPaceSecPerKm: 375, meanCadence: 155, meanHR: 158))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+        // Rec 3: 6 buckets (90s) at 135 SPM
+        for _ in 0..<6 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 30, durationSeconds: 15, meanPaceSecPerKm: 500, meanCadence: 135, meanHR: 145))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+
+        // Rep 4: 4 buckets (60s) at 171 SPM (HIT)
+        for _ in 0..<4 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 45, durationSeconds: 15, meanPaceSecPerKm: 333, meanCadence: 171, meanHR: 165))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+        // Rec 4: 6 buckets (90s) at 135 SPM
+        for _ in 0..<6 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 30, durationSeconds: 15, meanPaceSecPerKm: 500, meanCadence: 135, meanHR: 145))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+
+        let summary = DrillIntervalEvaluator.evaluate(
+            buckets: buckets,
+            drillId: .cadencePyramids,
+            baselineCadence: 160,
+            workoutDuration: 900
+        )
+
+        // 3 out of 4 work reps met target
+        XCTAssertEqual(summary.totalIntervals, 4)
+        XCTAssertEqual(summary.intervalsMet, 3)
+        XCTAssertEqual(summary.adherencePercentage, 75)
+        XCTAssertEqual(summary.tier, .partiallyMet)
+        XCTAssertEqual(summary.reps.count, 4)
+        XCTAssertEqual(summary.reps[0].isMet, true)
+        XCTAssertEqual(summary.reps[1].isMet, true)
+        XCTAssertEqual(summary.reps[2].isMet, false)
+        XCTAssertEqual(summary.reps[3].isMet, true)
+        XCTAssertTrue(summary.workCadenceAvg >= 165)
+        XCTAssertTrue(summary.recoveryCadenceAvg <= 140)
+
+        // Verify framboise tags formatting and round-trip decoding
+        let tags = summary.framboiseTags
+        XCTAssertTrue(tags.contains("drillIntervals:3/4"))
+        XCTAssertTrue(tags.contains("drillReps:1,1,0,1"))
+
+        let reconstructed = DrillIntervalSummary.from(tags: tags, drillId: .cadencePyramids)
+        XCTAssertNotNil(reconstructed)
+        XCTAssertEqual(reconstructed?.intervalsMet, 3)
+        XCTAssertEqual(reconstructed?.totalIntervals, 4)
+        XCTAssertEqual(reconstructed?.tier, .partiallyMet)
+    }
 }

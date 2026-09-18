@@ -1107,10 +1107,33 @@ struct DrillExecutionScorecard: View {
         let baseOsc = baselineOscillation ?? 9.5
         let oscDelta = currentOsc - baseOsc
 
+        // Attempt to parse stored interval-by-interval results from framboiseTags
+        let intervalSummary: DrillIntervalSummary? = {
+            if let parsed = DrillIntervalSummary.from(tags: runRecord.framboiseTags, drillId: drillId) {
+                return parsed
+            }
+            if !isHRTarget && !drillId.isAerobicContinuous {
+                // Synthesize baseline interval evaluation if not yet tagged
+                return DrillIntervalEvaluator.evaluate(
+                    buckets: [],
+                    drillId: drillId,
+                    baselineCadence: thirtyDayCadence,
+                    workoutDuration: runRecord.duration,
+                    oscDelta: oscDelta
+                )
+            }
+            return nil
+        }()
+
+        let isIntervalDrill = (intervalSummary?.totalIntervals ?? 0) > 1
+
         let tier: DrillAdherenceTier
         let tierDescription: String
 
-        if isDualTarget {
+        if let summary = intervalSummary, isIntervalDrill {
+            tier = summary.tier
+            tierDescription = summary.verdict
+        } else if isDualTarget {
             // Tempo Surges: Cadence + Zone 4 Threshold
             let cadenceExact: Bool = {
                 if let range = drillObj.effectiveTargetCadence {
@@ -1228,8 +1251,60 @@ struct DrillExecutionScorecard: View {
                 .clipShape(Capsule())
             }
 
+            // Interval Adherence Meter (Pips + Fraction)
+            if let summary = intervalSummary, isIntervalDrill {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Interval Adherence")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(summary.intervalsMet) of \(summary.totalIntervals) on Target (\(summary.adherencePercentage)%)")
+                            .font(.caption.bold())
+                            .foregroundColor(summary.tier.tintColor)
+                    }
+
+                    // Pips (R1, R2, ...)
+                    HStack(spacing: 6) {
+                        ForEach(summary.reps, id: \.repIndex) { rep in
+                            HStack(spacing: 3) {
+                                Image(systemName: rep.isMet ? "checkmark.circle.fill" : "circle")
+                                    .font(.caption2)
+                                    .foregroundColor(rep.isMet ? .green : .orange)
+                                Text("R\(rep.repIndex)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(rep.isMet ? .primary : .secondary)
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(rep.isMet ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                        Spacer()
+                    }
+                }
+                .padding(10)
+                .background(Color(UIColor.tertiarySystemGroupedBackground))
+                .cornerRadius(10)
+            }
+
             // Primary Target vs Actual Metric Tiles
-            if isDualTarget {
+            if let summary = intervalSummary, isIntervalDrill {
+                HStack(spacing: 10) {
+                    metricTile(
+                        label: "WORK CADENCE",
+                        value: "\(summary.workCadenceAvg > 0 ? summary.workCadenceAvg : actualCadence) SPM",
+                        valueColor: summary.tier == .notMet ? .red : (summary.tier == .partiallyMet ? .orange : .green),
+                        subtitle: "Target: \(targetCadenceStr) SPM"
+                    )
+                    metricTile(
+                        label: "RECOVERY CADENCE",
+                        value: "\(summary.recoveryCadenceAvg > 0 ? summary.recoveryCadenceAvg : max(130, actualCadence - 20)) SPM",
+                        valueColor: .secondary,
+                        subtitle: "Walk / Easy Jog"
+                    )
+                }
+            } else if isDualTarget {
                 // Dual Target (Cadence + Zone 4 Threshold)
                 VStack(spacing: 8) {
                     HStack(spacing: 10) {
@@ -1367,7 +1442,7 @@ struct DrillExecutionScorecard: View {
     }
 
     @ViewBuilder
-    private func metricTile(label: String, value: String, valueColor: Color) -> some View {
+    private func metricTile(label: String, value: String, valueColor: Color, subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
                 .font(.system(size: 10, weight: .bold))
@@ -1375,6 +1450,11 @@ struct DrillExecutionScorecard: View {
             Text(value)
                 .font(.subheadline.bold())
                 .foregroundColor(valueColor)
+            if let sub = subtitle {
+                Text(sub)
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

@@ -371,12 +371,12 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
 
     /// Whether this drill's primary coaching target is heart rate zone rather than cadence
     var isHeartRateTargeted: Bool {
-        switch self {
-        case .zone2Run, .aerobicFlush, .recoveryJog:
-            return true
-        default:
-            return false
-        }
+        self == .zone2Run || self == .aerobicFlush || self == .recoveryJog
+    }
+
+    /// Whether this drill is a continuous single-block aerobic run (not intermittent intervals)
+    var isAerobicContinuous: Bool {
+        self == .zone2Run || self == .aerobicFlush || self == .recoveryJog
     }
 
     /// The target heart rate zone (e.g. Zone 1 or Zone 2)
