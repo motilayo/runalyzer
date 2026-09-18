@@ -69,7 +69,7 @@ actor ModelManager {
 
                 // 2. Intermittent Gate:
                 // If cadenceCV and pace CV are both high, the workout has intermittent work/rest intervals.
-                if (targetClass == "Steady Effort" || targetClass == "Easy Run" || targetClass == "Recovery Run") && cadenceCV >= 0.038 && cv >= 0.12 {
+                if (targetClass == "Steady Effort" || targetClass == "Easy Run" || targetClass == "Recovery Run" || targetClass == "Tempo Run") && cadenceCV >= 0.038 && cv >= 0.12 {
                     targetClass = "Intervals"
                 }
 
