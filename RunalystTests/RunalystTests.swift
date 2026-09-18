@@ -1282,4 +1282,30 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
         XCTAssertEqual(reconstructed?.totalIntervals, 4)
         XCTAssertEqual(reconstructed?.tier, .partiallyMet)
     }
+
+    func testDrillTitlesNeverContainUnderscores() {
+        // Direct instantiation with raw underscore identifiers
+        let drill1 = DrillRecommendation(drillTitle: "rhythm_intervals")
+        XCTAssertEqual(drill1.drillTitle, "Rhythm Intervals")
+        XCTAssertEqual(drill1.formattedTitle, "Rhythm Intervals")
+
+        let drill2 = DrillRecommendation(drillTitle: "cadence_pyramids")
+        XCTAssertEqual(drill2.drillTitle, "Cadence Pyramids")
+        XCTAssertEqual(drill2.formattedTitle, "Cadence Pyramids")
+
+        // Legacy record with raw string in property
+        let legacyDrill = DrillRecommendation(drillTitle: "tempo_surges")
+        legacyDrill.drillTitle = "tempo_surges"
+        XCTAssertEqual(legacyDrill.formattedTitle, "Tempo Surges")
+
+        // Canonical drill resolution across all raw identifiers
+        for drill in PreRunDrillId.allCases {
+            guard let resolved = PreRunDrillId.canonicalDrillTitle(for: drill.rawValue) else {
+                XCTFail("Failed to resolve canonical title for \(drill.rawValue)")
+                continue
+            }
+            XCTAssertFalse(resolved.contains("_"), "Canonical title for \(drill.rawValue) must not contain underscores")
+            XCTAssertEqual(resolved, drill.title)
+        }
+    }
 }

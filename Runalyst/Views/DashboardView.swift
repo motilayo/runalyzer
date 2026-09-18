@@ -1169,7 +1169,7 @@ struct HeroCardView: View {
                         Image(systemName: "figure.run")
                             .foregroundColor(.purple)
 
-                        Text("Scheduled: \(firstDrill.drillTitle)")
+                        Text("Scheduled: \(firstDrill.formattedTitle)")
                             .font(.headline)
                             .foregroundColor(.purple)
 

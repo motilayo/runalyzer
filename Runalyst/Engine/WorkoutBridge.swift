@@ -68,7 +68,10 @@ public struct ScheduledDrillIntent: Codable, Sendable, Equatable {
         targetCadence: String? = nil,
         matchedWorkoutID: UUID? = nil
     ) {
-        self.drillTitle = drillTitle
+        let cleanTitle = PreRunDrillId.canonicalDrillTitle(for: drillTitle)
+            ?? preRunDrillId.flatMap { PreRunDrillId(rawValue: $0)?.title }
+            ?? drillTitle.replacingOccurrences(of: "_", with: " ").capitalized
+        self.drillTitle = cleanTitle
         self.preRunDrillId = preRunDrillId
         self.scheduledDate = scheduledDate
         self.durationMinutes = durationMinutes

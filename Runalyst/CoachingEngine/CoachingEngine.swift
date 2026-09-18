@@ -78,7 +78,7 @@ struct DashboardFatigueInsight {
 @available(iOS 26.0, *)
 @Generable
 struct SuggestedDrill {
-    @Guide(description: "A clear and concise drill name.")
+    @Guide(description: "A clear, human-friendly drill name without underscores (e.g. 'Rhythm Intervals', 'Cadence Pyramids', 'Strides').")
     var drillTitle: String
 
     @Guide(description: "Must be exactly one of: cadence_pyramids, rhythm_intervals, tempo_surges, strides, neuromuscular_primer, aerobic_flush, fartlek_primer, hill_bounds, recovery_jog")
@@ -654,8 +654,16 @@ actor RunAnalyzerActor {
             var drillRecs: [DrillRecommendation] = []
             if !isOlderThan7Days {
                 for (index, suggestedDrill) in payload.drills.enumerated() {
-                    let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId) ?? .strides
+                    let preRunId = PreRunDrillId(rawValue: suggestedDrill.preRunDrillId)
+                        ?? PreRunDrillId.allCases.first(where: {
+                            $0.rawValue.localizedCaseInsensitiveCompare(suggestedDrill.drillTitle) == .orderedSame ||
+                            $0.title.localizedCaseInsensitiveCompare(suggestedDrill.drillTitle) == .orderedSame ||
+                            $0.title.localizedCaseInsensitiveCompare(suggestedDrill.drillTitle.replacingOccurrences(of: "_", with: " ")) == .orderedSame
+                        })
+                        ?? .strides
                     let template = DrillTemplate.template(for: preRunId)
+                    let cleanDrillTitle = PreRunDrillId.canonicalDrillTitle(for: suggestedDrill.drillTitle)
+                        ?? template.title
                     let effectiveCadence = max(thirtyDayCadence, Int(run.workingAvgCadence))
                     let computedTarget = template.calculateTargetCadence(effectiveCadence)
                     let preRunDrill = PreRunDrill(id: preRunId, previousCadence: effectiveCadence, targetCadence: computedTarget)
@@ -672,7 +680,7 @@ actor RunAnalyzerActor {
                     }
 
                     let drill = DrillRecommendation(
-                        drillTitle: suggestedDrill.drillTitle,
+                        drillTitle: cleanDrillTitle,
                         preRunDrillId: preRunId.rawValue,
                         drillPurpose: suggestedDrill.drillPurpose.isEmpty ? template.defaultPurpose : suggestedDrill.drillPurpose,
                         drillWork: preRunDrill.defaultWorkString,

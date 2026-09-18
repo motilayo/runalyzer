@@ -88,6 +88,7 @@ struct RunDetailView: View {
             if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
                 return canonical
             }
+            return candidate.replacingOccurrences(of: "_", with: " ").capitalized
         }
         // 2. PreRunDrillId rawValue in framboiseTags
         if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) }) {
@@ -806,9 +807,15 @@ private struct DrillCardView: View {
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
     var body: some View {
-        let preRunId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
+        let preRunId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "")
+            ?? PreRunDrillId.allCases.first(where: {
+                $0.title.localizedCaseInsensitiveCompare(drill.drillTitle) == .orderedSame ||
+                $0.rawValue.localizedCaseInsensitiveCompare(drill.drillTitle) == .orderedSame ||
+                $0.title.localizedCaseInsensitiveCompare(drill.drillTitle.replacingOccurrences(of: "_", with: " ")) == .orderedSame
+            })
+            ?? .strides
         let template = DrillTemplate.template(for: preRunId)
-        let displayTitle = drill.drillTitle.isEmpty ? template.title : drill.drillTitle
+        let displayTitle = drill.formattedTitle.isEmpty ? template.title : drill.formattedTitle
         let work = (drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork
         let recovery = (drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery
         let effort = (drill.drillEffort?.isEmpty == false ? drill.drillEffort : nil) ?? template.defaultEffort
@@ -980,7 +987,7 @@ private struct DrillCardView: View {
                     let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
                     activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
                     pendingWatchDrillDTO = DrillPrescriptionDTO(
-                        title: drill.drillTitle,
+                        title: displayTitle,
                         preRunDrillId: preRunId.rawValue,
                         purpose: drill.drillPurpose ?? "",
                         targetCadence: targetInt,
