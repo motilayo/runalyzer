@@ -972,21 +972,8 @@ struct DashboardView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        #if DEBUG
-                        Button(action: {
-                            Task {
-                                await HealthKitSeeder.shared.seedCouchTo5K(context: modelContext)
-                            }
-                        }) {
-                            Image(systemName: "ladybug.fill")
-                                .foregroundColor(.red)
-                        }
-                        #endif
-
-                        NavigationLink(destination: SettingsView(onForceSync: onSync)) {
-                            Image(systemName: "gearshape")
-                        }
+                    NavigationLink(destination: SettingsView(onForceSync: onSync)) {
+                        Image(systemName: "gearshape")
                     }
                 }
             }

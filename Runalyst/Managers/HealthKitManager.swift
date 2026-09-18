@@ -834,7 +834,8 @@ class HealthKitSeeder {
                         doubleValue: metrics.distanceMeters / 15.0
                     )
                     let hrQuantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: metrics.heartRate)
-                    let stepQuantity = HKQuantity(unit: .count(), doubleValue: metrics.cadence)
+                    let stepsInChunk = (metrics.cadence / 60.0) * 15.0
+                    let stepQuantity = HKQuantity(unit: .count(), doubleValue: stepsInChunk)
 
                     var chunkSamples: [HKSample] = [
                         HKQuantitySample(type: HKQuantityType(.distanceWalkingRunning), quantity: distanceQuantity, start: chunkStart, end: chunkEnd),

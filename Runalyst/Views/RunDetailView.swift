@@ -319,7 +319,7 @@ struct RunDetailView: View {
                 .alert("Drill Tracking", isPresented: $showingDrillExplainer) {
                     Button("OK", role: .cancel) { }
                 } message: {
-                    Text("Link this workout to a drill (like Cadence Pyramids, Strides, or Zone 2 Run) to track your form adherence against coaching targets on the Drill Execution Scorecard.")
+                    Text("Link this workout to a drill (like Cadence Pyramids, Strides, or Zone 2 Run) to track your form adherence against coaching targets in Drill Performance.")
                 }
 
                 // MARK: Drill Scorecard
@@ -1205,14 +1205,15 @@ struct DrillExecutionScorecard: View {
             tierDescription = "Completed steady effort drill."
         }
 
-        return VStack(spacing: 12) {
-            HStack {
+        return VStack(spacing: 14) {
+            // Header: Icon + Title + Capsule Badge (Single line)
+            HStack(spacing: 8) {
                 Image(systemName: drillId.iconName)
                     .foregroundColor(drillId.iconColor)
-                    .font(.title2)
-                Text("Drill Execution Scorecard")
-                    .font(.headline)
-                    .foregroundColor(drillId.iconColor)
+                    .font(.title3)
+                Text("Drill Performance")
+                    .font(.headline.weight(.semibold))
+                    .foregroundColor(.primary)
                 Spacer()
                 HStack(spacing: 4) {
                     Image(systemName: tier.badgeIcon)
@@ -1220,149 +1221,165 @@ struct DrillExecutionScorecard: View {
                     Text(tier.badgeText)
                         .font(.caption.bold())
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(tier.tintColor.opacity(0.15))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(tier.tintColor.opacity(0.12))
                 .foregroundColor(tier.tintColor)
                 .clipShape(Capsule())
             }
 
-            Divider()
-
+            // Primary Target vs Actual Metric Tiles
             if isDualTarget {
-                // Dual Target layout: Cadence + Zone 4 Lactate Threshold
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Target Cadence")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(targetCadenceStr) SPM")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.primary)
+                // Dual Target (Cadence + Zone 4 Threshold)
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        metricTile(
+                            label: "TARGET CADENCE",
+                            value: "\(targetCadenceStr) SPM",
+                            valueColor: .primary
+                        )
+                        metricTile(
+                            label: "ACTUAL CADENCE",
+                            value: "\(actualCadence) SPM",
+                            valueColor: tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green)
+                        )
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Actual Cadence")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(actualCadence) SPM")
-                            .font(.subheadline.bold())
-                            .foregroundColor(tier == .notMet ? .orange : .green)
-                    }
-                }
 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Threshold Intensity")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("Zone 4 Target (≥20%)")
-                            .font(.caption.bold())
-                            .foregroundColor(.primary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Zone 4 Time")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(String(format: "%.0f%%", runRecord.percentZone4 * 100))
-                            .font(.caption.bold())
-                            .foregroundColor(runRecord.percentZone4 >= 0.20 ? .green : .orange)
+                    HStack(spacing: 10) {
+                        metricTile(
+                            label: "THRESHOLD GOAL",
+                            value: "≥20% Zone 4",
+                            valueColor: .primary
+                        )
+                        metricTile(
+                            label: "ZONE 4 TIME",
+                            value: String(format: "%.0f%%", runRecord.percentZone4 * 100),
+                            valueColor: runRecord.percentZone4 >= 0.20 ? .green : .orange
+                        )
                     }
                 }
             } else if isHRTarget {
-                // Heart Rate Hero Metric + Cadence Guardrail
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Target HR Zone")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(drillId.targetHeartRateZoneName ?? "Zone 2")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.primary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Actual Heart Rate")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(actualHR > 0 ? "\(actualHR) BPM" : "--")
-                            .font(.subheadline.bold())
-                            .foregroundColor(tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green))
-                    }
-                }
-
-                HStack {
-                    if actualCadence > 0 {
-                        Text("Turnover Guardrail: \(actualCadence) SPM")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    if runRecord.percentZone4 > 0 {
-                        Text(String(format: "High Intensity: %.0f%%", runRecord.percentZone4 * 100))
-                            .font(.caption.bold())
-                            .foregroundColor(runRecord.percentZone4 <= 0.08 ? .secondary : .orange)
-                    }
+                // Heart Rate Hero Metric
+                HStack(spacing: 10) {
+                    metricTile(
+                        label: "TARGET ZONE",
+                        value: drillId.targetHeartRateZoneName ?? "Zone 2",
+                        valueColor: .primary
+                    )
+                    metricTile(
+                        label: "ACTUAL HEART RATE",
+                        value: actualHR > 0 ? "\(actualHR) BPM" : "--",
+                        valueColor: tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green)
+                    )
                 }
             } else {
-                // Cadence Hero Metric + Intensity Guardrail
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Target Cadence")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(targetCadenceStr) SPM")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.primary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Actual Cadence")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(actualCadence) SPM")
-                            .font(.subheadline.bold())
-                            .foregroundColor(tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green))
-                    }
-                }
-
-                if runRecord.percentZone4 > 0.15 {
-                    HStack {
-                        Text("Intensity Guardrail")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text(String(format: "Zone 4 Spike: %.0f%%", runRecord.percentZone4 * 100))
-                            .font(.caption.bold())
-                            .foregroundColor(.orange)
-                    }
+                // Cadence Hero Metric
+                HStack(spacing: 10) {
+                    metricTile(
+                        label: "TARGET CADENCE",
+                        value: "\(targetCadenceStr) SPM",
+                        valueColor: .primary
+                    )
+                    metricTile(
+                        label: "ACTUAL CADENCE",
+                        value: "\(actualCadence) SPM",
+                        valueColor: tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green)
+                    )
                 }
             }
 
-            if abs(oscDelta) > 0.01 && runRecord.workingAvgVerticalOscillation != nil {
-                HStack {
-                    Text("Vertical Form Delta")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(String(format: "%+.1f cm", oscDelta))
-                        .font(.caption.bold())
+            // Secondary Form / Guardrail Chips
+            let hasFormDelta = abs(oscDelta) > 0.01 && runRecord.workingAvgVerticalOscillation != nil
+            let hasTurnoverChip = isHRTarget && actualCadence > 0
+            let hasZone4Chip = !isDualTarget && runRecord.percentZone4 > 0.15
+
+            if hasFormDelta || hasTurnoverChip || hasZone4Chip {
+                HStack(spacing: 8) {
+                    if hasFormDelta {
+                        HStack(spacing: 4) {
+                            Image(systemName: oscDelta < 0 ? "arrow.down.right" : "arrow.up.right")
+                                .font(.caption2.bold())
+                            Text(String(format: "Form Delta: %+.1f cm", oscDelta))
+                                .font(.caption2.bold())
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(oscDelta < 0 ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
                         .foregroundColor(oscDelta < 0 ? .green : .orange)
+                        .clipShape(Capsule())
+                    }
+
+                    if hasTurnoverChip {
+                        HStack(spacing: 4) {
+                            Image(systemName: "shoeprints.fill")
+                                .font(.caption2)
+                            Text("Turnover: \(actualCadence) SPM")
+                                .font(.caption2.bold())
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.12))
+                        .foregroundColor(.secondary)
+                        .clipShape(Capsule())
+                    }
+
+                    if hasZone4Chip {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bolt.fill")
+                                .font(.caption2)
+                            Text(String(format: "Zone 4 Spike: %.0f%%", runRecord.percentZone4 * 100))
+                                .font(.caption2.bold())
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.12))
+                        .foregroundColor(.orange)
+                        .clipShape(Capsule())
+                    }
+
+                    Spacer()
                 }
             }
 
-            Text(tierDescription)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Coaching Verdict Callout Banner
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: tier == .notMet ? "xmark.circle.fill" : (tier == .partiallyMet ? "info.circle.fill" : "checkmark.seal.fill"))
+                    .font(.caption)
+                    .foregroundColor(tier.tintColor)
+                    .padding(.top, 1)
+                Text(tierDescription)
+                    .font(.caption)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+            }
+            .padding(10)
+            .background(tier.tintColor.opacity(0.08))
+            .cornerRadius(8)
         }
-        .padding()
-        .background(drillId.iconColor.opacity(0.05))
-        .cornerRadius(12)
+        .padding(14)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(14)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(drillId.iconColor.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func metricTile(label: String, value: String, valueColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.subheadline.bold())
+                .foregroundColor(valueColor)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04))
+        .cornerRadius(8)
     }
 }
