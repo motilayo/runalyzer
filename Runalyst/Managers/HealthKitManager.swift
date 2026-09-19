@@ -1,6 +1,9 @@
 import Foundation
 import HealthKit
 import SwiftData
+#if canImport(WorkoutKit)
+@preconcurrency import WorkoutKit
+#endif
 
 protocol HKHealthStoreProtocol: AnyObject, Sendable {
     func requestAuthorization(toShare typesToShare: Set<HKSampleType>, read typesToRead: Set<HKObjectType>) async throws
@@ -440,16 +443,49 @@ struct RunBaselineData: Sendable {
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
         let cadenceCV = await engine.calculateCadenceCV(bucketCadences: cadences)
 
-        let dynamicZone4Threshold: Double = 161.5
-        // if #available(iOS 27.0, *) {
-        //     if let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
-        //        let actualStore = healthStore as? HKHealthStore,
-        //        let preferredConfig = try? await actualStore.preferredWorkoutZoneConfiguration(for: hrType) {
-        //         if preferredConfig.zones.count >= 4, let z4Start = preferredConfig.zones[3].minimum?.doubleValue(for: HKUnit(from: "count/min")) {
-        //             dynamicZone4Threshold = z4Start
-        //         }
-        //     }
-        // }
+        var dynamicZone4Threshold: Double = 161.5
+        var dynamicZone2Threshold: Double = 142.0
+        var dynamicZone1Threshold: Double = 125.0
+
+        if #available(iOS 27.0, *),
+           let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+           let actualStore = healthStore as? NSObject {
+            let sel = NSSelectorFromString("preferredWorkoutZoneConfigurationForQuantityType:completion:")
+            if actualStore.responds(to: sel) {
+                struct DynamicZoneThresholds: Sendable {
+                    let zone1Max: Double?
+                    let zone2Max: Double?
+                    let zone4Min: Double?
+                }
+                let thresholds: DynamicZoneThresholds? = await withCheckedContinuation { continuation in
+                    typealias CompletionHandler = @convention(block) (AnyObject?, NSError?) -> Void
+                    let handler: CompletionHandler = { config, _ in
+                        if let config = config {
+                            let extracted = DrillPatternRecognizer.extractZoneThresholds(from: config)
+                            continuation.resume(returning: DynamicZoneThresholds(
+                                zone1Max: extracted.zone1Max,
+                                zone2Max: extracted.zone2Max,
+                                zone4Min: extracted.zone4Min
+                            ))
+                        } else {
+                            continuation.resume(returning: nil)
+                        }
+                    }
+                    _ = actualStore.perform(sel, with: hrType, with: handler)
+                }
+                if let thresholds = thresholds {
+                    if let z4 = thresholds.zone4Min {
+                        dynamicZone4Threshold = z4
+                    }
+                    if let z2 = thresholds.zone2Max {
+                        dynamicZone2Threshold = z2
+                    }
+                    if let z1 = thresholds.zone1Max {
+                        dynamicZone1Threshold = z1
+                    }
+                }
+            }
+        }
         let engineMaxHR = dynamicZone4Threshold / 0.85
         let zone4 = await engine.calculatePercentZone4(bucketHRs: hrs, maxHR: engineMaxHR)
 
@@ -470,10 +506,37 @@ struct RunBaselineData: Sendable {
             $0.date < targetDate
         }
 
-        // Check if workout matches a prescribed Runalyst drill (via WorkoutKit metadata or scheduled intent)
+        let computedBaselineCadence: Double? = {
+            guard !validPriorRuns.isEmpty else { return nil }
+            let totalCadenceDuration = validPriorRuns.map(\.duration).reduce(0, +)
+            if totalCadenceDuration > 0 {
+                return validPriorRuns.map { $0.cadence * $0.duration }.reduce(0, +) / totalCadenceDuration
+            } else {
+                return validPriorRuns.map(\.cadence).reduce(0, +) / Double(validPriorRuns.count)
+            }
+        }()
+
+        var customWorkoutPlan: CustomWorkout?
+        #if canImport(WorkoutKit)
+        if #available(iOS 17.0, *) {
+            if let plan = try? await workout.workoutPlan {
+                if case .custom(let custom) = plan.workout {
+                    customWorkoutPlan = custom
+                }
+            }
+        }
+        #endif
+
+        // Multi-tiered drill recognition (WorkoutKit metadata, structural activities/laps, intent heuristic, autonomous pattern recognition)
         let matchedDrillIntent = WorkoutBridge.matchDrill(
             workout: workout,
-            durationSeconds: duration
+            durationSeconds: duration,
+            buckets: buckets,
+            baselineCadence: computedBaselineCadence.map(Int.init),
+            zone4Threshold: dynamicZone4Threshold,
+            zone2Threshold: dynamicZone2Threshold,
+            zone1Threshold: dynamicZone1Threshold,
+            customWorkout: customWorkoutPlan
         )
 
         let classification: String
@@ -543,6 +606,8 @@ struct RunBaselineData: Sendable {
         }
         var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
         if let matchedDrill = matchedDrillIntent {
+            WorkoutBridge.markIntentMatched(workoutID: workout.uuid, drillTitle: matchedDrill.drillTitle, workoutDate: workout.startDate)
+
             if !tags.contains("prescribedDrill") {
                 tags.append("prescribedDrill")
             }
@@ -551,6 +616,29 @@ struct RunBaselineData: Sendable {
                 let drillTag = "drill:\(preRunId)"
                 if !tags.contains(drillTag) {
                     tags.append(drillTag)
+                }
+            }
+            let titleTag = "drill:\(matchedDrill.drillTitle)"
+            if !tags.contains(titleTag) {
+                tags.append(titleTag)
+            }
+
+            // Interval-by-interval drill evaluation
+            let drillId = PreRunDrillId(rawValue: matchedDrill.preRunDrillId ?? "")
+                ?? PreRunDrillId.allCases.first(where: { $0.title == matchedDrill.drillTitle })
+            if let drillId = drillId {
+                let thirtyDayCadence = Int(computedBaselineCadence ?? (currentCadence > 0 ? currentCadence : 155))
+                let oscDelta = (validWorkingOsc ?? 9.5) - 9.5
+                let intervalSummary = DrillIntervalEvaluator.evaluate(
+                    workout: workout,
+                    buckets: buckets,
+                    drillId: drillId,
+                    baselineCadence: thirtyDayCadence,
+                    workoutDuration: duration,
+                    oscDelta: oscDelta
+                )
+                for tag in intervalSummary.framboiseTags where !tags.contains(tag) {
+                    tags.append(tag)
                 }
             }
         }
@@ -633,613 +721,5 @@ struct RunBaselineData: Sendable {
             }
             store?.execute(query)
         }
-    }
-}
-//
-//  seeder.swift
-//  Runalyst
-//
-//  Created by Joshua Agboola on 2026-08-22.
-//  Updated for Runalyst V2: 1-Minute Chunking & Variance Profiles
-//
-
-enum MockRunProfile: String, CaseIterable {
-    case easy = "Easy Run"
-    case recovery = "Recovery Run"
-    case steady = "Steady Effort"
-    case tempo = "Tempo Run"
-    case intervals = "Intervals"
-    case pyramids = "Pyramids"
-    case fartlek = "Fartlek"
-    case progression = "Progression Run"
-    case cadenceRun = "Cadence Run"
-    case hillRepeats = "Hill Repeats"
-    case longRun = "Long Run"
-    case urbanTraffic = "Urban Traffic"
-
-    var durationMinutes: Int {
-        switch self {
-        case .recovery: return 25
-        case .longRun: return 75
-        case .intervals, .hillRepeats, .pyramids: return 30
-        default: return 40
-        }
-    }
-}
-
-@MainActor
-class HealthKitSeeder {
-    static let shared = HealthKitSeeder()
-    static let totalProgressionRuns = 38
-    let healthStore = HKHealthStore()
-
-    static func profile(forIndex index: Int) -> MockRunProfile {
-        let phase1: [MockRunProfile] = [
-            .recovery, .easy, .urbanTraffic, .easy,
-            .recovery, .cadenceRun, .urbanTraffic, .easy,
-            .recovery, .cadenceRun, .easy, .recovery
-        ]
-        let phase2: [MockRunProfile] = [
-            .easy, .steady, .cadenceRun, .steady,
-            .fartlek, .easy, .progression, .steady,
-            .cadenceRun, .easy, .steady, .fartlek, .progression
-        ]
-        let phase3: [MockRunProfile] = [
-            .steady, .tempo, .longRun, .cadenceRun,
-            .intervals, .steady, .pyramids, .tempo,
-            .hillRepeats, .progression, .intervals, .longRun, .tempo
-        ]
-        if index < phase1.count {
-            return phase1[index]
-        } else if index < phase1.count + phase2.count {
-            return phase2[index - phase1.count]
-        } else {
-            let offset = index - (phase1.count + phase2.count)
-            return phase3[min(offset, phase3.count - 1)]
-        }
-    }
-
-    static func recommendedDrillId(for profile: MockRunProfile, progress: Double) -> PreRunDrillId {
-        switch profile {
-        case .cadenceRun, .pyramids:
-            return .cadencePyramids
-        case .recovery:
-            return progress < 0.5 ? .recoveryJog : .aerobicFlush
-        case .easy:
-            return .zone2Run
-        case .steady:
-            return .rhythmIntervals
-        case .tempo, .progression:
-            return .tempoSurges
-        case .intervals:
-            return progress < 0.5 ? .neuromuscularPrimer : .strides
-        case .fartlek:
-            return .fartlekPrimer
-        case .hillRepeats:
-            return .hillBounds
-        case .longRun:
-            return .aerobicFlush
-        case .urbanTraffic:
-            return .neuromuscularPrimer
-        }
-    }
-
-    func seedCouchTo5K(context: ModelContext? = nil) async {
-        let seededWorkouts = await seedAdvancedMockRuns()
-        if let context = context {
-            if seededWorkouts.isEmpty {
-                // If Apple Health is not authorized or failed, seed directly to SwiftData
-                seedDirectToSwiftData(context: context)
-            } else {
-                // Purge any existing SwiftData records so the ensuing HealthKit sync will populate clean, non-duplicate runs
-                let descriptor = FetchDescriptor<RunRecord>()
-                if let existing = try? context.fetch(descriptor) {
-                    for run in existing {
-                        context.delete(run)
-                    }
-                    try? context.save()
-                }
-            }
-        }
-    }
-
-    @discardableResult
-    func seedAdvancedMockRuns() async -> [HKWorkout] {
-        var savedWorkouts: [HKWorkout] = []
-        let typesToWrite: Set<HKSampleType> = [
-            HKObjectType.workoutType(),
-            HKQuantityType(.distanceWalkingRunning),
-            HKQuantityType(.heartRate),
-            HKQuantityType(.stepCount),
-            HKQuantityType(.runningSpeed),
-            HKQuantityType(.vo2Max),
-            HKQuantityType(.runningVerticalOscillation),
-            HKQuantityType(.runningGroundContactTime),
-            HKQuantityType(.runningStrideLength)
-        ]
-
-        do {
-            try await healthStore.requestAuthorization(toShare: typesToWrite, read: [])
-        } catch {
-            print("Failed to authorize HealthKit Seeder: \(error)")
-            return []
-        }
-
-        let calendar = Calendar.current
-        let today = Date()
-
-        let configuration = HKWorkoutConfiguration()
-        configuration.activityType = .running
-        configuration.locationType = .outdoor
-
-        // Seed 38 runs spanning 3 months (~90 days) showing beginner-to-intermediate progression
-        let totalRuns = Self.totalProgressionRuns
-        for index in 0..<totalRuns {
-            let profile = Self.profile(forIndex: index)
-            let progress = Double(index) / Double(max(1, totalRuns - 1))
-            let daysAgo = 90.0 - (Double(index) * (89.0 / Double(max(1, totalRuns - 1))))
-            guard let workoutStartTime = calendar.date(byAdding: .day, value: -Int(daysAgo), to: today) else { continue }
-
-            let totalMinutes = profile.durationMinutes
-            let workoutEndTime = workoutStartTime.addingTimeInterval(TimeInterval(totalMinutes * 60))
-
-            do {
-                let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: configuration, device: nil)
-                try await builder.beginCollection(at: workoutStartTime)
-
-                var allSamples: [HKSample] = []
-
-                for chunkIndex in 0..<(totalMinutes * 4) {
-                    let chunkStart = workoutStartTime.addingTimeInterval(TimeInterval(chunkIndex * 15))
-                    let chunkEnd = chunkStart.addingTimeInterval(15)
-
-                    let metrics = generate15SecondMetrics(for: profile, chunkIndex: chunkIndex, progress: progress)
-
-                    let distanceQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.distanceMeters)
-                    let speedQuantity = HKQuantity(
-                        unit: HKUnit.meter().unitDivided(by: .second()),
-                        doubleValue: metrics.distanceMeters / 15.0
-                    )
-                    let hrQuantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: metrics.heartRate)
-                    let stepQuantity = HKQuantity(unit: .count(), doubleValue: metrics.cadence)
-
-                    var chunkSamples: [HKSample] = [
-                        HKQuantitySample(type: HKQuantityType(.distanceWalkingRunning), quantity: distanceQuantity, start: chunkStart, end: chunkEnd),
-                        HKQuantitySample(type: HKQuantityType(.runningSpeed), quantity: speedQuantity, start: chunkStart, end: chunkEnd),
-                        HKQuantitySample(type: HKQuantityType(.heartRate), quantity: hrQuantity, start: chunkStart, end: chunkEnd),
-                        HKQuantitySample(type: HKQuantityType(.stepCount), quantity: stepQuantity, start: chunkStart, end: chunkEnd)
-                    ]
-
-                    // Apple Watch only records running biomechanics when actively taking running strides
-                    if metrics.cadence > 0 && metrics.oscillation > 0 {
-                        let oscQuantity = HKQuantity(unit: HKUnit.meterUnit(with: .centi), doubleValue: metrics.oscillation)
-                        let gctQuantity = HKQuantity(unit: HKUnit.secondUnit(with: .milli), doubleValue: metrics.gct)
-                        let strideQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.stride)
-
-                        chunkSamples.append(contentsOf: [
-                            HKQuantitySample(type: HKQuantityType(.runningVerticalOscillation), quantity: oscQuantity, start: chunkStart, end: chunkEnd),
-                            HKQuantitySample(type: HKQuantityType(.runningGroundContactTime), quantity: gctQuantity, start: chunkStart, end: chunkEnd),
-                            HKQuantitySample(type: HKQuantityType(.runningStrideLength), quantity: strideQuantity, start: chunkStart, end: chunkEnd)
-                        ])
-                    }
-
-                    allSamples.append(contentsOf: chunkSamples)
-                }
-
-                // Progressive VO2 Max from 37.5 (beginner) to 44.5 (intermediate/advanced)
-                let vo2Value = 37.5 + (progress * 7.0)
-                let vo2Quantity = HKQuantity(unit: HKUnit(from: "ml/kg*min"), doubleValue: vo2Value)
-                allSamples.append(HKQuantitySample(type: HKQuantityType(.vo2Max), quantity: vo2Quantity, start: workoutStartTime, end: workoutEndTime))
-
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    builder.add(allSamples) { _, error in
-                        if let error = error {
-                            continuation.resume(throwing: error)
-                        } else {
-                            continuation.resume(returning: ())
-                        }
-                    }
-                }
-
-                if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
-                    let drill = Self.recommendedDrillId(for: profile, progress: progress)
-                    let meta: [String: Any] = [
-                        HKMetadataKeyWorkoutBrandName: "Runalyst",
-                        "WorkoutPlan": drill.title,
-                        "PreRunDrillId": drill.rawValue
-                    ]
-                    try? await builder.addMetadata(meta)
-                }
-
-                try await builder.endCollection(at: workoutEndTime)
-                if let finished = try await builder.finishWorkout() {
-                    savedWorkouts.append(finished)
-                }
-
-            } catch {
-                print("Failed to save mock workout for day \(index): \(error)")
-            }
-        }
-        print("✅ Successfully seeded 3 months of progressive runs to Apple Health!")
-        return savedWorkouts
-    }
-
-    func seedDirectToSwiftData(context: ModelContext) {
-        // Purge any previously seeded/stored RunRecords to prevent duplicate stacking
-        let descriptor = FetchDescriptor<RunRecord>()
-        if let existing = try? context.fetch(descriptor) {
-            for run in existing {
-                context.delete(run)
-            }
-            try? context.save()
-        }
-
-        let calendar = Calendar.current
-        let today = Date()
-        let totalRuns = Self.totalProgressionRuns
-
-        for index in 0..<totalRuns {
-            let profile = Self.profile(forIndex: index)
-            let progress = Double(index) / Double(max(1, totalRuns - 1))
-            let daysAgo = 90.0 - (Double(index) * (89.0 / Double(max(1, totalRuns - 1))))
-            guard let date = calendar.date(byAdding: .hour, value: -Int(daysAgo * 24.0), to: today) else { continue }
-
-            let durationMin = Double(profile.durationMinutes)
-            // Total workout elapsed time recorded by Apple Watch
-            let rawDurationSec = durationMin * 60.0
-
-            // Model realistic dead-stop & pause durations filtered out by Framboise
-            let pauseSec: Double = {
-                switch profile {
-                case .urbanTraffic: return Double.random(in: 90...180) // 1.5–3 mins of stoplights
-                case .intervals, .pyramids: return Double.random(in: 45...90) // 1–1.5 mins recovery pauses
-                case .hillRepeats: return Double.random(in: 30...60) // walking back down hill
-                case .fartlek, .recovery: return Double.random(in: 20...45) // gentle breathers
-                case .easy, .steady, .longRun: return Double.random(in: 15...35) // street crossings
-                case .tempo, .cadenceRun, .progression: return Double.random(in: 10...25) // quick crossings/watch start
-                }
-            }()
-
-            // True active running duration
-            let workingSec = rawDurationSec - pauseSec
-            // Progression curves across 3 months:
-            // Slower beginner pace (430s/km ~ 7:10/km) advancing to faster pace (320s/km ~ 5:20/km)
-            let basePace = 430.0 - (progress * 110.0)
-            let profilePaceOffset: Double = {
-                switch profile {
-                case .recovery: return 45.0
-                case .easy: return 20.0
-                case .steady: return 0.0
-                case .tempo: return -20.0
-                case .intervals: return -10.0 // Fast intervals + slow jogs = slightly faster than steady
-                case .pyramids: return -5.0
-                case .fartlek: return -5.0
-                case .progression: return -10.0
-                case .cadenceRun: return 10.0
-                case .hillRepeats: return 15.0 // Hills are slow going up and jogging down
-                case .longRun: return 15.0
-                case .urbanTraffic: return 20.0
-                }
-            }()
-            let workingPaceSec = max(240.0, basePace + profilePaceOffset + Double.random(in: -3...3))
-            let distanceMeters = (workingSec / workingPaceSec) * 1000.0
-            let distanceKm = distanceMeters / 1000.0
-
-            // Exact mathematical averages:
-            let workingAvgPace = distanceKm > 0 ? (workingSec / distanceKm) : workingPaceSec
-            let rawAvgPace = distanceKm > 0 ? (rawDurationSec / distanceKm) : workingPaceSec
-
-            // Cadence begins at ~148 SPM (beginner floor) and climbs toward ~168 SPM
-            let baseCadence = 148.0 + (progress * 20.0)
-            let profileCadenceOffset: Double = {
-                switch profile {
-                case .cadenceRun: return 6.0
-                case .intervals: return 2.0
-                case .pyramids: return 1.0
-                case .tempo: return 4.0
-                case .recovery: return -4.0
-                case .easy: return -2.0
-                case .urbanTraffic: return -5.0
-                case .hillRepeats: return -2.0
-                default: return 0.0
-                }
-            }()
-            let workingCadence = min(186.0, max(142.0, baseCadence + profileCadenceOffset + Double.random(in: -1.5...1.5)))
-            // Raw cadence is total steps over the entire elapsed duration
-            let rawCadence = (workingCadence * (workingSec / 60.0)) / (rawDurationSec / 60.0)
-
-            // Vertical oscillation: starts higher at ~10.4 cm (bounding) and drops to ~8.0 cm (efficient)
-            let baseOsc = 10.4 - (progress * 2.4)
-            let profileOscOffset: Double = {
-                switch profile {
-                case .cadenceRun, .pyramids: return -0.4
-                case .recovery: return 0.3
-                case .urbanTraffic: return 0.4
-                default: return 0.0
-                }
-            }()
-            let vertOsc = max(7.2, baseOsc + profileOscOffset + Double.random(in: -0.2...0.2))
-            // Vertical oscillation is only recorded when actively running, so working and raw are identical
-            let rawOsc = vertOsc
-
-            // Heart rate: Aerobic efficiency improves over time
-            let baseHR = 154.0 - (progress * 12.0)
-            let profileHROffset: Double = {
-                switch profile {
-                case .recovery: return -20.0
-                case .easy: return -10.0
-                case .steady: return 0.0
-                case .tempo: return 15.0
-                case .intervals: return 5.0
-                case .hillRepeats: return 10.0
-                case .fartlek: return 5.0
-                case .progression: return 5.0
-                case .pyramids: return 5.0
-                case .longRun: return 5.0
-                case .urbanTraffic: return -5.0
-                case .cadenceRun: return -4.0
-                }
-            }()
-            let workingHR = max(115.0, min(192.0, baseHR + profileHROffset + Double.random(in: -2...2)))
-            // Raw HR includes pauses where heart rate drops (assuming rest HR around 110 for recovery)
-            let rawHR = ((workingHR * workingSec) + (110.0 * pauseSec)) / rawDurationSec
-
-            let paceCV: Double = {
-                switch profile {
-                case .intervals: return 0.18
-                case .fartlek, .pyramids: return 0.12
-                case .urbanTraffic: return 0.22
-                case .hillRepeats: return 0.15
-                default: return 0.04
-                }
-            }()
-            let paceSlope = profile == .progression ? -0.45 : (profile == .longRun ? 0.35 : 0.0)
-            let percentZone4: Double = {
-                switch profile {
-                case .tempo: return 0.65
-                case .intervals: return 0.45
-                case .pyramids: return 0.35
-                case .hillRepeats: return 0.40
-                case .fartlek: return 0.30
-                default: return 0.08
-                }
-            }()
-
-            // Aligned Drill Recommendation
-            let drillId = Self.recommendedDrillId(for: profile, progress: progress)
-            let template = DrillTemplate.template(for: drillId)
-            let targetCadenceInt = template.calculateTargetCadence(Int(workingCadence))
-
-            let drill = DrillRecommendation(
-                drillTitle: template.title,
-                preRunDrillId: template.id.rawValue,
-                drillPurpose: template.defaultPurpose,
-                drillWork: template.defaultWork,
-                drillCues: template.generateInstructionalCue(targetCadenceInt),
-                drillEffort: template.defaultEffort,
-                drillRecovery: template.defaultRecovery,
-                targetCadence: "\(targetCadenceInt) SPM",
-                previousCadence: Int(workingCadence)
-            )
-
-            // Dynamic Coaching Insight tailored to the runner's 3-month progression
-            let headline: String
-            let observation: String
-            if progress < 0.33 {
-                headline = "Low Cadence Turnover & High Ground Impact"
-                observation = "Early baseline shows average cadence at \(Int(workingCadence)) SPM with vertical oscillation at \(String(format: "%.1f", vertOsc)) cm. Focus on quick, light foot strikes to protect knees and ankles."
-            } else if progress < 0.67 {
-                headline = "Aerobic Base Stabilizing with Improved Rhythm"
-                observation = "Cadence has progressed to \(Int(workingCadence)) SPM and vertical oscillation has reduced to \(String(format: "%.1f", vertOsc)) cm. Heart rate stability demonstrates growing aerobic efficiency."
-            } else {
-                headline = "Efficient Biomechanics & Strong Tempo Stability"
-                observation = "Turnover is well-stabilized at \(Int(workingCadence)) SPM with a compact vertical oscillation of \(String(format: "%.1f", vertOsc)) cm. Form remains resilient through varying paces."
-            }
-
-            let insight = CoachingInsight(
-                headline: headline,
-                longitudinalObservation: observation,
-                drillRecommendation: drill,
-                drillRecommendations: [drill]
-            )
-
-            let record = RunRecord(
-                hkWorkoutID: UUID(),
-                date: date,
-                totalDistanceMeters: distanceMeters,
-                duration: rawDurationSec,
-                rawAvgPace: rawAvgPace,
-                rawAvgHeartRate: rawHR,
-                rawAvgCadence: rawCadence,
-                workingAvgPace: workingAvgPace,
-                workingAvgCadence: workingCadence,
-                workingAvgHeartRate: workingHR,
-                workingAvgVerticalOscillation: vertOsc,
-                rawAvgVerticalOscillation: rawOsc,
-                workingDistanceMeters: distanceMeters,
-                workingDurationSeconds: workingSec,
-                paceCV: paceCV,
-                paceSlope: paceSlope,
-                percentZone4: percentZone4,
-                detectedTypeRaw: (profile == .cadenceRun) ? "Intervals" : profile.rawValue,
-                framboiseTags: {
-                    var tags = [(profile == .cadenceRun) ? "Intervals" : profile.rawValue]
-                    if profile == .cadenceRun || profile == .pyramids || profile == .intervals {
-                        let drill = Self.recommendedDrillId(for: profile, progress: progress)
-                        tags.append("prescribedDrill")
-                        tags.append(drill.rawValue)
-                        tags.append("drill:\(drill.rawValue)")
-                        tags.append("drill:\(drill.title)")
-                    }
-                    return tags
-                }(),
-                insight: insight
-            )
-
-            context.insert(record)
-        }
-
-        try? context.save()
-        print("✅ Successfully seeded \(totalRuns) SwiftData RunRecords directly with 3-month progression and aligned drill IDs!")
-    }
-
-    private func generate15SecondMetrics(
-        for profile: MockRunProfile,
-        chunkIndex: Int,
-        progress: Double
-    ) -> (distanceMeters: Double, heartRate: Double, cadence: Double, oscillation: Double, gct: Double, stride: Double) {
-        var distance: Double = 0
-        var hr: Double = 0
-        var cadence: Double = 0
-
-        // Speed scale factor: beginner runs slower (~0.85x), advanced runs faster (~1.12x)
-        let speedFactor = 0.85 + (progress * 0.27)
-        // Cadence progression offset: -10 SPM early on to +8 SPM later
-        let cadenceShift = -10.0 + (progress * 18.0)
-        // HR efficiency shift: runs at easy paces cost less cardiac effort as fitness improves
-        let hrShift = 6.0 - (progress * 12.0)
-
-        let minuteIndex = chunkIndex / 4
-
-        switch profile {
-        case .easy:
-            if minuteIndex == 15 {
-                distance = 0
-                hr = Double.random(in: 125...132)
-                cadence = 0
-            } else {
-                distance = (Double.random(in: 155...165) * speedFactor) / 4.0
-                hr = Double.random(in: 135...142) + hrShift
-                cadence = Double.random(in: 158...162) + cadenceShift
-            }
-
-        case .recovery:
-            if minuteIndex == 12 {
-                distance = 0
-                hr = Double.random(in: 118...124)
-                cadence = 0
-            } else {
-                distance = (Double.random(in: 145...155) * speedFactor) / 4.0
-                hr = Double.random(in: 125...132) + hrShift
-                cadence = Double.random(in: 154...158) + cadenceShift
-            }
-
-        case .steady:
-            if minuteIndex == 18 {
-                distance = 0
-                hr = Double.random(in: 135...140)
-                cadence = 0
-            } else {
-                distance = (Double.random(in: 175...185) * speedFactor) / 4.0
-                hr = Double.random(in: 148...152) + hrShift
-                cadence = Double.random(in: 164...166) + cadenceShift
-            }
-
-        case .tempo:
-            distance = (Double.random(in: 210...220) * speedFactor) / 4.0
-            hr = Double.random(in: 175...182)
-            cadence = Double.random(in: 172...176) + (cadenceShift * 0.5)
-
-        case .intervals:
-            let isWorkInterval = (minuteIndex % 5) < 3
-            let isRestStop = minuteIndex == 14 || minuteIndex == 24
-            if isWorkInterval {
-                distance = (Double.random(in: 220...240) * speedFactor) / 4.0
-                hr = Double.random(in: 180...190)
-                cadence = Double.random(in: 175...182) + (cadenceShift * 0.5)
-            } else if isRestStop {
-                distance = 0
-                hr = Double.random(in: 125...135)
-                cadence = 0
-            } else {
-                distance = (Double.random(in: 110...125) * speedFactor) / 4.0
-                hr = Double.random(in: 135...145) + hrShift
-                cadence = Double.random(in: 150...156) + cadenceShift
-            }
-
-        case .fartlek:
-            let isFast = (minuteIndex % 4) == 0
-            if isFast {
-                distance = (Double.random(in: 230...250) * speedFactor) / 4.0
-                hr = Double.random(in: 175...185)
-                cadence = Double.random(in: 178...184) + (cadenceShift * 0.5)
-            } else {
-                distance = (Double.random(in: 140...150) * speedFactor) / 4.0
-                hr = Double.random(in: 135...145) + hrShift
-                cadence = Double.random(in: 155...160) + cadenceShift
-            }
-
-        case .progression:
-            let minuteProgress = Double(minuteIndex) / 45.0
-            distance = ((145.0 + (minuteProgress * 65.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
-            hr = 135.0 + (minuteProgress * 45.0) + Double.random(in: -3...3)
-            cadence = 155.0 + (minuteProgress * 20.0) + cadenceShift + Double.random(in: -2...2)
-
-        case .longRun:
-            let minuteProgress = Double(minuteIndex) / 90.0
-            distance = ((175.0 - (minuteProgress * 15.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
-            hr = 145.0 + (minuteProgress * 20.0) + Double.random(in: -3...3)
-            cadence = 165.0 - (minuteProgress * 5.0) + cadenceShift + Double.random(in: -2...2)
-
-        case .pyramids:
-            let cycle = minuteIndex % 8
-            let isPause = minuteIndex == 15
-            if isPause {
-                distance = 0
-                hr = Double.random(in: 130...138)
-                cadence = 0
-            } else {
-                let effort = cycle < 4 ? Double(cycle) : Double(7 - cycle)
-                distance = ((160.0 + (effort * 25.0)) * speedFactor) / 4.0
-                hr = 145.0 + (effort * 12.0)
-                cadence = 162.0 + (effort * 4.0) + (cadenceShift * 0.5)
-            }
-
-        case .cadenceRun:
-            distance = (Double.random(in: 175...185) * speedFactor) / 4.0
-            hr = Double.random(in: 145...152) + hrShift
-            cadence = Double.random(in: 172...178) + (cadenceShift * 0.5)
-
-        case .hillRepeats:
-            let isUphill = (minuteIndex % 3) == 0
-            let isPauseAtBottom = minuteIndex == 14 || minuteIndex == 26
-            if isUphill {
-                distance = (Double.random(in: 130...145) * speedFactor) / 4.0
-                hr = Double.random(in: 178...188)
-                cadence = Double.random(in: 156...162) + (cadenceShift * 0.5)
-            } else if isPauseAtBottom {
-                distance = 0
-                hr = Double.random(in: 130...140)
-                cadence = 0
-            } else {
-                distance = (Double.random(in: 120...135) * speedFactor) / 4.0
-                hr = Double.random(in: 138...148) + hrShift
-                cadence = Double.random(in: 150...155) + cadenceShift
-            }
-
-        case .urbanTraffic:
-            let isDeadStop = (minuteIndex == 12 || minuteIndex == 25)
-            if isDeadStop {
-                distance = 0
-                hr = Double.random(in: 130...140)
-                cadence = 0
-            } else {
-                distance = (Double.random(in: 170...180) * speedFactor) / 4.0
-                hr = Double.random(in: 145...155) + hrShift
-                cadence = Double.random(in: 160...165) + cadenceShift
-            }
-        }
-
-        // Biomechanical relationships:
-        // Lower turnover & beginner stage = higher vertical oscillation and longer ground contact time
-        let baseOsc = 10.4 - (progress * 2.4)
-        let baseGCT = 275.0 - (progress * 42.0)
-        let baseStride = 0.94 + (progress * 0.26)
-
-        let osc = cadence > 0 ? max(6.8, baseOsc + Double.random(in: -0.4...0.4)) : 0.0
-        let gct = cadence > 0 ? max(210.0, baseGCT + Double.random(in: -8...8)) : 0.0
-        let stride = cadence > 0 ? max(0.85, baseStride + ((distance - 150) / 600.0)) : 0.0
-
-        return (distanceMeters: distance, heartRate: max(100.0, hr), cadence: max(0, cadence), oscillation: osc, gct: gct, stride: stride)
     }
 }

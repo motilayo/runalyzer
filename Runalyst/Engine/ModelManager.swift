@@ -30,6 +30,18 @@ actor ModelManager {
         cadenceCV: Double = 0.0,
         rawAverageHR: Double? = nil
     ) async -> String {
+        let framboise = FramboiseEngine()
+        let weightedClass = await framboise.classifyRun(
+            cv: cv,
+            slope: slope,
+            zone4: percentZone4,
+            durationMinutes: durationMinutes,
+            cadenceCV: cadenceCV,
+            averageHR: rawAverageHR,
+            paceDelta: paceDelta,
+            hrDelta: hrDelta
+        )
+
         if let classifier = self.runClassifier {
             do {
                 let input = RunalystClassifierInput(
@@ -45,14 +57,29 @@ actor ModelManager {
                     cadenceCV: cadenceCV
                 )
                 let prediction = try await classifier.prediction(input: input)
-                return prediction.targetClass
+                var targetClass = prediction.targetClass
+
+                // Physiological Structural Gate:
+                // 1. Cadence Stability Gate (Continuous vs. Intermittent):
+                // If cadenceCV is locked in (< 0.025), the run is continuous with no interval alternation.
+                // It CANNOT be Fartlek or Intervals.
+                if (targetClass == "Fartlek" || targetClass == "Intervals") && cadenceCV < 0.025 {
+                    targetClass = weightedClass
+                }
+
+                // 2. Intermittent Gate:
+                // If cadenceCV and pace CV are both high, the workout has intermittent work/rest intervals.
+                if (targetClass == "Steady Effort" || targetClass == "Easy Run" || targetClass == "Recovery Run" || targetClass == "Tempo Run") && cadenceCV >= 0.038 && cv >= 0.12 {
+                    targetClass = "Intervals"
+                }
+
+                return targetClass
             } catch {
                 print("CoreML prediction failed: \(error). Falling back to FramboiseEngine.")
             }
         }
 
-        let framboise = FramboiseEngine()
-        return await framboise.classifyRun(cv: cv, slope: slope, zone4: percentZone4, durationMinutes: durationMinutes, cadenceCV: cadenceCV, averageHR: rawAverageHR)
+        return weightedClass
     }
 
 }

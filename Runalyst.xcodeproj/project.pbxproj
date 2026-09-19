@@ -19,6 +19,12 @@
 		5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = E5504BAE8BEC385BDD7F07D0 /* PersonalizedRunClassifier.mlmodel */; };
 		8A134F81873E70E012F97522 /* TrainingCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C44838A872210F6909E642 /* TrainingCorrection.swift */; };
 		8EE242FF8F81F965BDC748CC /* WorkoutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF8446C093FADDF41149B361 /* WorkoutBridge.swift */; };
+		7B2A3C4D5E6F7A8B9C0D1E2F /* DrillIntervalEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C3D4E5F6A7B8C9D0E1F2A3B /* DrillIntervalEvaluator.swift */; };
+		8C3B4D5E6F7A8B9C0D1E2F3A /* DrillPatternRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4E5F6A7B8C9D0E1F2A3B4C /* DrillPatternRecognizer.swift */; };
+		34C493421E7F4ACCB2EE5001 /* PreRunDrillId.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72B03F5BC3D402A96C0C907 /* PreRunDrillId.swift */; };
+		43D90B67B3C2451D924E0314 /* PreRunDrill.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */; };
+		B34F9612C3224FC787FE1029 /* DrillTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */; };
+		D4199BCA5EEC404CA22EC9CA /* HealthKitSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */; };
 		98DB7AE1F0FD4D5A9E2AED7E /* Runalyst/Views/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 768372D4E377479C83BEA700 /* Runalyst/Views/SettingsView.swift */; };
 		9A22F762B423A292DEEDCBF8 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */; };
 		9DEC99887D72772D3AB524D1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B29A62CEEC0D478BA7CAB794 /* Foundation.framework */; };
@@ -70,6 +76,12 @@
 		B29A62CEEC0D478BA7CAB794 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		B2C3D4E5F6A708192A3B4C5D /* RunalystMigrationPlan.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RunalystMigrationPlan.swift; path = Runalyst/Models/RunalystMigrationPlan.swift; sourceTree = "<group>"; };
 		BF8446C093FADDF41149B361 /* WorkoutBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WorkoutBridge.swift; path = Runalyst/Engine/WorkoutBridge.swift; sourceTree = SOURCE_ROOT; };
+		8C3D4E5F6A7B8C9D0E1F2A3B /* DrillIntervalEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillIntervalEvaluator.swift; path = Runalyst/Engine/DrillIntervalEvaluator.swift; sourceTree = SOURCE_ROOT; };
+		9D4E5F6A7B8C9D0E1F2A3B4C /* DrillPatternRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillPatternRecognizer.swift; path = Runalyst/Engine/DrillPatternRecognizer.swift; sourceTree = SOURCE_ROOT; };
+		A72B03F5BC3D402A96C0C907 /* PreRunDrillId.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PreRunDrillId.swift; path = Runalyst/Models/PreRunDrillId.swift; sourceTree = SOURCE_ROOT; };
+		CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PreRunDrill.swift; path = Runalyst/Engine/PreRunDrill.swift; sourceTree = SOURCE_ROOT; };
+		F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillTemplate.swift; path = Runalyst/Models/DrillTemplate.swift; sourceTree = SOURCE_ROOT; };
+		FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthKitSeeder.swift; path = Runalyst/Utilities/HealthKitSeeder.swift; sourceTree = SOURCE_ROOT; };
 		C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Runalyst/ContentView.swift; sourceTree = "<group>"; };
 		CDDF4AD982B5C44AF7523E68 /* DrillsLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillsLibraryView.swift; path = Runalyst/Views/DrillsLibraryView.swift; sourceTree = SOURCE_ROOT; };
 		D3E4F5A60718293A4B5C6D7E /* BuildSettings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildSettings.xcconfig; sourceTree = SOURCE_ROOT; };
@@ -148,6 +160,12 @@
 				B11742538A05B00142AABD16 /* FramboiseEngine.swift */,
 				35724688B362914BC9EAC058 /* ModelManager.swift */,
 				BF8446C093FADDF41149B361 /* WorkoutBridge.swift */,
+				8C3D4E5F6A7B8C9D0E1F2A3B /* DrillIntervalEvaluator.swift */,
+				9D4E5F6A7B8C9D0E1F2A3B4C /* DrillPatternRecognizer.swift */,
+				A72B03F5BC3D402A96C0C907 /* PreRunDrillId.swift */,
+				CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */,
+				F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */,
+				FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */,
 			);
 			name = Runalyst;
 			sourceTree = SOURCE_ROOT;
@@ -308,6 +326,12 @@
 				DEE345D7801E107E3983DDDE /* FramboiseEngine.swift in Sources */,
 				F20E4C048AB2389BBF14327D /* ModelManager.swift in Sources */,
 				8EE242FF8F81F965BDC748CC /* WorkoutBridge.swift in Sources */,
+				7B2A3C4D5E6F7A8B9C0D1E2F /* DrillIntervalEvaluator.swift in Sources */,
+				8C3B4D5E6F7A8B9C0D1E2F3A /* DrillPatternRecognizer.swift in Sources */,
+				34C493421E7F4ACCB2EE5001 /* PreRunDrillId.swift in Sources */,
+				43D90B67B3C2451D924E0314 /* PreRunDrill.swift in Sources */,
+				B34F9612C3224FC787FE1029 /* DrillTemplate.swift in Sources */,
+				D4199BCA5EEC404CA22EC9CA /* HealthKitSeeder.swift in Sources */,
 				A9994594B624150A24D868E9 /* DrillsLibraryView.swift in Sources */,
 				5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* RunalystMigrationPlan.swift in Sources */,

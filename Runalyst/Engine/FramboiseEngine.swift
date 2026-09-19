@@ -184,58 +184,100 @@ actor FramboiseEngine {
         return Double(zone4Count) / Double(bucketHRs.count)
     }
 
-    // MARK: - Classification (Rule-based Stub)
+    // MARK: - Classification (Physiological Weighted Engine)
 
-    /// Rule-based fallback classifier used until a CoreML model is available or as fallback.
-    /// Enforces strict cardiac guardrails (runs with high HR or high Zone 4 are never easy/recovery).
-    func classifyRun(cv: Double, slope: Double, zone4: Double, durationMinutes: Double, cadenceCV: Double = 0.0, averageHR: Double? = nil) -> String {
-        // Strict cardiac guardrail
-        if let hr = averageHR, hr >= 165 || zone4 >= 0.25 {
-            if cv > 0.15 {
+    /// Multi-delta weighted classification engine enforcing turnover stability,
+    /// cardiac strain guardrails, and pacing trends.
+    func classifyRun(
+        cv: Double,
+        slope: Double,
+        zone4: Double,
+        durationMinutes: Double,
+        cadenceCV: Double = 0.0,
+        averageHR: Double? = nil,
+        paceDelta: Double? = nil,
+        hrDelta: Double? = nil
+    ) -> String {
+        // PHASE 1: Structural Gate (Intermittent vs. Continuous)
+        // Intervals and Fartlek ("speed play") require alternating cadence surges and recovery.
+        // A rock-solid turnover (cadenceCV < 0.025) guarantees a continuous run.
+        let isIntermittentCandidate = cadenceCV >= 0.025 && cv >= 0.07
+
+        if isIntermittentCandidate {
+            if cv >= 0.12 || cadenceCV >= 0.038 {
                 return "Intervals"
-            } else if slope < -0.225 {
-                return "Progression Run"
-            } else if zone4 > 0.60 {
-                if durationMinutes < 25.0 || cv > 0.08 || cadenceCV > 0.035 {
-                    return "Intervals"
-                }
-                return "Tempo Run"
-            } else {
-                return "Steady Effort"
-            }
-        }
-
-        if cv > 0.15 && slope > -0.75 && slope < 0.75 {
-            if zone4 < 0.10 {
-                return "urbanTraffic"
-            } else if zone4 > 0.40 {
-                return "Intervals" // Or Pyramids/Hill Repeats, simplified for stub
             } else {
                 return "Fartlek"
             }
         }
 
-        if slope < -0.3 {
-            return "Progression Run"
-        }
-
-        if durationMinutes > 70 && slope > 0.075 {
+        // PHASE 2: Continuous Structural Archetypes (Pacing Slope & Volume)
+        if durationMinutes >= 68.0 && slope > -0.20 && zone4 < 0.45 {
             return "Long Run"
         }
 
-        if cv < 0.038 && zone4 > 0.50 {
-            return "Tempo Run"
+        if slope < -0.225 && durationMinutes >= 20.0 {
+            return "Progression Run"
         }
 
-        if zone4 < 0.03 && durationMinutes < 40 {
+        // PHASE 3: Continuous Intensity Matrix (Zone 4 + HR Strain + Pace Delta)
+        // Calculate normalized Intensity Score (0 to 100)
+        let z4Score = min(100.0, zone4 * 125.0)
+
+        let hrScore: Double
+        if let hr = averageHR {
+            if hr >= 170 {
+                hrScore = min(100.0, 85.0 + (hr - 170.0) * 1.5)
+            } else if hr >= 160 {
+                hrScore = 70.0 + (hr - 160.0) * 1.5
+            } else if hr >= 145 {
+                hrScore = 45.0 + (hr - 145.0) * 1.6
+            } else if hr >= 130 {
+                hrScore = 25.0 + (hr - 130.0) * 1.3
+            } else {
+                hrScore = max(10.0, hr - 110.0)
+            }
+        } else if let delta = hrDelta {
+            if delta >= 15 {
+                hrScore = min(100.0, 85.0 + (delta - 15.0) * 1.5)
+            } else if delta >= 5 {
+                hrScore = 65.0 + (delta - 5.0) * 2.0
+            } else if delta >= -5 {
+                hrScore = 45.0 + (delta + 5.0) * 2.0
+            } else {
+                hrScore = max(10.0, 30.0 + delta)
+            }
+        } else {
+            hrScore = z4Score
+        }
+
+        let paceScore: Double
+        if let pDelta = paceDelta {
+            if pDelta <= -30 {
+                paceScore = 90.0
+            } else if pDelta <= -10 {
+                paceScore = 70.0
+            } else if pDelta <= 10 {
+                paceScore = 50.0
+            } else {
+                paceScore = max(15.0, 30.0 - (pDelta - 10.0))
+            }
+        } else {
+            paceScore = hrScore
+        }
+
+        // Weighted combination: 45% Zone 4, 35% HR Strain, 20% Pace Effort
+        let totalIntensity = (0.45 * z4Score) + (0.35 * hrScore) + (0.20 * paceScore)
+
+        if totalIntensity < 22.0 && zone4 <= 0.03 && durationMinutes < 35.0 {
             return "Recovery Run"
-        }
-
-        if zone4 > 0.05 && zone4 < 0.20 && cv < 0.045 {
+        } else if totalIntensity < 48.0 && zone4 <= 0.20 {
+            return "Easy Run"
+        } else if totalIntensity >= 72.0 && zone4 >= 0.50 && durationMinutes >= 20.0 && (paceDelta.map { $0 <= -15.0 } ?? true) {
+            return "Tempo Run"
+        } else {
             return "Steady Effort"
         }
-
-        return "Easy Run"
     }
 
     // MARK: - Tags

@@ -35,7 +35,10 @@ final class DrillRecommendation {
         isCompleted: Bool = false,
         orderIndex: Int? = nil
     ) {
-        self.drillTitle = drillTitle
+        let clean = PreRunDrillId.canonicalDrillTitle(for: drillTitle)
+            ?? preRunDrillId.flatMap { PreRunDrillId(rawValue: $0)?.title }
+            ?? drillTitle.replacingOccurrences(of: "_", with: " ").capitalized
+        self.drillTitle = clean
         self.preRunDrillId = preRunDrillId
         self.drillWork = drillWork
         self.drillCues = drillCues
@@ -46,5 +49,12 @@ final class DrillRecommendation {
         self.previousCadence = previousCadence
         self.isCompleted = isCompleted
         self.orderIndex = orderIndex
+    }
+
+    /// User-facing sanitized drill title guaranteed to never contain underscores.
+    var formattedTitle: String {
+        PreRunDrillId.canonicalDrillTitle(for: drillTitle)
+            ?? preRunDrillId.flatMap { PreRunDrillId(rawValue: $0)?.title }
+            ?? drillTitle.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }

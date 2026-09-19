@@ -77,3 +77,10 @@ graph TD
 2. **`@ModelActor`**: `RunAnalyzerActor` runs on a background executor with its own private `ModelContext`. It is responsible for calculating 30-day relative baselines without blocking the UI. You must never pass a `PersistentModel` to it; only pass `PersistentIdentifier` (which is `Sendable`).
 3. **`actor ModelInferenceSerializer`**: Acts as a FIFO queue (using `CheckedContinuation`) to protect Apple's on-device `LanguageModelSession`. Apple's `SensitiveContentAnalysisML` safety filter enforces single-client limits; concurrent calls crash with `Client rate limit exceeded`. This actor serializes all requests.
 4. **Background Signals**: `HKObserverQuery` and `WCSessionDelegate` receive events on background daemon threads and dispatch them back to the `@MainActor`.
+
+---
+
+## Architecture Decision Records (ADRs)
+
+Detailed historical decisions, considered alternatives, and invariants are preserved in the [Architecture Decision Records directory](adr/README.md).
+
