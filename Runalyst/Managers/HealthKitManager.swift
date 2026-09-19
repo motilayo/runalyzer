@@ -446,22 +446,43 @@ struct RunBaselineData: Sendable {
         var dynamicZone4Threshold: Double = 161.5
         var dynamicZone2Threshold: Double = 142.0
         var dynamicZone1Threshold: Double = 125.0
-        var preferredZoneConfig: Any?
 
-        if #available(iOS 27.0, *) {
-            if let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
-               let actualStore = healthStore as? HKHealthStore,
-               let preferredConfig = try? await actualStore.preferredWorkoutZoneConfiguration(for: hrType) {
-                preferredZoneConfig = preferredConfig
-                let thresholds = DrillPatternRecognizer.extractZoneThresholds(from: preferredConfig)
-                if let z4 = thresholds.zone4Min {
-                    dynamicZone4Threshold = z4
+        if #available(iOS 27.0, *),
+           let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+           let actualStore = healthStore as? NSObject {
+            let sel = NSSelectorFromString("preferredWorkoutZoneConfigurationForQuantityType:completion:")
+            if actualStore.responds(to: sel) {
+                struct DynamicZoneThresholds: Sendable {
+                    let zone1Max: Double?
+                    let zone2Max: Double?
+                    let zone4Min: Double?
                 }
-                if let z2 = thresholds.zone2Max {
-                    dynamicZone2Threshold = z2
+                let thresholds: DynamicZoneThresholds? = await withCheckedContinuation { continuation in
+                    typealias CompletionHandler = @convention(block) (AnyObject?, NSError?) -> Void
+                    let handler: CompletionHandler = { config, _ in
+                        if let config = config {
+                            let extracted = DrillPatternRecognizer.extractZoneThresholds(from: config)
+                            continuation.resume(returning: DynamicZoneThresholds(
+                                zone1Max: extracted.zone1Max,
+                                zone2Max: extracted.zone2Max,
+                                zone4Min: extracted.zone4Min
+                            ))
+                        } else {
+                            continuation.resume(returning: nil)
+                        }
+                    }
+                    _ = actualStore.perform(sel, with: hrType, with: handler)
                 }
-                if let z1 = thresholds.zone1Max {
-                    dynamicZone1Threshold = z1
+                if let thresholds = thresholds {
+                    if let z4 = thresholds.zone4Min {
+                        dynamicZone4Threshold = z4
+                    }
+                    if let z2 = thresholds.zone2Max {
+                        dynamicZone2Threshold = z2
+                    }
+                    if let z1 = thresholds.zone1Max {
+                        dynamicZone1Threshold = z1
+                    }
                 }
             }
         }
@@ -515,8 +536,7 @@ struct RunBaselineData: Sendable {
             zone4Threshold: dynamicZone4Threshold,
             zone2Threshold: dynamicZone2Threshold,
             zone1Threshold: dynamicZone1Threshold,
-            customWorkout: customWorkoutPlan,
-            zoneConfig: preferredZoneConfig
+            customWorkout: customWorkoutPlan
         )
 
         let classification: String
