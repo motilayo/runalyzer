@@ -359,6 +359,56 @@ struct DashboardView: View {
         }
     }
 
+    private func sanitizeSpuriousDrillTags() {
+        var didMutate = false
+        // Purge any stale intents created by the bug that infected UserDefaults
+        let existingIntents = WorkoutBridge.recentIntents()
+        let legitimateIntents = existingIntents.filter { intent in
+            intent.matchedWorkoutID != nil || (intent.durationMinutes <= 15 && intent.targetCadence != nil)
+        }
+        if legitimateIntents.count != existingIntents.count {
+            WorkoutBridge.persistIntents(legitimateIntents)
+        }
+
+        let canonicalDrillIds = Set(PreRunDrillId.allCases.map(\.rawValue))
+        let canonicalDrillTitles = Set(PreRunDrillId.allCases.map(\.title))
+
+        for run in runRecords {
+            guard run.framboiseTags.contains("prescribedDrill") else { continue }
+            // Never scrub manual user drill bindings or unlinks
+            if run.framboiseTags.contains("userLinkedDrill") || run.framboiseTags.contains("userUnlinkedDrill") {
+                continue
+            }
+
+            // A continuous aerobic run (duration >= 12 minutes / 720s or distance >= 1.5 km)
+            // that was falsely recognized as Rhythm Intervals or continuous drill
+            let hasRhythm = run.framboiseTags.contains("drill:Rhythm Intervals") || run.framboiseTags.contains("rhythm_intervals")
+            let hasZone2 = run.framboiseTags.contains("drill:Zone 2 Run") || run.framboiseTags.contains("zone_2_run")
+            let hasRecovery = run.framboiseTags.contains("drill:Recovery Jog") || run.framboiseTags.contains("recovery_jog")
+
+            if (hasRhythm || hasZone2 || hasRecovery) && (run.duration >= 720.0 || run.totalDistanceMeters >= 1500.0) {
+                run.framboiseTags.removeAll { tag in
+                    tag == "prescribedDrill" ||
+                    tag.hasPrefix("drill:") ||
+                    tag.hasPrefix("drillIntervals:") ||
+                    tag.hasPrefix("drillWorkCadence:") ||
+                    tag.hasPrefix("drillRecCadence:") ||
+                    tag.hasPrefix("drillReps:") ||
+                    canonicalDrillIds.contains(tag) ||
+                    canonicalDrillTitles.contains(tag)
+                }
+                if run.detectedTypeRaw == "Intervals" {
+                    run.detectedTypeRaw = "Steady Effort"
+                }
+                didMutate = true
+            }
+        }
+
+        if didMutate {
+            try? modelContext.save()
+        }
+    }
+
     private var activePrimerId: PreRunDrillId {
         if let cadence = baselineCadence, cadence < 150 {
             return .cadencePyramids
@@ -928,6 +978,7 @@ struct DashboardView: View {
                 RunDetailView(runRecord: runRecord)
             }
             .task {
+                sanitizeSpuriousDrillTags()
                 do {
                     try await HealthKitManager.shared.requestAuthorization()
                     if let vo2s = try? await HealthKitManager.shared.fetchRecentGlobalVO2Maxes(limit: 1), !vo2s.isEmpty {
@@ -944,6 +995,7 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
+                sanitizeSpuriousDrillTags()
                 // Invalidate cache
                 cachedHeadline7Day = ""
                 cachedBody7Day = ""

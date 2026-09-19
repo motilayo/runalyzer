@@ -1,4 +1,5 @@
 import Foundation
+import HealthKit
 
 /// Represents the evaluated performance of an individual drill work rep.
 struct DrillIntervalRep: Sendable, Equatable {
@@ -94,8 +95,13 @@ struct DrillIntervalSummary: Sendable, Equatable {
 /// Evaluates interval workouts rep-by-rep against prescribed target cadence and durations.
 enum DrillIntervalEvaluator {
 
-    /// Slices continuous 15-second buckets into individual work and recovery intervals.
+    /// Slices workouts into individual work and recovery intervals using a 4-tier evaluation hierarchy:
+    /// 1. Native `HKWorkoutActivity` intervals (WorkoutKit / Apple Watch intervals, iOS 16+)
+    /// 2. Native `HKWorkoutEvent` lap/segment intervals (iOS 8+)
+    /// 3. Dynamic cadence waveform segmentation from 15-second `BucketData`
+    /// 4. Fallback theoretical schedule (only if buckets are empty or continuous)
     static func evaluate(
+        workout: HKWorkout? = nil,
         buckets: [BucketData],
         drillId: PreRunDrillId,
         baselineCadence: Int,
@@ -113,35 +119,499 @@ enum DrillIntervalEvaluator {
 
         let template = DrillTemplate.template(for: drillId)
         let targetCadenceStr = template.calculateTargetCadence(baselineCadence)
-        let preRunDrill = PreRunDrill(id: drillId, previousCadence: baselineCadence, targetCadence: targetCadenceStr, duration: durationCategory)
-        let effectiveRange = preRunDrill.effectiveTargetCadence
+        let preRunDrill = PreRunDrill(
+            id: drillId,
+            previousCadence: baselineCadence,
+            targetCadence: targetCadenceStr,
+            duration: durationCategory
+        )
+        let context = Context(
+            drillId: drillId,
+            effectiveRange: preRunDrill.effectiveTargetCadence,
+            baselineCadence: baselineCadence,
+            oscDelta: oscDelta,
+            durationCategory: durationCategory
+        )
 
-        let (warmupSec, iterations, workSec, recSec) = drillSchedule(for: drillId, duration: durationCategory)
+        // Continuous drills (Zone 2, Recovery Jog, Aerobic Flush)
+        if drillId.isAerobicContinuous {
+            return evaluateContinuous(
+                buckets: buckets,
+                context: context
+            )
+        }
+
+        // MARK: - Tier 1: Native HKWorkoutActivity Extraction (Apple Watch WorkoutKit)
+        if let workout = workout, workout.workoutActivities.count >= 2 {
+            if let summary = evaluateFromActivities(
+                activities: workout.workoutActivities,
+                buckets: buckets,
+                context: context
+            ) {
+                return summary
+            }
+        }
+
+        // MARK: - Tier 2: Native HKWorkoutEvent Lap/Segment Extraction
+        if let workout = workout, let events = workout.workoutEvents,
+           events.filter({ $0.type == .lap || $0.type == .segment }).count >= 4 {
+            if let summary = evaluateFromEvents(
+                events: events,
+                buckets: buckets,
+                context: context
+            ) {
+                return summary
+            }
+        }
+
+        // MARK: - Tier 3: Dynamic Cadence Waveform Peak/Valley Segmentation
+        if !buckets.isEmpty {
+            if let summary = evaluateFromWaveform(
+                buckets: buckets,
+                context: context
+            ) {
+                return summary
+            }
+        }
+
+        // MARK: - Tier 4: Fallback Theoretical Schedule (when buckets are empty)
+        return evaluateFromSchedule(
+            buckets: buckets,
+            durationCategory: durationCategory,
+            context: context
+        )
+    }
+
+    struct Context: Sendable {
+        let drillId: PreRunDrillId
+        let effectiveRange: ClosedRange<Int>?
+        let baselineCadence: Int
+        let oscDelta: Double
+        let durationCategory: DrillDuration
+
+        init(
+            drillId: PreRunDrillId,
+            effectiveRange: ClosedRange<Int>?,
+            baselineCadence: Int,
+            oscDelta: Double = 0.0,
+            durationCategory: DrillDuration = .fifteenMinutes
+        ) {
+            self.drillId = drillId
+            self.effectiveRange = effectiveRange
+            self.baselineCadence = baselineCadence
+            self.oscDelta = oscDelta
+            self.durationCategory = durationCategory
+        }
+    }
+
+    struct DrillSegment: Sendable {
+        let avgCadence: Double
+        let avgHR: Double
+        let duration: TimeInterval
+        let isWorkHint: Bool?
+    }
+
+    private static func evaluateContinuous(
+        buckets: [BucketData],
+        context: Context
+    ) -> DrillIntervalSummary {
+        let active = buckets.filter { $0.meanCadence > 0 }
+        let avgCadence: Int
+        if active.isEmpty {
+            avgCadence = context.baselineCadence
+        } else {
+            let totalCadence = active.map(\.meanCadence).reduce(0, +)
+            avgCadence = Int(round(totalCadence / Double(active.count)))
+        }
+        let inTarget = context.effectiveRange?.contains(avgCadence) ?? true
+        let met = inTarget ? 1 : 0
+        let tier: DrillAdherenceTier
+        if inTarget {
+            tier = context.oscDelta <= 0 ? .exceeded : .met
+        } else {
+            tier = .notMet
+        }
+        return DrillIntervalSummary(
+            drillId: context.drillId,
+            intervalsMet: met,
+            totalIntervals: 1,
+            workCadenceAvg: avgCadence,
+            recoveryCadenceAvg: 0,
+            reps: [DrillIntervalRep(
+                repIndex: 1,
+                workCadence: avgCadence,
+                workHeartRate: 0,
+                recoveryCadence: 0,
+                recoveryHeartRate: 0,
+                isMet: inTarget
+            )],
+            tier: tier,
+            verdict: inTarget ? "Held steady cadence throughout the drill." : "Cadence missed target steady band."
+        )
+    }
+
+    static func evaluateFromActivities(
+        activities: [HKWorkoutActivity],
+        buckets: [BucketData],
+        context: Context
+    ) -> DrillIntervalSummary? {
+        var segments: [DrillSegment] = []
+        for act in activities {
+            guard act.duration > 0 else { continue }
+            let actEnd = act.endDate ?? act.startDate.addingTimeInterval(act.duration)
+            let actBuckets = buckets.filter { $0.startTime >= act.startDate && $0.startTime < actEnd }
+            let avgC: Double
+            let avgH: Double
+            if !actBuckets.isEmpty {
+                let validCadences = actBuckets.map(\.meanCadence).filter { $0 > 0 }
+                avgC = validCadences.isEmpty ? 0 : (validCadences.reduce(0, +) / Double(validCadences.count))
+                let validHRs = actBuckets.map(\.meanHR).filter { $0 > 0 }
+                avgH = validHRs.isEmpty ? 0 : (validHRs.reduce(0, +) / Double(validHRs.count))
+            } else {
+                let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)
+                let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate)
+                let steps = stepType.flatMap { act.allStatistics[$0]?.sumQuantity()?.doubleValue(for: .count()) } ?? 0
+                let hrVal = hrType.flatMap {
+                    act.allStatistics[$0]?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                } ?? 0
+                avgC = act.duration > 0 ? (steps / (act.duration / 60.0)) : 0
+                avgH = hrVal
+            }
+
+            var hint: Bool?
+            if let typeStr = act.metadata?["HKWorkoutActivityType"] as? String {
+                if typeStr.caseInsensitiveCompare("work") == .orderedSame ||
+                    typeStr.caseInsensitiveCompare("interval") == .orderedSame {
+                    hint = true
+                } else if typeStr.caseInsensitiveCompare("recovery") == .orderedSame ||
+                    typeStr.caseInsensitiveCompare("rest") == .orderedSame {
+                    hint = false
+                }
+            }
+
+            segments.append(DrillSegment(
+                avgCadence: avgC,
+                avgHR: avgH,
+                duration: act.duration,
+                isWorkHint: hint
+            ))
+        }
+
+        return evaluateSegments(segments, context: context)
+    }
+
+    static func evaluateFromEvents(
+        events: [HKWorkoutEvent],
+        buckets: [BucketData],
+        context: Context
+    ) -> DrillIntervalSummary? {
+        let intervalEvents = events.filter { $0.type == .lap || $0.type == .segment }
+        guard intervalEvents.count >= 2 else { return nil }
+
+        var segments: [DrillSegment] = []
+        for evt in intervalEvents {
+            guard evt.dateInterval.duration > 0 else { continue }
+            let start = evt.dateInterval.start
+            let end = evt.dateInterval.end
+            let duration = evt.dateInterval.duration
+            let segBuckets = buckets.filter { $0.startTime >= start && $0.startTime < end }
+            let avgC = segBuckets.isEmpty ? 0.0 : (segBuckets.map(\.meanCadence).reduce(0, +) / Double(segBuckets.count))
+            let validHRs = segBuckets.map(\.meanHR).filter { $0 > 0 }
+            let avgH = validHRs.isEmpty ? 0.0 : (validHRs.reduce(0, +) / Double(validHRs.count))
+
+            var hint: Bool?
+            if let typeStr = evt.metadata?["HKWorkoutActivityType"] as? String {
+                if typeStr.caseInsensitiveCompare("work") == .orderedSame ||
+                    typeStr.caseInsensitiveCompare("interval") == .orderedSame {
+                    hint = true
+                } else if typeStr.caseInsensitiveCompare("recovery") == .orderedSame ||
+                    typeStr.caseInsensitiveCompare("rest") == .orderedSame {
+                    hint = false
+                }
+            }
+
+            segments.append(DrillSegment(
+                avgCadence: avgC,
+                avgHR: avgH,
+                duration: duration,
+                isWorkHint: hint
+            ))
+        }
+
+        return evaluateSegments(segments, context: context)
+    }
+
+    static func evaluateSegments(
+        _ segments: [DrillSegment],
+        context: Context
+    ) -> DrillIntervalSummary? {
+        guard segments.count >= 2 else { return nil }
+
+        let cadences = segments.map(\.avgCadence).filter { $0 > 0 }
+        guard let minC = cadences.min(), let maxC = cadences.max(), (maxC - minC) >= 8.0 else {
+            return nil
+        }
+
+        let schedule = drillSchedule(for: context.drillId, duration: context.durationCategory)
+        let expectedIterations = schedule.iterations
+
+        // Strategy A: Explicit work/recovery metadata hints
+        let workIndices = segments.indices.filter { segments[$0].isWorkHint == true }
+        if !workIndices.isEmpty {
+            var reps: [DrillIntervalRep] = []
+            for (repIdx, workIdx) in workIndices.enumerated() {
+                let work = segments[workIdx]
+                let rec: DrillSegment?
+                if workIdx + 1 < segments.count && segments[workIdx + 1].isWorkHint == false {
+                    rec = segments[workIdx + 1]
+                } else {
+                    rec = nil
+                }
+                reps.append(makeRep(
+                    repIndex: repIdx + 1,
+                    work: work,
+                    recovery: rec,
+                    context: context
+                ))
+            }
+            if reps.count >= 2 {
+                return buildSummary(reps: reps, context: context)
+            }
+        }
+
+        // Strategy B: Alternating structural sequence pairing
+        var working = segments
+
+        // 1. Strip Warmup bookend if present
+        if working.count >= 3 {
+            let exactBookendMatch = (working.count == 2 * expectedIterations + 2) ||
+                (working.count == 2 * expectedIterations + 1)
+            let isWarmupDuration = working[0].duration >= min(100.0, schedule.warmup * 0.6) &&
+                working[0].duration >= schedule.workSec * 1.2
+            if exactBookendMatch || isWarmupDuration {
+                working.removeFirst()
+            }
+        }
+
+        // 2. Strip Cooldown bookend if present
+        if working.count >= 2 {
+            if working.count == 2 * expectedIterations + 1 {
+                working.removeLast()
+            } else if working.count > 2 * expectedIterations && working.count % 2 == 1 {
+                working.removeLast()
+            } else if working.count % 2 == 1, let last = working.last, last.duration >= 90.0 {
+                working.removeLast()
+            }
+        }
+
+        guard working.count >= 2 else { return nil }
+
+        var reps: [DrillIntervalRep] = []
+        let pairCount = working.count / 2
+
+        for k in 0..<pairCount {
+            let candidateA = working[2 * k]
+            let candidateB = working[2 * k + 1]
+
+            let workSeg: DrillSegment
+            let recSeg: DrillSegment
+
+            if candidateA.avgCadence >= candidateB.avgCadence {
+                workSeg = candidateA
+                recSeg = candidateB
+            } else if (candidateB.avgCadence - candidateA.avgCadence >= 8.0) &&
+                (candidateA.duration > candidateB.duration) {
+                // Inverted sequence
+                workSeg = candidateB
+                recSeg = candidateA
+            } else {
+                workSeg = candidateA
+                recSeg = candidateB
+            }
+
+            reps.append(makeRep(
+                repIndex: k + 1,
+                work: workSeg,
+                recovery: recSeg,
+                context: context
+            ))
+        }
+
+        // Odd trailing work interval without recovery
+        if working.count % 2 == 1 && reps.count < expectedIterations {
+            let trailingWork = working[working.count - 1]
+            if trailingWork.duration >= 15.0 && trailingWork.avgCadence >= Double(context.baselineCadence) - 5.0 {
+                reps.append(makeRep(
+                    repIndex: reps.count + 1,
+                    work: trailingWork,
+                    recovery: nil,
+                    context: context
+                ))
+            }
+        }
+
+        guard reps.count >= 2 else { return nil }
+
+        return buildSummary(reps: reps, context: context)
+    }
+
+    private static func makeRep(
+        repIndex: Int,
+        work: DrillSegment,
+        recovery: DrillSegment?,
+        context: Context
+    ) -> DrillIntervalRep {
+        let repWorkCadence = Int(round(work.avgCadence))
+        let repWorkHR = Int(round(work.avgHR))
+
+        let repRecCadence: Int
+        let repRecHR: Int
+        if let recovery = recovery, recovery.avgCadence > 0 {
+            repRecCadence = Int(round(recovery.avgCadence))
+            repRecHR = Int(round(recovery.avgHR))
+        } else {
+            repRecCadence = max(130, context.baselineCadence - 20)
+            repRecHR = 0
+        }
+
+        let isMet: Bool
+        if let range = context.effectiveRange {
+            isMet = range.contains(repWorkCadence) ||
+                (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
+        } else {
+            isMet = repWorkCadence >= context.baselineCadence
+        }
+
+        return DrillIntervalRep(
+            repIndex: repIndex,
+            workCadence: repWorkCadence,
+            workHeartRate: repWorkHR,
+            recoveryCadence: repRecCadence,
+            recoveryHeartRate: repRecHR,
+            isMet: isMet
+        )
+    }
+
+    static func evaluateFromWaveform(
+        buckets: [BucketData],
+        context: Context
+    ) -> DrillIntervalSummary? {
+        let active = buckets.filter { $0.meanCadence > 0 && $0.durationSeconds > 0 }
+        guard active.count >= 6 else { return nil }
+
+        // Smooth cadences using a 2-bucket (30-second) sliding window
+        var smoothed: [Double] = []
+        smoothed.reserveCapacity(active.count)
+        for i in 0..<active.count {
+            let start = max(0, i - 1)
+            let end = min(active.count, i + 2)
+            let slice = active[start..<end]
+            smoothed.append(slice.map(\.meanCadence).reduce(0, +) / Double(slice.count))
+        }
+
+        guard let minC = smoothed.min(), let maxC = smoothed.max(), (maxC - minC) >= 12.0 else {
+            return nil
+        }
+
+        let threshold = (minC + maxC) / 2.0
+
+        struct WaveformSegment {
+            let isWork: Bool
+            var duration: Double
+            var buckets: [BucketData]
+            var avgCadence: Double {
+                buckets.isEmpty ? 0 : (buckets.map(\.meanCadence).reduce(0, +) / Double(buckets.count))
+            }
+            var avgHR: Double {
+                let valid = buckets.map(\.meanHR).filter { $0 > 0 }
+                return valid.isEmpty ? 0 : (valid.reduce(0, +) / Double(valid.count))
+            }
+        }
+
+        var segments: [WaveformSegment] = []
+        var currentIsWork = active[0].meanCadence >= threshold
+        var currentBuckets: [BucketData] = [active[0]]
+
+        for i in 1..<active.count {
+            let isWork = active[i].meanCadence >= threshold
+            if isWork == currentIsWork {
+                currentBuckets.append(active[i])
+            } else {
+                let dur = currentBuckets.map(\.durationSeconds).reduce(0, +)
+                segments.append(WaveformSegment(isWork: currentIsWork, duration: dur, buckets: currentBuckets))
+                currentIsWork = isWork
+                currentBuckets = [active[i]]
+            }
+        }
+        if !currentBuckets.isEmpty {
+            let dur = currentBuckets.map(\.durationSeconds).reduce(0, +)
+            segments.append(WaveformSegment(isWork: currentIsWork, duration: dur, buckets: currentBuckets))
+        }
+
+        // Filter valid interval work segments (duration >= 15s and <= 300s)
+        var reps: [DrillIntervalRep] = []
+        var repIndex = 1
+
+        for i in 0..<segments.count {
+            let seg = segments[i]
+            guard seg.isWork && seg.duration >= 15.0 && seg.duration <= 300.0 else { continue }
+
+            let repWorkCadence = Int(round(seg.avgCadence))
+            let repWorkHR = Int(round(seg.avgHR))
+
+            let repRecCadence: Int
+            let repRecHR: Int
+            if i + 1 < segments.count && !segments[i + 1].isWork {
+                let recSeg = segments[i + 1]
+                repRecCadence = Int(round(recSeg.avgCadence))
+                repRecHR = Int(round(recSeg.avgHR))
+            } else {
+                repRecCadence = max(130, context.baselineCadence - 20)
+                repRecHR = 0
+            }
+
+            let isMet: Bool
+            if let range = context.effectiveRange {
+                isMet = range.contains(repWorkCadence) ||
+                    (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
+            } else {
+                isMet = repWorkCadence >= context.baselineCadence
+            }
+
+            reps.append(DrillIntervalRep(
+                repIndex: repIndex,
+                workCadence: repWorkCadence,
+                workHeartRate: repWorkHR,
+                recoveryCadence: repRecCadence,
+                recoveryHeartRate: repRecHR,
+                isMet: isMet
+            ))
+            repIndex += 1
+        }
+
+        guard reps.count >= 2 else { return nil }
+
+        return buildSummary(
+            reps: reps,
+            context: context
+        )
+    }
+
+    private static func evaluateFromSchedule(
+        buckets: [BucketData],
+        durationCategory: DrillDuration,
+        context: Context
+    ) -> DrillIntervalSummary {
+        let (warmupSec, iterations, workSec, recSec) = drillSchedule(for: context.drillId, duration: durationCategory)
 
         guard iterations > 1, !buckets.isEmpty, let workoutStart = buckets.first?.startTime else {
-            // Fallback for continuous drills (Zone 2, Recovery Jog, Aerobic Flush) or empty buckets
-            let avgCadence = Int(round(buckets.map(\.meanCadence).reduce(0, +) / Double(max(1, buckets.count))))
-            let inTarget = effectiveRange?.contains(avgCadence) ?? true
-            let met = inTarget ? 1 : 0
-            let tier: DrillAdherenceTier = inTarget ? .met : .notMet
-            return DrillIntervalSummary(
-                drillId: drillId,
-                intervalsMet: met,
-                totalIntervals: 1,
-                workCadenceAvg: avgCadence,
-                recoveryCadenceAvg: 0,
-                reps: [DrillIntervalRep(repIndex: 1, workCadence: avgCadence, workHeartRate: 0, recoveryCadence: 0, recoveryHeartRate: 0, isMet: inTarget)],
-                tier: tier,
-                verdict: inTarget ? "Held steady cadence throughout the drill." : "Cadence missed target steady band."
+            return evaluateContinuous(
+                buckets: buckets,
+                context: context
             )
         }
 
         var reps: [DrillIntervalRep] = []
-        var totalWorkCadence = 0
-        var workCount = 0
-        var totalRecCadence = 0
-        var recCount = 0
-
         for i in 0..<iterations {
             let workStartOffset = warmupSec + Double(i) * (workSec + recSec)
             let workEndOffset = workStartOffset + workSec
@@ -153,44 +623,31 @@ enum DrillIntervalEvaluator {
             let recStartDate = workoutStart.addingTimeInterval(recStartOffset)
             let recEndDate = workoutStart.addingTimeInterval(recEndOffset)
 
-            // Collect buckets whose midpoint falls within work interval
             let workBuckets = buckets.filter { bucket in
                 let mid = bucket.startTime.addingTimeInterval(bucket.durationSeconds / 2.0)
                 return mid >= workStartDate && mid < workEndDate
             }
-
-            // Collect buckets whose midpoint falls within recovery interval
             let recBuckets = buckets.filter { bucket in
                 let mid = bucket.startTime.addingTimeInterval(bucket.durationSeconds / 2.0)
                 return mid >= recStartDate && mid < recEndDate
             }
 
-            let repWorkCadence: Int
-            let repWorkHR: Int
-            if !workBuckets.isEmpty {
-                repWorkCadence = Int(round(workBuckets.map(\.meanCadence).reduce(0, +) / Double(workBuckets.count)))
-                repWorkHR = Int(round(workBuckets.map(\.meanHR).filter { $0 > 0 }.reduce(0, +) / Double(max(1, workBuckets.filter { $0.meanHR > 0 }.count))))
-            } else {
-                repWorkCadence = baselineCadence
-                repWorkHR = 0
-            }
+            let repWorkCadence = workBuckets.isEmpty ? context.baselineCadence :
+                Int(round(workBuckets.map(\.meanCadence).reduce(0, +) / Double(workBuckets.count)))
+            let validWorkHR = workBuckets.map(\.meanHR).filter { $0 > 0 }
+            let repWorkHR = validWorkHR.isEmpty ? 0 : Int(round(validWorkHR.reduce(0, +) / Double(validWorkHR.count)))
 
-            let repRecCadence: Int
-            let repRecHR: Int
-            if !recBuckets.isEmpty {
-                repRecCadence = Int(round(recBuckets.map(\.meanCadence).reduce(0, +) / Double(recBuckets.count)))
-                repRecHR = Int(round(recBuckets.map(\.meanHR).filter { $0 > 0 }.reduce(0, +) / Double(max(1, recBuckets.filter { $0.meanHR > 0 }.count))))
-            } else {
-                repRecCadence = max(130, baselineCadence - 20)
-                repRecHR = 0
-            }
+            let repRecCadence = recBuckets.isEmpty ? max(130, context.baselineCadence - 20) :
+                Int(round(recBuckets.map(\.meanCadence).reduce(0, +) / Double(recBuckets.count)))
+            let validRecHR = recBuckets.map(\.meanHR).filter { $0 > 0 }
+            let repRecHR = validRecHR.isEmpty ? 0 : Int(round(validRecHR.reduce(0, +) / Double(validRecHR.count)))
 
             let isMet: Bool
-            if let range = effectiveRange {
-                // Generous grace: in band or within 2 SPM
-                isMet = range.contains(repWorkCadence) || (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
+            if let range = context.effectiveRange {
+                isMet = range.contains(repWorkCadence) ||
+                    (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
             } else {
-                isMet = repWorkCadence >= baselineCadence
+                isMet = repWorkCadence >= context.baselineCadence
             }
 
             reps.append(DrillIntervalRep(
@@ -201,23 +658,30 @@ enum DrillIntervalEvaluator {
                 recoveryHeartRate: repRecHR,
                 isMet: isMet
             ))
-
-            totalWorkCadence += repWorkCadence
-            workCount += 1
-            totalRecCadence += repRecCadence
-            recCount += 1
         }
 
+        return buildSummary(
+            reps: reps,
+            context: context
+        )
+    }
+
+    private static func buildSummary(
+        reps: [DrillIntervalRep],
+        context: Context
+    ) -> DrillIntervalSummary {
         let intervalsMet = reps.filter(\.isMet).count
         let totalIntervals = reps.count
-        let avgWork = workCount > 0 ? (totalWorkCadence / workCount) : baselineCadence
-        let avgRec = recCount > 0 ? (totalRecCadence / recCount) : max(130, baselineCadence - 20)
+        let totalWorkCadence = reps.map(\.workCadence).reduce(0, +)
+        let totalRecCadence = reps.map(\.recoveryCadence).reduce(0, +)
+        let avgWork = totalIntervals > 0 ? (totalWorkCadence / totalIntervals) : context.baselineCadence
+        let avgRec = totalIntervals > 0 ? (totalRecCadence / totalIntervals) : max(130, context.baselineCadence - 20)
 
         let tier: DrillAdherenceTier
         let verdict: String
 
-        if intervalsMet == totalIntervals {
-            if oscDelta <= 0 {
+        if intervalsMet == totalIntervals && totalIntervals > 0 {
+            if context.oscDelta <= 0 {
                 tier = .exceeded
                 verdict = "Flawless form execution: nailed all \(totalIntervals) intervals with improved vertical efficiency."
             } else {
@@ -233,7 +697,7 @@ enum DrillIntervalEvaluator {
         }
 
         return DrillIntervalSummary(
-            drillId: drillId,
+            drillId: context.drillId,
             intervalsMet: intervalsMet,
             totalIntervals: totalIntervals,
             workCadenceAvg: avgWork,
@@ -245,7 +709,10 @@ enum DrillIntervalEvaluator {
     }
 
     /// Helper returning (warmupSec, iterations, workSec, recoverySec) for each drill archetype.
-    private static func drillSchedule(for drillId: PreRunDrillId, duration: DrillDuration) -> (warmup: Double, iterations: Int, workSec: Double, recSec: Double) {
+    private static func drillSchedule(
+        for drillId: PreRunDrillId,
+        duration: DrillDuration
+    ) -> (warmup: Double, iterations: Int, workSec: Double, recSec: Double) {
         switch drillId {
         case .cadencePyramids:
             switch duration {
