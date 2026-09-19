@@ -491,35 +491,46 @@ enum DrillPatternRecognizer {
         return nil
     }
 
-    // MARK: - iOS 27 Zone Thresholds Extraction
+    // MARK: - Dynamic Zone Thresholds Extraction
 
     #if canImport(HealthKit)
-    @available(iOS 27.0, *)
-    static func extractZoneThresholds(from config: HKWorkoutZoneConfiguration) -> (zone1Max: Double?, zone2Max: Double?, zone4Min: Double?) {
+    static func extractZoneThresholds(from config: Any) -> (zone1Max: Double?, zone2Max: Double?, zone4Min: Double?) {
         let bpmUnit = HKUnit(from: "count/min")
         var z1Max: Double?
         var z2Max: Double?
         var z4Min: Double?
 
-        for zone in config.zones {
-            if zone.index == 1 || (zone.index == 0 && config.zones.count >= 5) {
-                z1Max = zone.maximum?.doubleValue(for: bpmUnit)
-            } else if zone.index == 2 || (zone.index == 1 && config.zones.count >= 5) {
-                z2Max = zone.maximum?.doubleValue(for: bpmUnit)
-            } else if zone.index == 4 || (zone.index == 3 && config.zones.count >= 5) {
-                z4Min = zone.minimum?.doubleValue(for: bpmUnit)
+        guard let configObj = config as? NSObject,
+              let zones = configObj.value(forKey: "zones") as? [NSObject] else {
+            return (nil, nil, nil)
+        }
+
+        for (idx, zone) in zones.enumerated() {
+            let zoneIndex = (zone.value(forKey: "index") as? Int) ?? (idx + 1)
+            let maxQty = zone.value(forKey: "maximum") as? HKQuantity
+            let minQty = zone.value(forKey: "minimum") as? HKQuantity
+
+            if zoneIndex == 1 || (zoneIndex == 0 && zones.count >= 5) {
+                z1Max = maxQty?.doubleValue(for: bpmUnit)
+            } else if zoneIndex == 2 || (zoneIndex == 1 && zones.count >= 5) {
+                z2Max = maxQty?.doubleValue(for: bpmUnit)
+            } else if zoneIndex == 4 || (zoneIndex == 3 && zones.count >= 5) {
+                z4Min = minQty?.doubleValue(for: bpmUnit)
             }
         }
 
         // Fallback by array index if zone.index didn't explicitly match
-        if z4Min == nil && config.zones.count >= 4 {
-            z4Min = config.zones[3].minimum?.doubleValue(for: bpmUnit)
+        if z4Min == nil && zones.count >= 4 {
+            let minQty = zones[3].value(forKey: "minimum") as? HKQuantity
+            z4Min = minQty?.doubleValue(for: bpmUnit)
         }
-        if z2Max == nil && config.zones.count >= 2 {
-            z2Max = config.zones[1].maximum?.doubleValue(for: bpmUnit)
+        if z2Max == nil && zones.count >= 2 {
+            let maxQty = zones[1].value(forKey: "maximum") as? HKQuantity
+            z2Max = maxQty?.doubleValue(for: bpmUnit)
         }
-        if z1Max == nil && config.zones.count >= 1 {
-            z1Max = config.zones[0].maximum?.doubleValue(for: bpmUnit)
+        if z1Max == nil && !zones.isEmpty {
+            let maxQty = zones[0].value(forKey: "maximum") as? HKQuantity
+            z1Max = maxQty?.doubleValue(for: bpmUnit)
         }
 
         return (z1Max, z2Max, z4Min)
