@@ -36,10 +36,14 @@ Runalyst 2.0 transforms your running data into proactive, on-device biomechanica
 
 ### 🛠️ Technical Improvements & Architecture
 - **Swift 6 Concurrency**: Strict concurrency compliance across all actors, models, and background tasks.
+- **Architecture Decision Records (ADRs)**: Standardized architecture documentation under `docs/adr/` capturing foundational system decisions.
+- **Grammar-Based Sequence Parsing**: Deterministic grammar parsing engine (`DrillIntervalEvaluator`) analyzing structured workout intervals with work-only adherence grading.
+- **Biomechanical Pattern Recognition**: Autonomous time-series pattern recognition (`DrillPatternRecognizer`) detecting drills directly from 15-second metric buckets.
+- **Modularized Domain Architecture**: Decoupled monolithic WorkoutBridge and HealthKitManager into single-responsibility domain components (`PreRunDrill`, `DrillTemplate`, `PreRunDrillId`, `HealthKitSeeder`).
 - **SwiftData Schema Migration**: Versioned `RunalystSchemaV1` schema supporting lightweight model migrations.
 - **Dynamic User Profile**: Experience level and weekly volume dynamically calculated from recent 30-day SwiftData history.
 - **On-Demand AI Insights**: Pull-to-refresh on `RunDetailView` and `DashboardView` allows instant recalculation of coaching insights.
-- **Automated CI/CD Quality Gates**: Strict SwiftLint enforcement, Gitleaks secret scanning, CoreML seed data generation pipeline, and 37 comprehensive unit & integration tests.
+- **Automated CI/CD Quality Gates**: Strict SwiftLint enforcement, Gitleaks secret scanning, CoreML seed data generation pipeline, and 69 comprehensive unit & integration tests.
 
 ---
 
