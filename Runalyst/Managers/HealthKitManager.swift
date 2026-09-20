@@ -637,6 +637,12 @@ struct RunBaselineData: Sendable {
                     workoutDuration: duration,
                     oscDelta: oscDelta
                 )
+                tags.removeAll {
+                    $0.hasPrefix("drillIntervals:") ||
+                    $0.hasPrefix("drillWorkCadence:") ||
+                    $0.hasPrefix("drillRecCadence:") ||
+                    $0.hasPrefix("drillReps:")
+                }
                 for tag in intervalSummary.framboiseTags where !tags.contains(tag) {
                     tags.append(tag)
                 }

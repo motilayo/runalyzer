@@ -1660,6 +1660,175 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
         XCTAssertTrue(tags.contains("drillReps:1,1,1,1"))
     }
 
+    func testRhythmIntervalsWithAsymmetricCadenceToleranceAndExactStats() {
+        let now = Date()
+        var buckets: [BucketData] = []
+        var currentTime = now
+        var activities: [HKWorkoutActivity] = []
+        let config = HKWorkoutConfiguration()
+        config.activityType = .running
+
+        // Segment 0: Warmup (180s, 148 SPM)
+        let warmupStart = currentTime
+        let warmupEnd = warmupStart.addingTimeInterval(180)
+        for _ in 0..<12 {
+            buckets.append(BucketData(
+                startTime: currentTime,
+                distanceMeters: 45,
+                durationSeconds: 15,
+                meanPaceSecPerKm: 333,
+                meanCadence: 148,
+                meanHR: 130
+            ))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+        activities.append(HKWorkoutActivity(
+            workoutConfiguration: config,
+            start: warmupStart,
+            end: warmupEnd,
+            metadata: nil
+        ))
+
+        // Reps 1 to 5: Work (45s) + Recovery (75s)
+        // Work: 162, 167, 170, 167, 169 SPM
+        // Recovery: 157, 161, 164, 162, 156 SPM
+        let repsData: [(workC: Double, workHR: Double, recC: Double, recHR: Double)] = [
+            (162, 148, 157, 157),
+            (167, 157, 161, 161),
+            (170, 165, 164, 166),
+            (167, 167, 162, 163),
+            (169, 161, 156, 161)
+        ]
+
+        for rep in repsData {
+            let workStart = currentTime
+            let workEnd = workStart.addingTimeInterval(45)
+            for _ in 0..<3 {
+                buckets.append(BucketData(
+                    startTime: currentTime,
+                    distanceMeters: 55,
+                    durationSeconds: 15,
+                    meanPaceSecPerKm: 272,
+                    meanCadence: rep.workC,
+                    meanHR: rep.workHR
+                ))
+                currentTime = currentTime.addingTimeInterval(15)
+            }
+            activities.append(HKWorkoutActivity(
+                workoutConfiguration: config,
+                start: workStart,
+                end: workEnd,
+                metadata: nil
+            ))
+
+            let recStart = currentTime
+            let recEnd = recStart.addingTimeInterval(75)
+            for _ in 0..<5 {
+                buckets.append(BucketData(
+                    startTime: currentTime,
+                    distanceMeters: 40,
+                    durationSeconds: 15,
+                    meanPaceSecPerKm: 375,
+                    meanCadence: rep.recC,
+                    meanHR: rep.recHR
+                ))
+                currentTime = currentTime.addingTimeInterval(15)
+            }
+            activities.append(HKWorkoutActivity(
+                workoutConfiguration: config,
+                start: recStart,
+                end: recEnd,
+                metadata: nil
+            ))
+        }
+
+        // Segment 11: Cooldown (120s, 158 SPM)
+        let cooldownStart = currentTime
+        let cooldownEnd = cooldownStart.addingTimeInterval(120)
+        for _ in 0..<8 {
+            buckets.append(BucketData(
+                startTime: currentTime,
+                distanceMeters: 40,
+                durationSeconds: 15,
+                meanPaceSecPerKm: 375,
+                meanCadence: 158,
+                meanHR: 156
+            ))
+            currentTime = currentTime.addingTimeInterval(15)
+        }
+        activities.append(HKWorkoutActivity(
+            workoutConfiguration: config,
+            start: cooldownStart,
+            end: cooldownEnd,
+            metadata: nil
+        ))
+
+        XCTAssertEqual(activities.count, 12, "Should have 12 activities: warmup, 5 work/rec pairs, cooldown")
+
+        let context = DrillIntervalEvaluator.Context(
+            drillId: .rhythmIntervals,
+            effectiveRange: 157...163,
+            baselineCadence: 151,
+            oscDelta: 0.1,
+            durationCategory: .fifteenMinutes
+        )
+
+        let summary = DrillIntervalEvaluator.evaluateFromActivities(
+            activities: activities,
+            buckets: buckets,
+            context: context
+        )
+
+        XCTAssertNotNil(summary)
+        guard let summary = summary else { return }
+
+        // Total intervals should be exactly 5
+        XCTAssertEqual(summary.totalIntervals, 5)
+        XCTAssertEqual(summary.reps.count, 5)
+
+        // Work average: (162 + 167 + 170 + 167 + 169) / 5 = 167 SPM
+        XCTAssertEqual(summary.workCadenceAvg, 167)
+
+        // Recovery average: (157 + 161 + 164 + 162 + 156) / 5 = 160 SPM
+        XCTAssertEqual(summary.recoveryCadenceAvg, 160)
+
+        // With asymmetric tolerance (+8 SPM: 155-171), all 5 reps meet the target
+        XCTAssertEqual(summary.intervalsMet, 5)
+        XCTAssertEqual(summary.adherencePercentage, 100)
+        for rep in summary.reps {
+            XCTAssertTrue(rep.isMet, "Rep \(rep.repIndex) with cadence \(rep.workCadence) should be met")
+        }
+
+        // Verify tags
+        let tags = summary.framboiseTags
+        XCTAssertTrue(tags.contains("drillIntervals:5/5"))
+        XCTAssertTrue(tags.contains("drillWorkCadence:167"))
+        XCTAssertTrue(tags.contains("drillRecCadence:160"))
+        XCTAssertTrue(tags.contains("drillReps:1,1,1,1,1"))
+    }
+
+    func testStridesFloorTargetCadenceAdherence() {
+        let context = DrillIntervalEvaluator.Context(
+            drillId: .strides,
+            effectiveRange: 170...176,
+            baselineCadence: 155
+        )
+
+        // Lower than floor - 2 (167 < 168) -> not met
+        XCTAssertFalse(DrillIntervalEvaluator.checkIsMet(workCadence: 167, context: context))
+
+        // Within buffer / at floor (168..176) -> met
+        XCTAssertTrue(DrillIntervalEvaluator.checkIsMet(workCadence: 168, context: context))
+        XCTAssertTrue(DrillIntervalEvaluator.checkIsMet(workCadence: 172, context: context))
+
+        // Exceeding upper bound for strides (e.g. 182, 190) -> met (floor philosophy)
+        XCTAssertTrue(DrillIntervalEvaluator.checkIsMet(workCadence: 182, context: context))
+        XCTAssertTrue(DrillIntervalEvaluator.checkIsMet(workCadence: 190, context: context))
+
+        // Hyper-cadence above 195 cap -> not met
+        XCTAssertFalse(DrillIntervalEvaluator.checkIsMet(workCadence: 198, context: context))
+    }
+
     func testDrillTitlesNeverContainUnderscores() {
         // Direct instantiation with raw underscore identifiers
         let drill1 = DrillRecommendation(drillTitle: "rhythm_intervals")

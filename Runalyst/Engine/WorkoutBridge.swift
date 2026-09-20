@@ -428,6 +428,12 @@ final class WorkoutBridge {
                     workoutDuration: runRecord.duration,
                     oscDelta: oscDelta
                 )
+                runRecord.framboiseTags.removeAll {
+                    $0.hasPrefix("drillIntervals:") ||
+                    $0.hasPrefix("drillWorkCadence:") ||
+                    $0.hasPrefix("drillRecCadence:") ||
+                    $0.hasPrefix("drillReps:")
+                }
                 for tag in summary.framboiseTags where !runRecord.framboiseTags.contains(tag) {
                     runRecord.framboiseTags.append(tag)
                 }

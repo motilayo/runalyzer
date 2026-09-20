@@ -255,37 +255,52 @@ enum DrillIntervalEvaluator {
         buckets: [BucketData],
         context: Context
     ) -> DrillIntervalSummary? {
+        let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)
+        let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate)
+
+        let sortedActivities = activities.sorted { $0.startDate < $1.startDate }
         var segments: [DrillSegment] = []
-        for act in activities {
+
+        for act in sortedActivities {
             guard act.duration > 0 else { continue }
-            let actEnd = act.endDate ?? act.startDate.addingTimeInterval(act.duration)
-            let actBuckets = buckets.filter { $0.startTime >= act.startDate && $0.startTime < actEnd }
+            let steps = stepType.flatMap { act.allStatistics[$0]?.sumQuantity()?.doubleValue(for: .count()) } ?? 0
+            let hrVal = hrType.flatMap {
+                act.allStatistics[$0]?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            } ?? 0
+
             let avgC: Double
             let avgH: Double
-            if !actBuckets.isEmpty {
-                let validCadences = actBuckets.map(\.meanCadence).filter { $0 > 0 }
-                avgC = validCadences.isEmpty ? 0 : (validCadences.reduce(0, +) / Double(validCadences.count))
-                let validHRs = actBuckets.map(\.meanHR).filter { $0 > 0 }
-                avgH = validHRs.isEmpty ? 0 : (validHRs.reduce(0, +) / Double(validHRs.count))
-            } else {
-                let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)
-                let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate)
-                let steps = stepType.flatMap { act.allStatistics[$0]?.sumQuantity()?.doubleValue(for: .count()) } ?? 0
-                let hrVal = hrType.flatMap {
-                    act.allStatistics[$0]?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
-                } ?? 0
-                avgC = act.duration > 0 ? (steps / (act.duration / 60.0)) : 0
+
+            if steps > 0 {
+                // Priority 1: Exact native Apple Watch hardware statistics for this activity segment
+                avgC = steps / (act.duration / 60.0)
                 avgH = hrVal
+            } else {
+                // Priority 2: Fallback to time-series bucket interpolation (e.g. test mocks without allStatistics)
+                let actEnd = act.endDate ?? act.startDate.addingTimeInterval(act.duration)
+                let actBuckets = buckets.filter { $0.startTime >= act.startDate && $0.startTime < actEnd }
+                if !actBuckets.isEmpty {
+                    let validCadences = actBuckets.map(\.meanCadence).filter { $0 > 0 }
+                    avgC = validCadences.isEmpty ? 0 : (validCadences.reduce(0, +) / Double(validCadences.count))
+                    let validHRs = actBuckets.map(\.meanHR).filter { $0 > 0 }
+                    avgH = validHRs.isEmpty ? 0 : (validHRs.reduce(0, +) / Double(validHRs.count))
+                } else {
+                    avgC = 0
+                    avgH = hrVal
+                }
             }
 
             var hint: Bool?
-            if let typeStr = act.metadata?["HKWorkoutActivityType"] as? String {
-                if typeStr.caseInsensitiveCompare("work") == .orderedSame ||
-                    typeStr.caseInsensitiveCompare("interval") == .orderedSame {
-                    hint = true
-                } else if typeStr.caseInsensitiveCompare("recovery") == .orderedSame ||
-                    typeStr.caseInsensitiveCompare("rest") == .orderedSame {
-                    hint = false
+            if let metadata = act.metadata {
+                for (_, v) in metadata {
+                    let valStr = String(describing: v).lowercased()
+                    if valStr.contains("work") || valStr.contains("interval") {
+                        hint = true
+                        break
+                    } else if valStr.contains("recovery") || valStr.contains("rest") {
+                        hint = false
+                        break
+                    }
                 }
             }
 
@@ -308,8 +323,9 @@ enum DrillIntervalEvaluator {
         let intervalEvents = events.filter { $0.type == .lap || $0.type == .segment }
         guard intervalEvents.count >= 2 else { return nil }
 
+        let sortedEvents = intervalEvents.sorted { $0.dateInterval.start < $1.dateInterval.start }
         var segments: [DrillSegment] = []
-        for evt in intervalEvents {
+        for evt in sortedEvents {
             guard evt.dateInterval.duration > 0 else { continue }
             let start = evt.dateInterval.start
             let end = evt.dateInterval.end
@@ -320,13 +336,16 @@ enum DrillIntervalEvaluator {
             let avgH = validHRs.isEmpty ? 0.0 : (validHRs.reduce(0, +) / Double(validHRs.count))
 
             var hint: Bool?
-            if let typeStr = evt.metadata?["HKWorkoutActivityType"] as? String {
-                if typeStr.caseInsensitiveCompare("work") == .orderedSame ||
-                    typeStr.caseInsensitiveCompare("interval") == .orderedSame {
-                    hint = true
-                } else if typeStr.caseInsensitiveCompare("recovery") == .orderedSame ||
-                    typeStr.caseInsensitiveCompare("rest") == .orderedSame {
-                    hint = false
+            if let metadata = evt.metadata {
+                for (_, v) in metadata {
+                    let valStr = String(describing: v).lowercased()
+                    if valStr.contains("work") || valStr.contains("interval") {
+                        hint = true
+                        break
+                    } else if valStr.contains("recovery") || valStr.contains("rest") {
+                        hint = false
+                        break
+                    }
                 }
             }
 
@@ -455,6 +474,26 @@ enum DrillIntervalEvaluator {
         return buildSummary(reps: reps, context: context)
     }
 
+    static func checkIsMet(workCadence: Int, context: Context) -> Bool {
+        guard let range = context.effectiveRange else {
+            return workCadence >= context.baselineCadence
+        }
+
+        switch context.drillId {
+        case .strides, .neuromuscularPrimer, .hillBounds, .tempoSurges, .fartlekPrimer:
+            // Sprint & explosive turnover drills: target is a floor (capped at safe physiological limit 195 SPM)
+            return workCadence >= (range.lowerBound - 2) && workCadence <= 195
+
+        case .rhythmIntervals, .cadencePyramids:
+            // Rhythm & cadence pyramid drills: standard lower buffer with generous upward tolerance (+8 SPM, up to 185 SPM)
+            return workCadence >= (range.lowerBound - 2) && workCadence <= min(185, range.upperBound + 8)
+
+        case .zone2Run, .recoveryJog, .aerobicFlush:
+            // Continuous aerobic / active recovery: steady band
+            return workCadence >= (range.lowerBound - 2) && workCadence <= (range.upperBound + 2)
+        }
+    }
+
     private static func makeRep(
         repIndex: Int,
         work: DrillSegment,
@@ -474,13 +513,7 @@ enum DrillIntervalEvaluator {
             repRecHR = 0
         }
 
-        let isMet: Bool
-        if let range = context.effectiveRange {
-            isMet = range.contains(repWorkCadence) ||
-                (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
-        } else {
-            isMet = repWorkCadence >= context.baselineCadence
-        }
+        let isMet = checkIsMet(workCadence: repWorkCadence, context: context)
 
         return DrillIntervalRep(
             repIndex: repIndex,
@@ -570,13 +603,7 @@ enum DrillIntervalEvaluator {
                 repRecHR = 0
             }
 
-            let isMet: Bool
-            if let range = context.effectiveRange {
-                isMet = range.contains(repWorkCadence) ||
-                    (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
-            } else {
-                isMet = repWorkCadence >= context.baselineCadence
-            }
+            let isMet = checkIsMet(workCadence: repWorkCadence, context: context)
 
             reps.append(DrillIntervalRep(
                 repIndex: repIndex,
@@ -642,13 +669,7 @@ enum DrillIntervalEvaluator {
             let validRecHR = recBuckets.map(\.meanHR).filter { $0 > 0 }
             let repRecHR = validRecHR.isEmpty ? 0 : Int(round(validRecHR.reduce(0, +) / Double(validRecHR.count)))
 
-            let isMet: Bool
-            if let range = context.effectiveRange {
-                isMet = range.contains(repWorkCadence) ||
-                    (repWorkCadence >= range.lowerBound - 2 && repWorkCadence <= range.upperBound + 2)
-            } else {
-                isMet = repWorkCadence >= context.baselineCadence
-            }
+            let isMet = checkIsMet(workCadence: repWorkCadence, context: context)
 
             reps.append(DrillIntervalRep(
                 repIndex: i + 1,
