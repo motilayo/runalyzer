@@ -269,4 +269,123 @@ final class DrillPatternRecognitionTests: XCTestCase {
         XCTAssertEqual(intent?.drillTitle, "Rhythm Intervals")
         XCTAssertEqual(intent?.preRunDrillId, "rhythm_intervals")
     }
+
+    func testAppleFitnessPlusIntervalRunIsNotRecognizedAsTempoSurges() {
+        // User reported issue: Apple Fitness+ intervals run with 4 sets of song-based easy run + hard push
+        // must NOT be classified as Tempo Surges.
+        var buckets: [BucketData] = []
+        var t: Double = 0
+
+        // 4 songs with varying push and recovery lengths based on track arrangement
+        // Song 1: 150s easy (158 SPM, 145 HR), 90s push (174 SPM, 166 HR)
+        // Song 2: 180s easy (158 SPM, 148 HR), 150s push (175 SPM, 168 HR)
+        // Song 3: 210s easy (157 SPM, 150 HR), 105s push (176 SPM, 170 HR)
+        // Song 4: 180s easy (158 SPM, 152 HR), 135s push (176 SPM, 172 HR)
+        let sets: [(easySec: Double, pushSec: Double)] = [
+            (150.0, 90.0),
+            (180.0, 150.0),
+            (210.0, 105.0),
+            (180.0, 135.0)
+        ]
+
+        for set in sets {
+            let easyBuckets = Int(set.easySec / 15.0)
+            for _ in 0..<easyBuckets {
+                buckets.append(createBucket(offsetSeconds: t, cadence: 158.0, hr: 148.0, pace: 290.0))
+                t += 15.0
+            }
+            let pushBuckets = Int(set.pushSec / 15.0)
+            for _ in 0..<pushBuckets {
+                buckets.append(createBucket(offsetSeconds: t, cadence: 175.0, hr: 168.0, pace: 240.0))
+                t += 15.0
+            }
+        }
+
+        let match = DrillPatternRecognizer.recognizeDrill(
+            buckets: buckets,
+            baselineCadence: 160,
+            workoutDuration: t,
+            zone4Threshold: 162.0
+        )
+
+        XCTAssertNil(match, "Apple Fitness+ song-based 4-set push/easy intervals must not match Runalyst Tempo Surges")
+    }
+
+    func testWorkoutBridgeExemptsAppleFitnessPlusWorkoutsFromDrillMatching() {
+        var buckets: [BucketData] = []
+        var t: Double = 0
+
+        // Even if buckets artificially mimic a drill, Apple Fitness+ session metadata must reject drill matching
+        for _ in 0..<12 {
+            buckets.append(createBucket(offsetSeconds: t, cadence: 150.0, hr: 135.0))
+            t += 15.0
+        }
+        for _ in 0..<5 {
+            for _ in 0..<3 {
+                buckets.append(createBucket(offsetSeconds: t, cadence: 164.0, hr: 160.0))
+                t += 15.0
+            }
+            for _ in 0..<5 {
+                buckets.append(createBucket(offsetSeconds: t, cadence: 144.0, hr: 138.0))
+                t += 15.0
+            }
+        }
+
+        let afpMetadata: [String: Any] = [
+            HKMetadataKeyAppleFitnessPlusSession: true
+        ]
+
+        let intent = WorkoutBridge.matchDrill(
+            workoutDate: Date(),
+            durationSeconds: t,
+            metadata: afpMetadata,
+            buckets: buckets,
+            baselineCadence: 152
+        )
+
+        XCTAssertNil(intent, "Apple Fitness+ guided sessions must never be tagged as Runalyst drills")
+    }
+
+    func testWorkoutBridgeExemptsThirdPartyAppSessions() {
+        let thirdPartyMetadata: [String: Any] = [
+            "com.nike.running.session": true
+        ]
+
+        let isThirdParty = WorkoutBridge.isGuidedOrThirdPartySession(metadata: thirdPartyMetadata)
+        XCTAssertTrue(isThirdParty, "Nike Running Club sessions must be recognized as third-party")
+
+        let stravaMetadata: [String: Any] = [
+            "StravaActivityId": "12345678"
+        ]
+        XCTAssertTrue(WorkoutBridge.isGuidedOrThirdPartySession(metadata: stravaMetadata), "Strava sessions must be recognized as third-party")
+    }
+
+    func testStrictDrillSchedule15MinTempoSurgesMatches() {
+        var buckets: [BucketData] = []
+        var t: Double = 0
+
+        // 20 min continuous tempo run (80 buckets), base cadence 162, HR 155
+        // 15-minute Tempo Surges: 3 iterations x 120s (8 buckets each)
+        for i in 0..<80 {
+            if (16 <= i && i < 24) || (36 <= i && i < 44) || (56 <= i && i < 64) {
+                // 120s surges: Cadence 174, HR 166 (Zone 4)
+                buckets.append(createBucket(offsetSeconds: t, cadence: 174.0, hr: 166.0, pace: 240.0))
+            } else {
+                // Base tempo: Cadence 162, HR 155 (Zone 3)
+                buckets.append(createBucket(offsetSeconds: t, cadence: 162.0, hr: 155.0, pace: 270.0))
+            }
+            t += 15.0
+        }
+
+        let match = DrillPatternRecognizer.recognizeDrill(
+            buckets: buckets,
+            baselineCadence: 160,
+            workoutDuration: t,
+            zone4Threshold: 161.5
+        )
+
+        XCTAssertNotNil(match, "15-minute Tempo Surges (3 x 120s) must be recognized")
+        XCTAssertEqual(match?.drillId, .tempoSurges)
+        XCTAssertEqual(match?.detectedIntervalCount, 3)
+    }
 }

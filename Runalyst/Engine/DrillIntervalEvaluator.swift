@@ -371,7 +371,7 @@ enum DrillIntervalEvaluator {
             return nil
         }
 
-        let schedule = drillSchedule(for: context.drillId, duration: context.durationCategory)
+        let schedule = DrillSchedule.schedule(for: context.drillId, duration: context.durationCategory)
         let expectedIterations = schedule.iterations
 
         // Strategy A: Explicit work/recovery metadata hints
@@ -639,7 +639,11 @@ enum DrillIntervalEvaluator {
         durationCategory: DrillDuration,
         context: Context
     ) -> DrillIntervalSummary {
-        let (warmupSec, iterations, workSec, recSec) = drillSchedule(for: context.drillId, duration: durationCategory)
+        let schedule = DrillSchedule.schedule(for: context.drillId, duration: durationCategory)
+        let warmupSec = schedule.warmupSeconds
+        let iterations = schedule.iterations
+        let workSec = schedule.workSeconds
+        let recSec = schedule.recoverySeconds
 
         guard iterations > 1, !buckets.isEmpty, let workoutStart = buckets.first?.startTime else {
             return evaluateContinuous(
@@ -739,56 +743,4 @@ enum DrillIntervalEvaluator {
         )
     }
 
-    /// Helper returning (warmupSec, iterations, workSec, recoverySec) for each drill archetype.
-    private static func drillSchedule(
-        for drillId: PreRunDrillId,
-        duration: DrillDuration
-    ) -> (warmup: Double, iterations: Int, workSec: Double, recSec: Double) {
-        switch drillId {
-        case .cadencePyramids:
-            switch duration {
-            case .tenMinutes: return (120, 4, 30, 45)
-            case .fifteenMinutes: return (180, 4, 60, 90)
-            case .thirtyMinutes: return (240, 6, 90, 120)
-            }
-        case .rhythmIntervals:
-            switch duration {
-            case .tenMinutes: return (120, 4, 30, 45)
-            case .fifteenMinutes: return (180, 5, 45, 75)
-            case .thirtyMinutes: return (240, 6, 90, 120)
-            }
-        case .tempoSurges:
-            switch duration {
-            case .tenMinutes: return (120, 3, 60, 90)
-            case .fifteenMinutes: return (180, 3, 120, 120)
-            case .thirtyMinutes: return (240, 4, 180, 180)
-            }
-        case .strides:
-            switch duration {
-            case .tenMinutes: return (120, 4, 15, 45)
-            case .fifteenMinutes: return (180, 6, 20, 60)
-            case .thirtyMinutes: return (240, 8, 30, 90)
-            }
-        case .neuromuscularPrimer:
-            switch duration {
-            case .tenMinutes: return (120, 4, 20, 40)
-            case .fifteenMinutes: return (180, 5, 30, 60)
-            case .thirtyMinutes: return (240, 6, 45, 90)
-            }
-        case .fartlekPrimer:
-            switch duration {
-            case .tenMinutes: return (120, 4, 45, 45)
-            case .fifteenMinutes: return (180, 5, 60, 60)
-            case .thirtyMinutes: return (240, 6, 120, 120)
-            }
-        case .hillBounds:
-            switch duration {
-            case .tenMinutes: return (120, 4, 20, 40)
-            case .fifteenMinutes: return (180, 5, 30, 60)
-            case .thirtyMinutes: return (240, 6, 45, 90)
-            }
-        case .aerobicFlush, .recoveryJog, .zone2Run:
-            return (0, 1, Double(duration.rawValue * 60), 0)
-        }
-    }
 }

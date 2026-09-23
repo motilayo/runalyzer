@@ -43,8 +43,8 @@ enum DrillPatternRecognizer {
         let refBaseline = baselineCadence > 0 ? Double(baselineCadence) : meanCadence
 
         // MARK: 1. Tempo Surges Signature (Continuous Tempo Run with Threshold Surges)
-        // A continuous aerobic run with 2-5 distinct surges pushing into Zone 4
-        if workoutDuration >= 720.0 {
+        // A continuous aerobic run with distinct surges pushing into Zone 4
+        if workoutDuration >= 360.0 {
             if let tempoMatch = detectTempoSurges(
                 buckets: buckets,
                 refBaseline: refBaseline,
@@ -108,7 +108,14 @@ enum DrillPatternRecognizer {
 
         for i in 1..<smoothedCadences.count {
             let isWork = smoothedCadences[i] >= splitThreshold
-            if isWork == currentIsWork {
+            let curAvgCadence = currentBuckets.map(\.meanCadence).reduce(0, +) / Double(currentBuckets.count)
+            let curDuration = currentBuckets.map(\.durationSeconds).reduce(0, +)
+
+            // Detect segment boundary either by threshold crossing or by significant cadence step
+            // from an extended phase (e.g. warmup of >= 60s transitioning into an interval)
+            let isCadenceStep = curDuration >= 60.0 && abs(smoothedCadences[i] - curAvgCadence) >= 10.0
+
+            if isWork == currentIsWork && !isCadenceStep {
                 currentBuckets.append(active[i])
             } else {
                 let dur = currentBuckets.map(\.durationSeconds).reduce(0, +)
@@ -122,10 +129,16 @@ enum DrillPatternRecognizer {
             segments.append(CandidateSegment(isWork: currentIsWork, duration: dur, buckets: currentBuckets))
         }
 
-        // Real interval work reps last between 15s and 180s.
+        // Strip leading Warmup bookend if present (duration >= 90s before alternating intervals)
+        var intervalSegments = segments
+        if intervalSegments.count >= 3 && intervalSegments[0].duration >= 90.0 {
+            intervalSegments.removeFirst()
+        }
+
+        // Real interval work reps last between 15s and 130s.
         // Recovery reps must be intentional recovery (duration >= 20s), not momentary 5s street pauses.
-        let workReps = segments.filter { $0.isWork && $0.duration >= 15.0 && $0.duration <= 240.0 }
-        let recReps = segments.filter { !$0.isWork && $0.duration >= 20.0 }
+        let workReps = intervalSegments.filter { $0.isWork && $0.duration >= 15.0 && $0.duration <= 130.0 }
+        let recReps = intervalSegments.filter { !$0.isWork && $0.duration >= 20.0 }
 
         // Structured intervals require alternating sets with at least 3 distinct recovery reps
         guard workReps.count >= 3 && recReps.count >= 2 else {
@@ -148,25 +161,36 @@ enum DrillPatternRecognizer {
         if stridesCandidates.count >= 3 && Double(stridesCandidates.count) >= Double(workReps.count) * 0.70 {
             let avgRecC = recReps.isEmpty ? 0.0 : (recReps.map { $0.avgCadence }.reduce(0, +) / Double(recReps.count))
             let avgStridesC = stridesCandidates.map { $0.avgCadence }.reduce(0, +) / Double(stridesCandidates.count)
-            if avgRecC <= 130.0 || (avgStridesC - avgRecC) >= 30.0 {
+            let avgWorkDur = stridesCandidates.map(\.duration).reduce(0, +) / Double(stridesCandidates.count)
+            let avgRecDur = recReps.isEmpty ? 0.0 : (recReps.map(\.duration).reduce(0, +) / Double(recReps.count))
+
+            if let sched = DrillSchedule.findMatchingSchedule(
+                workoutDuration: workoutDuration,
+                detectedIterations: stridesCandidates.count,
+                avgWorkDuration: avgWorkDur,
+                avgRecoveryDuration: avgRecDur,
+                candidateDrills: [.strides]
+            ), avgRecC <= 130.0 || (avgStridesC - avgRecC) >= 28.0 {
                 return DrillPatternMatch(
                     drillId: .strides,
-                    confidence: 0.92,
+                    confidence: 0.95,
                     detectedIntervalCount: stridesCandidates.count,
                     avgWorkCadence: Int(round(avgStridesC)),
                     avgRecoveryCadence: Int(round(avgRecC)),
-                    signatureDescription: "Detected \(stridesCandidates.count) explosive accelerations (avg \(Int(round(avgStridesC))) SPM) with walk/light recovery."
+                    signatureDescription: "Detected \(stridesCandidates.count) explosive accelerations (\(sched.durationCategory.title), avg \(Int(round(avgStridesC))) SPM) with walk/light recovery."
                 )
             }
         }
 
         // MARK: 2. Cadence Pyramids vs Rhythm Intervals
-        let intervalWorkReps = workReps.filter { $0.duration >= 25.0 && $0.duration <= 180.0 }
+        let intervalWorkReps = workReps.filter { $0.duration >= 20.0 && $0.duration <= 130.0 }
         if intervalWorkReps.count >= 4 && recReps.count >= 3 {
             let workCadences = intervalWorkReps.map { $0.avgCadence }
             let wMean = workCadences.reduce(0, +) / Double(workCadences.count)
             let avgRecC = recReps.map { $0.avgCadence }.reduce(0, +) / Double(recReps.count)
             let contrast = wMean - avgRecC
+            let avgWorkDur = intervalWorkReps.map(\.duration).reduce(0, +) / Double(intervalWorkReps.count)
+            let avgRecDur = recReps.map(\.duration).reduce(0, +) / Double(recReps.count)
 
             // Cadence Pyramids: progressive monotonic step-up (>= 2.0 SPM per step) or up/down pyramid
             let isMonotonicUp: Bool = {
@@ -196,14 +220,20 @@ enum DrillPatternRecognizer {
                 }
             }
 
-            if contrast >= 12.0 && ((isMonotonicUp && cadenceSpread >= 5.0) || isPyramid) {
+            if let sched = DrillSchedule.findMatchingSchedule(
+                workoutDuration: workoutDuration,
+                detectedIterations: intervalWorkReps.count,
+                avgWorkDuration: avgWorkDur,
+                avgRecoveryDuration: avgRecDur,
+                candidateDrills: [.cadencePyramids]
+            ), contrast >= 12.0 && ((isMonotonicUp && cadenceSpread >= 5.0) || isPyramid) {
                 return DrillPatternMatch(
                     drillId: .cadencePyramids,
                     confidence: 0.95,
                     detectedIntervalCount: intervalWorkReps.count,
                     avgWorkCadence: Int(round(wMean)),
                     avgRecoveryCadence: Int(round(avgRecC)),
-                    signatureDescription: "Detected \(intervalWorkReps.count) stepped intervals with progressive turnover range (\(Int(round(workCadences.min() ?? 0)))–\(Int(round(workCadences.max() ?? 0))) SPM)."
+                    signatureDescription: "Detected \(intervalWorkReps.count) stepped intervals (\(sched.durationCategory.title)) with progressive turnover range (\(Int(round(workCadences.min() ?? 0)))–\(Int(round(workCadences.max() ?? 0))) SPM)."
                 )
             }
 
@@ -214,18 +244,24 @@ enum DrillPatternRecognizer {
             let wVariance = workCadences.map { pow($0 - wMean, 2) }.reduce(0, +) / Double(workCadences.count)
             let wStd = sqrt(wVariance)
 
-            if contrast >= 15.0 &&
+            if let sched = DrillSchedule.findMatchingSchedule(
+                workoutDuration: workoutDuration,
+                detectedIterations: intervalWorkReps.count,
+                avgWorkDuration: avgWorkDur,
+                avgRecoveryDuration: avgRecDur,
+                candidateDrills: [.rhythmIntervals]
+            ), contrast >= 15.0 &&
                wMean >= (refBaseline + 5.0) &&
                wMean >= 160.0 &&
                avgRecC <= (refBaseline - 5.0) &&
                wStd <= 2.5 {
                 return DrillPatternMatch(
                     drillId: .rhythmIntervals,
-                    confidence: 0.93,
+                    confidence: 0.95,
                     detectedIntervalCount: intervalWorkReps.count,
                     avgWorkCadence: Int(round(wMean)),
                     avgRecoveryCadence: Int(round(avgRecC)),
-                    signatureDescription: "Detected \(intervalWorkReps.count) steady rhythm intervals at \(Int(round(wMean))) SPM with tight turnover consistency (std \(String(format: "%.1f", wStd)) SPM)."
+                    signatureDescription: "Detected \(intervalWorkReps.count) steady rhythm intervals (\(sched.durationCategory.title)) at \(Int(round(wMean))) SPM with tight turnover consistency (std \(String(format: "%.1f", wStd)) SPM)."
                 )
             }
         }
@@ -240,7 +276,7 @@ enum DrillPatternRecognizer {
         zone4Threshold: Double,
         zone2Threshold: Double
     ) -> DrillPatternMatch? {
-        guard workoutDuration >= 720.0 else { return nil }
+        guard workoutDuration >= 360.0 else { return nil }
 
         // Identify candidate surge reps: contiguous bucket index ranges with HR in Zone 4 and elevated cadence
         var surgeRanges: [Range<Int>] = []
@@ -254,7 +290,7 @@ enum DrillPatternRecognizer {
             } else {
                 if let start = surgeStart {
                     let dur = buckets[start..<i].map(\.durationSeconds).reduce(0, +)
-                    if dur >= 25.0 && dur <= 150.0 {
+                    if dur >= 20.0 && dur <= 240.0 {
                         surgeRanges.append(start..<i)
                     }
                     surgeStart = nil
@@ -263,12 +299,41 @@ enum DrillPatternRecognizer {
         }
         if let start = surgeStart {
             let dur = buckets[start..<buckets.count].map(\.durationSeconds).reduce(0, +)
-            if dur >= 25.0 && dur <= 150.0 {
+            if dur >= 20.0 && dur <= 240.0 {
                 surgeRanges.append(start..<buckets.count)
             }
         }
 
-        guard surgeRanges.count >= 2 && surgeRanges.count <= 5 else { return nil }
+        // Tempo Surges in Runalyst strictly prescribes 3 iterations (10m, 15m) or 4 iterations (30m)
+        guard surgeRanges.count == 3 || surgeRanges.count == 4 else { return nil }
+
+        let surgeDurations = surgeRanges.map { r in
+            buckets[r].map(\.durationSeconds).reduce(0, +)
+        }
+        let avgWorkDuration = surgeDurations.reduce(0, +) / Double(surgeDurations.count)
+
+        // Compute recovery durations between consecutive surges
+        var recDurations: [Double] = []
+        for idx in 0..<(surgeRanges.count - 1) {
+            let recStart = surgeRanges[idx].upperBound
+            let recEnd = surgeRanges[idx + 1].lowerBound
+            if recEnd > recStart {
+                let dur = buckets[recStart..<recEnd].map(\.durationSeconds).reduce(0, +)
+                recDurations.append(dur)
+            }
+        }
+        let avgRecDuration = recDurations.isEmpty ? 0.0 : (recDurations.reduce(0, +) / Double(recDurations.count))
+
+        // Strict schedule matching: Must match one of the canonical Tempo Surges schedules
+        guard let matchingSchedule = DrillSchedule.findMatchingSchedule(
+            workoutDuration: workoutDuration,
+            detectedIterations: surgeRanges.count,
+            avgWorkDuration: avgWorkDuration,
+            avgRecoveryDuration: avgRecDuration,
+            candidateDrills: [.tempoSurges]
+        ) else {
+            return nil
+        }
 
         // Inspect baseline running outside of surges
         var surgeIndices = Set<Int>()
@@ -290,17 +355,17 @@ enum DrillPatternRecognizer {
         guard baseCadence >= (refBaseline - 4.0),
               baseHR >= (zone2Threshold - 2.0),
               (surgeCadence - baseCadence) >= 7.0,
-              (surgeTime / workoutDuration) <= 0.30 else {
+              (surgeTime / workoutDuration) <= 0.35 else {
             return nil
         }
 
         return DrillPatternMatch(
             drillId: .tempoSurges,
-            confidence: 0.90,
+            confidence: 0.94,
             detectedIntervalCount: surgeRanges.count,
             avgWorkCadence: Int(round(surgeCadence)),
             avgRecoveryCadence: Int(round(baseCadence)),
-            signatureDescription: "Detected continuous tempo run containing \(surgeRanges.count) threshold surges (avg \(Int(round(surgeCadence))) SPM in Zone 4)."
+            signatureDescription: "Detected continuous tempo run containing \(surgeRanges.count) threshold surges (\(matchingSchedule.durationCategory.title), avg \(Int(round(surgeCadence))) SPM in Zone 4)."
         )
     }
 
@@ -362,15 +427,25 @@ enum DrillPatternRecognizer {
         let wStd = sqrt(wVariance)
         let avgRecC = recActs.isEmpty ? 0.0 : (recActs.map { $0.avgCadence }.reduce(0, +) / Double(recActs.count))
 
+        let totalActDuration = activityStats.map(\.duration).reduce(0, +)
+        let avgWorkDur = workActs.map(\.duration).reduce(0, +) / Double(workActs.count)
+        let avgRecDur = recActs.isEmpty ? 0.0 : (recActs.map(\.duration).reduce(0, +) / Double(recActs.count))
+
         // Strides check
-        if workActs.allSatisfy({ $0.duration <= 45.0 }) && (wMean >= 174.0 || wMean >= Double(baselineCadence) + 16.0) {
+        if let sched = DrillSchedule.findMatchingSchedule(
+            workoutDuration: totalActDuration,
+            detectedIterations: workActs.count,
+            avgWorkDuration: avgWorkDur,
+            avgRecoveryDuration: avgRecDur,
+            candidateDrills: [.strides]
+        ), workActs.allSatisfy({ $0.duration <= 45.0 }) && (wMean >= 174.0 || wMean >= Double(baselineCadence) + 16.0) {
             return DrillPatternMatch(
                 drillId: .strides,
                 confidence: 0.95,
                 detectedIntervalCount: workActs.count,
                 avgWorkCadence: Int(round(wMean)),
                 avgRecoveryCadence: Int(round(avgRecC)),
-                signatureDescription: "Structured workout activities: \(workActs.count) short stride sprints at \(Int(round(wMean))) SPM."
+                signatureDescription: "Structured workout activities: \(workActs.count) short stride sprints (\(sched.durationCategory.title)) at \(Int(round(wMean))) SPM."
             )
         }
 
@@ -382,26 +457,56 @@ enum DrillPatternRecognizer {
             return true
         }()
         let spread = (workCadences.max() ?? 0) - (workCadences.min() ?? 0)
-        if isMonotonicUp && spread >= 5.0 {
+        if let sched = DrillSchedule.findMatchingSchedule(
+            workoutDuration: totalActDuration,
+            detectedIterations: workActs.count,
+            avgWorkDuration: avgWorkDur,
+            avgRecoveryDuration: avgRecDur,
+            candidateDrills: [.cadencePyramids]
+        ), isMonotonicUp && spread >= 5.0 {
             return DrillPatternMatch(
                 drillId: .cadencePyramids,
                 confidence: 0.96,
                 detectedIntervalCount: workActs.count,
                 avgWorkCadence: Int(round(wMean)),
                 avgRecoveryCadence: Int(round(avgRecC)),
-                signatureDescription: "Structured workout activities: \(workActs.count) progressive pyramid reps (\(Int(round(workCadences.min() ?? 0)))–\(Int(round(workCadences.max() ?? 0))) SPM)."
+                signatureDescription: "Structured workout activities: \(workActs.count) progressive pyramid reps (\(sched.durationCategory.title), \(Int(round(workCadences.min() ?? 0)))–\(Int(round(workCadences.max() ?? 0))) SPM)."
             )
         }
 
         // Rhythm intervals check
-        if wStd <= 3.8 {
+        if let sched = DrillSchedule.findMatchingSchedule(
+            workoutDuration: totalActDuration,
+            detectedIterations: workActs.count,
+            avgWorkDuration: avgWorkDur,
+            avgRecoveryDuration: avgRecDur,
+            candidateDrills: [.rhythmIntervals]
+        ), wStd <= 3.8 {
             return DrillPatternMatch(
                 drillId: .rhythmIntervals,
                 confidence: 0.95,
                 detectedIntervalCount: workActs.count,
                 avgWorkCadence: Int(round(wMean)),
                 avgRecoveryCadence: Int(round(avgRecC)),
-                signatureDescription: "Structured workout activities: \(workActs.count) interval reps dialed to \(Int(round(wMean))) SPM."
+                signatureDescription: "Structured workout activities: \(workActs.count) interval reps (\(sched.durationCategory.title)) dialed to \(Int(round(wMean))) SPM."
+            )
+        }
+
+        // Tempo surges check
+        if let sched = DrillSchedule.findMatchingSchedule(
+            workoutDuration: totalActDuration,
+            detectedIterations: workActs.count,
+            avgWorkDuration: avgWorkDur,
+            avgRecoveryDuration: avgRecDur,
+            candidateDrills: [.tempoSurges]
+        ), wMean >= Double(baselineCadence) + 5.0 {
+            return DrillPatternMatch(
+                drillId: .tempoSurges,
+                confidence: 0.95,
+                detectedIntervalCount: workActs.count,
+                avgWorkCadence: Int(round(wMean)),
+                avgRecoveryCadence: Int(round(avgRecC)),
+                signatureDescription: "Structured workout activities: \(workActs.count) tempo surge reps (\(sched.durationCategory.title)) at \(Int(round(wMean))) SPM."
             )
         }
 
@@ -457,6 +562,10 @@ enum DrillPatternRecognizer {
         let wStd = sqrt(wVariance)
         let avgRecC = recLaps.isEmpty ? 0.0 : (recLaps.map { $0.avgCadence }.reduce(0, +) / Double(recLaps.count))
 
+        let totalEvtDuration = lapStats.map(\.duration).reduce(0, +)
+        let avgWorkDur = workLaps.map(\.duration).reduce(0, +) / Double(workLaps.count)
+        let avgRecDur = recLaps.isEmpty ? 0.0 : (recLaps.map(\.duration).reduce(0, +) / Double(recLaps.count))
+
         // Check Pyramids
         let isMonotonicUp: Bool = {
             for i in 0..<(workCadences.count - 1) where (workCadences[i + 1] - workCadences[i]) < 2.0 {
@@ -465,26 +574,38 @@ enum DrillPatternRecognizer {
             return true
         }()
         let spread = (workCadences.max() ?? 0) - (workCadences.min() ?? 0)
-        if isMonotonicUp && spread >= 5.0 {
+        if let sched = DrillSchedule.findMatchingSchedule(
+            workoutDuration: totalEvtDuration,
+            detectedIterations: workLaps.count,
+            avgWorkDuration: avgWorkDur,
+            avgRecoveryDuration: avgRecDur,
+            candidateDrills: [.cadencePyramids]
+        ), isMonotonicUp && spread >= 5.0 {
             return DrillPatternMatch(
                 drillId: .cadencePyramids,
                 confidence: 0.94,
                 detectedIntervalCount: workLaps.count,
                 avgWorkCadence: Int(round(wMean)),
                 avgRecoveryCadence: Int(round(avgRecC)),
-                signatureDescription: "Event lap markers: \(workLaps.count) progressive cadence pyramid laps."
+                signatureDescription: "Event lap markers: \(workLaps.count) progressive cadence pyramid laps (\(sched.durationCategory.title))."
             )
         }
 
         // Check Rhythm Intervals
-        if wStd <= 3.8 {
+        if let sched = DrillSchedule.findMatchingSchedule(
+            workoutDuration: totalEvtDuration,
+            detectedIterations: workLaps.count,
+            avgWorkDuration: avgWorkDur,
+            avgRecoveryDuration: avgRecDur,
+            candidateDrills: [.rhythmIntervals]
+        ), wStd <= 3.8 {
             return DrillPatternMatch(
                 drillId: .rhythmIntervals,
                 confidence: 0.93,
                 detectedIntervalCount: workLaps.count,
                 avgWorkCadence: Int(round(wMean)),
                 avgRecoveryCadence: Int(round(avgRecC)),
-                signatureDescription: "Event lap markers: \(workLaps.count) steady rhythm interval laps at \(Int(round(wMean))) SPM."
+                signatureDescription: "Event lap markers: \(workLaps.count) steady rhythm interval laps (\(sched.durationCategory.title)) at \(Int(round(wMean))) SPM."
             )
         }
 
