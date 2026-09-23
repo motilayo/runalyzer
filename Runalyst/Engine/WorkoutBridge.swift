@@ -337,7 +337,11 @@ final class WorkoutBridge {
     }
 
     /// Links a drill to a run record without overriding its native classification
-    @MainActor public static func linkDrill(to runRecord: RunRecord, drillId: PreRunDrillId) {
+    @MainActor public static func linkDrill(
+        to runRecord: RunRecord,
+        drillId: PreRunDrillId,
+        baselineCadence: Double? = nil
+    ) {
         let allIds = PreRunDrillId.allCases.map(\.rawValue)
         let allTitles = PreRunDrillId.allCases.map(\.title)
         runRecord.framboiseTags.removeAll {
@@ -358,6 +362,17 @@ final class WorkoutBridge {
         runRecord.framboiseTags.append(drillId.rawValue)
         runRecord.framboiseTags.append("drill:\(drillId.title)")
 
+        // Resolve authentic 30-day baseline strictly prior to this workout
+        let effectiveBaseline: Int = {
+            if let b = baselineCadence, b > 0 {
+                return Int(round(b))
+            }
+            if let historical = runRecord.computeHistoricalBaselineCadence(), historical > 0 {
+                return Int(round(historical))
+            }
+            return 155
+        }()
+
         // Purge any stale intent matching this workout and bind the new drill intent
         var intents = recentIntents()
         intents.removeAll { $0.matchedWorkoutID == runRecord.hkWorkoutID }
@@ -373,7 +388,7 @@ final class WorkoutBridge {
 
         // Update insight drill recommendations
         let template = DrillTemplate.template(for: drillId)
-        let targetCadenceInt = template.calculateTargetCadence(Int(runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155))
+        let targetCadenceInt = template.calculateTargetCadence(effectiveBaseline)
         if let recs = runRecord.insight?.drillRecommendations, !recs.isEmpty {
             var found = false
             for rec in recs {
@@ -394,7 +409,7 @@ final class WorkoutBridge {
                     drillEffort: template.defaultEffort,
                     drillRecovery: template.defaultRecovery,
                     targetCadence: "\(targetCadenceInt) SPM",
-                    previousCadence: Int(runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155),
+                    previousCadence: effectiveBaseline,
                     isCompleted: true
                 )
                 runRecord.insight?.drillRecommendations?.insert(newRec, at: 0)
@@ -409,22 +424,21 @@ final class WorkoutBridge {
         }
 
         if let parentClass = PreRunDrillId.correspondingClassification(for: drillId.title),
-           runRecord.detectedTypeRaw != parentClass {
+            runRecord.detectedTypeRaw != parentClass {
             runRecord.detectedTypeRaw = parentClass
         }
 
-        // Recalculate interval scorecard for the newly linked drill
+        // Recalculate interval scorecard for the newly linked drill using authentic baseline
         Task {
             if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID),
                let buckets = try? await HealthKitManager.shared.fetchBucketedSamples(for: workout),
                !buckets.isEmpty {
                 let oscDelta = (runRecord.workingAvgVerticalOscillation ?? 9.5) - 9.5
-                let baselineCadence = Int(runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155)
                 let summary = DrillIntervalEvaluator.evaluate(
                     workout: workout,
                     buckets: buckets,
                     drillId: drillId,
-                    baselineCadence: baselineCadence,
+                    baselineCadence: effectiveBaseline,
                     workoutDuration: runRecord.duration,
                     oscDelta: oscDelta
                 )

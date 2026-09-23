@@ -133,6 +133,20 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         self == .zone2Run || self == .aerobicFlush || self == .recoveryJog
     }
 
+    /// Subtitle describing the intended recovery effort between work intervals.
+    var recoveryLabel: String {
+        switch self {
+        case .tempoSurges:
+            return "Tempo Base / Float"
+        case .strides, .hillBounds:
+            return "Walk / Easy Jog"
+        case .cadencePyramids, .rhythmIntervals, .neuromuscularPrimer, .fartlekPrimer:
+            return "Easy Jog / Float"
+        case .zone2Run, .recoveryJog, .aerobicFlush:
+            return "Steady Aerobic"
+        }
+    }
+
     /// The target heart rate zone (e.g. Zone 1 or Zone 2)
     var targetHeartRateZone: Int? {
         switch self {

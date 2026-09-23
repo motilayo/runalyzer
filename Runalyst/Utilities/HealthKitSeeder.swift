@@ -197,7 +197,6 @@ class HealthKitSeeder {
                         doubleValue: metrics.distanceMeters / 15.0
                     )
                     let hrQuantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: metrics.heartRate)
-                    let cadenceQuantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: metrics.cadence)
                     let oscQuantity = HKQuantity(unit: .meterUnit(with: .centi), doubleValue: metrics.oscillation)
                     let gctQuantity = HKQuantity(unit: .secondUnit(with: .milli), doubleValue: metrics.gct)
                     let strideQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.stride)

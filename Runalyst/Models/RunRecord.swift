@@ -122,3 +122,35 @@ final class RunRecord {
         self.insight = insight
     }
 }
+
+extension RunRecord {
+    /// Computes the duration-weighted 30-day baseline cadence strictly prior to this run's date from a collection of runs.
+    func computeHistoricalBaselineCadence(in runs: [RunRecord]) -> Double? {
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: self.date) else { return nil }
+        let priorRuns = runs.filter {
+            $0.date < self.date &&
+            $0.date >= thirtyDaysAgo &&
+            $0.workingAvgCadence > 0
+        }
+        guard !priorRuns.isEmpty else { return nil }
+        let totalDuration = priorRuns.map(\.duration).reduce(0, +)
+        guard totalDuration > 0 else {
+            return priorRuns.map(\.workingAvgCadence).reduce(0, +) / Double(priorRuns.count)
+        }
+        return priorRuns.map { $0.workingAvgCadence * $0.duration }.reduce(0, +) / totalDuration
+    }
+
+    /// Computes the duration-weighted 30-day baseline cadence strictly prior to this run's date using its SwiftData ModelContext.
+    func computeHistoricalBaselineCadence() -> Double? {
+        guard let context = self.modelContext else { return nil }
+        let runDate = self.date
+        guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runDate) else { return nil }
+        let descriptor = FetchDescriptor<RunRecord>(
+            predicate: #Predicate<RunRecord> {
+                $0.date < runDate && $0.date >= thirtyDaysAgo
+            }
+        )
+        guard let priorRuns = try? context.fetch(descriptor) else { return nil }
+        return computeHistoricalBaselineCadence(in: priorRuns)
+    }
+}
