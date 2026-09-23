@@ -37,26 +37,28 @@ struct DashboardView: View {
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
 
-    private var filteredRunRecords: [RunRecord] {
-        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
-        var filtered = runRecords.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
-
-        // Time filter
+    private var timeRangeRuns: [RunRecord] {
         let now = Date()
         if timeRange == "7 Days", let limit = Calendar.current.date(byAdding: .day, value: -7, to: now) {
-            filtered = filtered.filter { $0.date >= limit }
+            return runRecords.filter { $0.date >= limit }
         } else if timeRange == "30 Days", let limit = Calendar.current.date(byAdding: .day, value: -30, to: now) {
-            filtered = filtered.filter { $0.date >= limit }
+            return runRecords.filter { $0.date >= limit }
         }
+        return runRecords
+    }
+
+    private var filteredRunRecords: [RunRecord] {
+        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+        var filtered = timeRangeRuns.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
 
         if let filter = selectedFilter {
-            filtered = filtered.filter { $0.detectedTypeRaw == filter || $0.framboiseTags.contains(filter) }
+            filtered = filtered.filter { $0.matchesFilter(filter) }
         }
         return filtered
     }
 
     var baselineCadence: Int? {
-        let runs = filteredRunRecords.filter { $0.workingAvgCadence > 0 }
+        let runs = timeRangeRuns.filter { $0.workingAvgCadence > 0 }
         guard !runs.isEmpty else { return nil }
         let totalDuration = runs.map(\.duration).reduce(0, +)
         guard totalDuration > 0 else {
@@ -66,7 +68,7 @@ struct DashboardView: View {
     }
 
     var baselinePace: Double? {
-        let runs = filteredRunRecords.filter { $0.workingAvgPace > 0 }
+        let runs = timeRangeRuns.filter { $0.workingAvgPace > 0 }
         guard !runs.isEmpty else { return nil }
         let totalDuration = runs.map(\.duration).reduce(0, +)
         guard totalDuration > 0 else {
@@ -122,7 +124,7 @@ struct DashboardView: View {
     }
 
     private var workoutDensityTier: String {
-        let uniqueDays = Set(filteredRunRecords.map { Calendar.current.startOfDay(for: $0.date) })
+        let uniqueDays = Set(timeRangeRuns.map { Calendar.current.startOfDay(for: $0.date) })
         let count = uniqueDays.count
         if count == 0 { return "—" }
         switch timeRange {
@@ -163,16 +165,29 @@ struct DashboardView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    // Extract unique tags for filter chips
+    // Extract unique classifications and drill names for filter chips
     var availableFilters: [String] {
-        var tags = Set<String>()
+        var classifications = Set<String>()
+        var drills = Set<String>()
+
         for run in runRecords {
-            tags.insert(run.detectedTypeRaw)
-            for tag in run.framboiseTags {
-                tags.insert(tag)
+            classifications.insert(run.normalizedClassification)
+            if let drillName = run.prescribedDrillName {
+                drills.insert(drillName)
             }
         }
-        return Array(tags).sorted()
+
+        let canonicalOrder = [
+            "Easy Run", "Steady Effort", "Tempo Run", "Intervals",
+            "Long Run", "Progression Run", "Recovery Run", "Fartlek",
+            "Hill Repeats", "Urban Traffic"
+        ]
+
+        let sortedClassifications = canonicalOrder.filter { classifications.contains($0) }
+            + classifications.filter { !canonicalOrder.contains($0) }.sorted()
+        let sortedDrills = drills.sorted()
+
+        return sortedClassifications + sortedDrills
     }
 
     var onSync: ((Bool) async -> Void)?
@@ -298,17 +313,17 @@ struct DashboardView: View {
 
     private func fetchInsight() {
         guard !isFetchingInsight else { return }
-        guard !filteredRunRecords.isEmpty else { return }
+        guard !timeRangeRuns.isEmpty else { return }
         isFetchingInsight = true
 
-        let avgPace = filteredRunRecords.map(\.workingAvgPace).reduce(0, +) / Double(filteredRunRecords.count)
-        let validHRRuns = filteredRunRecords.filter { $0.workingAvgHeartRate > 0 }
+        let avgPace = timeRangeRuns.map(\.workingAvgPace).reduce(0, +) / Double(timeRangeRuns.count)
+        let validHRRuns = timeRangeRuns.filter { $0.workingAvgHeartRate > 0 }
         let avgHR = validHRRuns.isEmpty ? 0 : validHRRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(validHRRuns.count)
-        let validCadenceRuns = filteredRunRecords.filter { $0.workingAvgCadence > 0 }
+        let validCadenceRuns = timeRangeRuns.filter { $0.workingAvgCadence > 0 }
         let avgCadence = validCadenceRuns.isEmpty ? 0 : validCadenceRuns.map(\.workingAvgCadence).reduce(0, +) / Double(validCadenceRuns.count)
-        let avgCV = filteredRunRecords.map(\.paceCV).reduce(0, +) / Double(filteredRunRecords.count)
-        let avgSlope = filteredRunRecords.map(\.paceSlope).reduce(0, +) / Double(filteredRunRecords.count)
-        let zone4Sum = filteredRunRecords.map(\.percentZone4).reduce(0, +) / Double(filteredRunRecords.count)
+        let avgCV = timeRangeRuns.map(\.paceCV).reduce(0, +) / Double(timeRangeRuns.count)
+        let avgSlope = timeRangeRuns.map(\.paceSlope).reduce(0, +) / Double(timeRangeRuns.count)
+        let zone4Sum = timeRangeRuns.map(\.percentZone4).reduce(0, +) / Double(timeRangeRuns.count)
 
         let paceContext = PaceFormatter.formatPace(secondsPerKilometer: avgPace)
         let hrContext = avgHR > 0 ? "\(Int(avgHR)) BPM" : "No heart rate data"
@@ -862,7 +877,7 @@ struct DashboardView: View {
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .white.opacity(0.6)))))
 
-                    Text(filteredRunRecords.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(filteredRunRecords.count) runs in \(timeRange.lowercased())")
+                    Text(timeRangeRuns.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(timeRangeRuns.count) runs in \(timeRange.lowercased())")
                         .font(.caption2)
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -909,19 +924,29 @@ struct DashboardView: View {
                                 selectedFilter = filter
                             }
                         }) {
-                            Text(filter)
-                                .font(.caption.bold())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(selectedFilter == filter ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
-                                .foregroundColor(selectedFilter == filter ? .white : .primary)
-                                .clipShape(Capsule())
+                            HStack(spacing: 4) {
+                                if let drillId = PreRunDrillId.allCases.first(where: { $0.title == filter }) {
+                                    Image(systemName: drillId.iconName)
+                                }
+                                Text(filter)
+                            }
+                            .font(.caption.bold())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(selectedFilter == filter ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
+                            .foregroundColor(selectedFilter == filter ? .white : .primary)
+                            .clipShape(Capsule())
                         }
                     }
                 }
                 .padding(.horizontal)
             }
             .padding(.vertical, 4)
+            .onChange(of: availableFilters) { _, newFilters in
+                if let selected = selectedFilter, !newFilters.contains(selected) {
+                    selectedFilter = nil
+                }
+            }
         }
     }
 
@@ -933,11 +958,13 @@ struct DashboardView: View {
 
                     fitnessBaselineCard
 
-                    if !filteredRunRecords.isEmpty {
+                    if !timeRangeRuns.isEmpty {
                         aiFatigueInsightCard
 
                         proactiveCoachCard
+                    }
 
+                    if !availableFilters.isEmpty {
                         filterChips
                     }
 
@@ -945,6 +972,31 @@ struct DashboardView: View {
                         if isSyncing && runRecords.isEmpty {
                             AnimatedLoadingView(text: "Analyzing your running history...")
                                 .padding(.top, 100)
+                        } else if let filter = selectedFilter {
+                            ContentUnavailableView {
+                                Label("No \(filter) Runs", systemImage: "line.3.horizontal.decrease.circle")
+                            } description: {
+                                Text("No runs match the \"\(filter)\" filter in \(timeRange.lowercased()).")
+                            } actions: {
+                                Button("Clear Filter") {
+                                    selectedFilter = nil
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            .padding(.top, 40)
+                        } else if !timeRangeRuns.isEmpty {
+                            let minDistanceUnit = useMetricSystem ? "km" : "mi"
+                            ContentUnavailableView {
+                                Label("No Runs Found", systemImage: "figure.run")
+                            } description: {
+                                Text("No runs meet the minimum distance of \(String(format: "%.1f", minimumRunDistance)) \(minDistanceUnit).")
+                            } actions: {
+                                Button("Reset Distance Filter") {
+                                    minimumRunDistance = useMetricSystem ? 1.0 : 0.6
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .padding(.top, 40)
                         } else {
                             ContentUnavailableView(
                                 "No Runs Found",
@@ -1093,31 +1145,7 @@ struct HeroCardView: View {
     }
 
     private var prescribedDrillName: String? {
-        // 1. Explicit tag "drill:<title>"
-        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
-            let candidate = String(tag.dropFirst(6))
-            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
-                return canonical
-            }
-        }
-        // 2. PreRunDrillId rawValue in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) }) {
-            return drill.title
-        }
-        // 3. PreRunDrillId title in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.title) }) {
-            return drill.title
-        }
-        // 4. If detectedTypeRaw is itself a specific drill title (e.g. "Rhythm Intervals")
-        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
-            return canonical
-        }
-        // 5. Associated completed drill recommendation from insight
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
-           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
-            return canonical
-        }
-        return nil
+        runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
@@ -1152,7 +1180,7 @@ struct HeroCardView: View {
                         .foregroundColor(.purple)
                         .clipShape(Capsule())
 
-                        Text("Classification: \(runRecord.detectedTypeRaw)")
+                        Text("Classification: \(runRecord.normalizedClassification)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -1340,24 +1368,7 @@ struct RunListRowView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var prescribedDrillName: String? {
-        guard runRecord.framboiseTags.contains("prescribedDrill") else { return nil }
-        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
-            let candidate = String(tag.dropFirst(6))
-            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
-                return canonical
-            }
-        }
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) || runRecord.framboiseTags.contains($0.title) }) {
-            return drill.title
-        }
-        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
-            return canonical
-        }
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
-           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
-            return canonical
-        }
-        return nil
+        runRecord.prescribedDrillName
     }
 
     var body: some View {
@@ -1383,7 +1394,7 @@ struct RunListRowView: View {
                     .foregroundColor(iconColor)
                     .clipShape(Capsule())
                 } else {
-                    Text(runRecord.detectedTypeRaw)
+                    Text(runRecord.normalizedClassification)
                         .font(.caption2.bold())
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)

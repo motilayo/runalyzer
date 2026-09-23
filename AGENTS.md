@@ -76,3 +76,5 @@ This `AGENTS.md` file acts as the primary repository of architectural context, t
 ## 5. Tooling Guidelines
 
 - **Bash Scripting**: When modifying Swift files programmatically via bash (sed/python), replace complete logical blocks or overwrite the file entirely instead of using targeted string insertions to avoid nested duplications and syntax errors.
+- **Git Branch & Pull Request Discipline**: Committing or pushing directly to `main` is strictly forbidden. All modifications—including bug fixes, architectural enhancements, refactors, and documentation updates—must be developed on a dedicated feature or fix branch (`feat/...`, `fix/...`, `chore/...`, `docs/...`). Before opening a PR, ensure the local test suite passes (`xcodebuild test`) and SwiftLint passes with 0 violations (`swiftlint --strict`). Changes must be pushed to origin and merged exclusively via GitHub Pull Requests.
+
