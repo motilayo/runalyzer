@@ -339,4 +339,40 @@ final class RunRecordModelAndSchemaTests: XCTestCase {
             XCTAssertFalse(filter == "steady", "Filter should not be lowercase 'steady'")
         }
     }
+
+    func testOnboardingViewInitializationAndCallbacks() {
+        var syncTriggered = false
+        var completedTriggered = false
+
+        let view = OnboardingView(
+            isReplay: false,
+            isSyncing: true,
+            syncProgress: (current: 5, total: 20),
+            syncStatusMessage: "Calibrating History",
+            onStartSync: {
+                syncTriggered = true
+            },
+            onComplete: {
+                completedTriggered = true
+            }
+        )
+
+        XCTAssertFalse(view.isReplay)
+        XCTAssertTrue(view.isSyncing)
+        XCTAssertEqual(view.syncProgress?.current, 5)
+        XCTAssertEqual(view.syncProgress?.total, 20)
+        XCTAssertEqual(view.syncStatusMessage, "Calibrating History")
+
+        view.onStartSync?()
+        XCTAssertTrue(syncTriggered)
+
+        view.onComplete?()
+        XCTAssertTrue(completedTriggered)
+
+        let embeddedAbout = AboutRunalystView(isEmbedded: true)
+        XCTAssertTrue(embeddedAbout.isEmbedded)
+
+        let standaloneAbout = AboutRunalystView(isEmbedded: false)
+        XCTAssertFalse(standaloneAbout.isEmbedded)
+    }
 }
