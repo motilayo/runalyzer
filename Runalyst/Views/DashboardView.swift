@@ -50,7 +50,7 @@ struct DashboardView: View {
         }
 
         if let filter = selectedFilter {
-            filtered = filtered.filter { $0.detectedTypeRaw == filter || $0.framboiseTags.contains(filter) }
+            filtered = filtered.filter { $0.matchesFilter(filter) }
         }
         return filtered
     }
@@ -163,16 +163,29 @@ struct DashboardView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    // Extract unique tags for filter chips
+    // Extract unique classifications and drill names for filter chips
     var availableFilters: [String] {
-        var tags = Set<String>()
+        var classifications = Set<String>()
+        var drills = Set<String>()
+
         for run in runRecords {
-            tags.insert(run.detectedTypeRaw)
-            for tag in run.framboiseTags {
-                tags.insert(tag)
+            classifications.insert(run.normalizedClassification)
+            if let drillName = run.prescribedDrillName {
+                drills.insert(drillName)
             }
         }
-        return Array(tags).sorted()
+
+        let canonicalOrder = [
+            "Easy Run", "Steady Effort", "Tempo Run", "Intervals",
+            "Long Run", "Progression Run", "Recovery Run", "Fartlek",
+            "Hill Repeats", "Urban Traffic"
+        ]
+
+        let sortedClassifications = canonicalOrder.filter { classifications.contains($0) }
+            + classifications.filter { !canonicalOrder.contains($0) }.sorted()
+        let sortedDrills = drills.sorted()
+
+        return sortedClassifications + sortedDrills
     }
 
     var onSync: ((Bool) async -> Void)?
@@ -909,19 +922,29 @@ struct DashboardView: View {
                                 selectedFilter = filter
                             }
                         }) {
-                            Text(filter)
-                                .font(.caption.bold())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(selectedFilter == filter ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
-                                .foregroundColor(selectedFilter == filter ? .white : .primary)
-                                .clipShape(Capsule())
+                            HStack(spacing: 4) {
+                                if let drillId = PreRunDrillId.allCases.first(where: { $0.title == filter }) {
+                                    Image(systemName: drillId.iconName)
+                                }
+                                Text(filter)
+                            }
+                            .font(.caption.bold())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(selectedFilter == filter ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
+                            .foregroundColor(selectedFilter == filter ? .white : .primary)
+                            .clipShape(Capsule())
                         }
                     }
                 }
                 .padding(.horizontal)
             }
             .padding(.vertical, 4)
+            .onChange(of: availableFilters) { _, newFilters in
+                if let selected = selectedFilter, !newFilters.contains(selected) {
+                    selectedFilter = nil
+                }
+            }
         }
     }
 
@@ -1093,31 +1116,7 @@ struct HeroCardView: View {
     }
 
     private var prescribedDrillName: String? {
-        // 1. Explicit tag "drill:<title>"
-        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
-            let candidate = String(tag.dropFirst(6))
-            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
-                return canonical
-            }
-        }
-        // 2. PreRunDrillId rawValue in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) }) {
-            return drill.title
-        }
-        // 3. PreRunDrillId title in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.title) }) {
-            return drill.title
-        }
-        // 4. If detectedTypeRaw is itself a specific drill title (e.g. "Rhythm Intervals")
-        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
-            return canonical
-        }
-        // 5. Associated completed drill recommendation from insight
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
-           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
-            return canonical
-        }
-        return nil
+        runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
@@ -1152,7 +1151,7 @@ struct HeroCardView: View {
                         .foregroundColor(.purple)
                         .clipShape(Capsule())
 
-                        Text("Classification: \(runRecord.detectedTypeRaw)")
+                        Text("Classification: \(runRecord.normalizedClassification)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -1340,24 +1339,7 @@ struct RunListRowView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var prescribedDrillName: String? {
-        guard runRecord.framboiseTags.contains("prescribedDrill") else { return nil }
-        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
-            let candidate = String(tag.dropFirst(6))
-            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
-                return canonical
-            }
-        }
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) || runRecord.framboiseTags.contains($0.title) }) {
-            return drill.title
-        }
-        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
-            return canonical
-        }
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
-           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
-            return canonical
-        }
-        return nil
+        runRecord.prescribedDrillName
     }
 
     var body: some View {
@@ -1383,7 +1365,7 @@ struct RunListRowView: View {
                     .foregroundColor(iconColor)
                     .clipShape(Capsule())
                 } else {
-                    Text(runRecord.detectedTypeRaw)
+                    Text(runRecord.normalizedClassification)
                         .font(.caption2.bold())
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)

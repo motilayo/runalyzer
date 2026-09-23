@@ -153,4 +153,65 @@ extension RunRecord {
         guard let priorRuns = try? context.fetch(descriptor) else { return nil }
         return computeHistoricalBaselineCadence(in: priorRuns)
     }
+
+    /// Canonical user-facing drill title associated with this run, if any (e.g. "Tempo Surges", "Cadence Pyramids").
+    var prescribedDrillName: String? {
+        // 1. Explicit tag "drill:<title>"
+        if let tag = framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
+            let candidate = String(tag.dropFirst(6))
+            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
+                return canonical
+            }
+            return candidate.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+        // 2. PreRunDrillId rawValue in framboiseTags
+        if let drill = PreRunDrillId.allCases.first(where: { framboiseTags.contains($0.rawValue) }) {
+            return drill.title
+        }
+        // 3. PreRunDrillId title in framboiseTags
+        if let drill = PreRunDrillId.allCases.first(where: { framboiseTags.contains($0.title) }) {
+            return drill.title
+        }
+        // 4. If detectedTypeRaw is itself a specific drill title (e.g. "Rhythm Intervals")
+        if let canonical = PreRunDrillId.canonicalDrillTitle(for: detectedTypeRaw) {
+            return canonical
+        }
+        // 5. Associated completed drill recommendation from insight
+        if let rec = insight?.drillRecommendations?.first(where: { $0.isCompleted }),
+           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
+            return canonical
+        }
+        return nil
+    }
+
+    /// Canonical user-facing run classification (e.g. "Steady Effort", "Easy Run", "Intervals").
+    var normalizedClassification: String {
+        let trimmed = detectedTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed.localizedCaseInsensitiveCompare("steady") == .orderedSame {
+            return "Steady Effort"
+        }
+        if let parentClassification = PreRunDrillId.correspondingClassification(for: trimmed) {
+            return parentClassification
+        }
+        if let canonical = PreRunDrillId.canonicalDrillTitle(for: trimmed),
+           let parent = PreRunDrillId.correspondingClassification(for: canonical) {
+            return parent
+        }
+        return trimmed
+    }
+
+    /// Checks if this run matches the provided filter chip (either canonical classification or drill name).
+    func matchesFilter(_ filter: String) -> Bool {
+        let cleanFilter = filter.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedClassification.localizedCaseInsensitiveCompare(cleanFilter) == .orderedSame {
+            return true
+        }
+        if let drill = prescribedDrillName, drill.localizedCaseInsensitiveCompare(cleanFilter) == .orderedSame {
+            return true
+        }
+        if detectedTypeRaw.localizedCaseInsensitiveCompare(cleanFilter) == .orderedSame {
+            return true
+        }
+        return false
+    }
 }

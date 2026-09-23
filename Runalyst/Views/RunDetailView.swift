@@ -82,32 +82,7 @@ struct RunDetailView: View {
     ]
 
     private var prescribedDrillName: String? {
-        // 1. Explicit tag "drill:<title>"
-        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
-            let candidate = String(tag.dropFirst(6))
-            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
-                return canonical
-            }
-            return candidate.replacingOccurrences(of: "_", with: " ").capitalized
-        }
-        // 2. PreRunDrillId rawValue in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) }) {
-            return drill.title
-        }
-        // 3. PreRunDrillId title in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.title) }) {
-            return drill.title
-        }
-        // 4. If detectedTypeRaw is itself a legacy specific drill title (e.g. "Rhythm Intervals")
-        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
-            return canonical
-        }
-        // 5. Associated completed drill recommendation from insight
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
-           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
-            return canonical
-        }
-        return nil
+        runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
