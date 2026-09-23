@@ -37,17 +37,19 @@ struct DashboardView: View {
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
 
-    private var filteredRunRecords: [RunRecord] {
-        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
-        var filtered = runRecords.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
-
-        // Time filter
+    private var timeRangeRuns: [RunRecord] {
         let now = Date()
         if timeRange == "7 Days", let limit = Calendar.current.date(byAdding: .day, value: -7, to: now) {
-            filtered = filtered.filter { $0.date >= limit }
+            return runRecords.filter { $0.date >= limit }
         } else if timeRange == "30 Days", let limit = Calendar.current.date(byAdding: .day, value: -30, to: now) {
-            filtered = filtered.filter { $0.date >= limit }
+            return runRecords.filter { $0.date >= limit }
         }
+        return runRecords
+    }
+
+    private var filteredRunRecords: [RunRecord] {
+        let minDistanceInMeters = useMetricSystem ? (minimumRunDistance * 1000.0) : (minimumRunDistance * 1609.344)
+        var filtered = timeRangeRuns.filter { $0.totalDistanceMeters >= (minDistanceInMeters - 0.01) }
 
         if let filter = selectedFilter {
             filtered = filtered.filter { $0.matchesFilter(filter) }
@@ -56,7 +58,7 @@ struct DashboardView: View {
     }
 
     var baselineCadence: Int? {
-        let runs = filteredRunRecords.filter { $0.workingAvgCadence > 0 }
+        let runs = timeRangeRuns.filter { $0.workingAvgCadence > 0 }
         guard !runs.isEmpty else { return nil }
         let totalDuration = runs.map(\.duration).reduce(0, +)
         guard totalDuration > 0 else {
@@ -66,7 +68,7 @@ struct DashboardView: View {
     }
 
     var baselinePace: Double? {
-        let runs = filteredRunRecords.filter { $0.workingAvgPace > 0 }
+        let runs = timeRangeRuns.filter { $0.workingAvgPace > 0 }
         guard !runs.isEmpty else { return nil }
         let totalDuration = runs.map(\.duration).reduce(0, +)
         guard totalDuration > 0 else {
@@ -122,7 +124,7 @@ struct DashboardView: View {
     }
 
     private var workoutDensityTier: String {
-        let uniqueDays = Set(filteredRunRecords.map { Calendar.current.startOfDay(for: $0.date) })
+        let uniqueDays = Set(timeRangeRuns.map { Calendar.current.startOfDay(for: $0.date) })
         let count = uniqueDays.count
         if count == 0 { return "—" }
         switch timeRange {
@@ -311,17 +313,17 @@ struct DashboardView: View {
 
     private func fetchInsight() {
         guard !isFetchingInsight else { return }
-        guard !filteredRunRecords.isEmpty else { return }
+        guard !timeRangeRuns.isEmpty else { return }
         isFetchingInsight = true
 
-        let avgPace = filteredRunRecords.map(\.workingAvgPace).reduce(0, +) / Double(filteredRunRecords.count)
-        let validHRRuns = filteredRunRecords.filter { $0.workingAvgHeartRate > 0 }
+        let avgPace = timeRangeRuns.map(\.workingAvgPace).reduce(0, +) / Double(timeRangeRuns.count)
+        let validHRRuns = timeRangeRuns.filter { $0.workingAvgHeartRate > 0 }
         let avgHR = validHRRuns.isEmpty ? 0 : validHRRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(validHRRuns.count)
-        let validCadenceRuns = filteredRunRecords.filter { $0.workingAvgCadence > 0 }
+        let validCadenceRuns = timeRangeRuns.filter { $0.workingAvgCadence > 0 }
         let avgCadence = validCadenceRuns.isEmpty ? 0 : validCadenceRuns.map(\.workingAvgCadence).reduce(0, +) / Double(validCadenceRuns.count)
-        let avgCV = filteredRunRecords.map(\.paceCV).reduce(0, +) / Double(filteredRunRecords.count)
-        let avgSlope = filteredRunRecords.map(\.paceSlope).reduce(0, +) / Double(filteredRunRecords.count)
-        let zone4Sum = filteredRunRecords.map(\.percentZone4).reduce(0, +) / Double(filteredRunRecords.count)
+        let avgCV = timeRangeRuns.map(\.paceCV).reduce(0, +) / Double(timeRangeRuns.count)
+        let avgSlope = timeRangeRuns.map(\.paceSlope).reduce(0, +) / Double(timeRangeRuns.count)
+        let zone4Sum = timeRangeRuns.map(\.percentZone4).reduce(0, +) / Double(timeRangeRuns.count)
 
         let paceContext = PaceFormatter.formatPace(secondsPerKilometer: avgPace)
         let hrContext = avgHR > 0 ? "\(Int(avgHR)) BPM" : "No heart rate data"
@@ -875,7 +877,7 @@ struct DashboardView: View {
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .white.opacity(0.6)))))
 
-                    Text(filteredRunRecords.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(filteredRunRecords.count) runs in \(timeRange.lowercased())")
+                    Text(timeRangeRuns.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(timeRangeRuns.count) runs in \(timeRange.lowercased())")
                         .font(.caption2)
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -956,11 +958,13 @@ struct DashboardView: View {
 
                     fitnessBaselineCard
 
-                    if !filteredRunRecords.isEmpty {
+                    if !timeRangeRuns.isEmpty {
                         aiFatigueInsightCard
 
                         proactiveCoachCard
+                    }
 
+                    if !availableFilters.isEmpty {
                         filterChips
                     }
 
@@ -968,6 +972,31 @@ struct DashboardView: View {
                         if isSyncing && runRecords.isEmpty {
                             AnimatedLoadingView(text: "Analyzing your running history...")
                                 .padding(.top, 100)
+                        } else if let filter = selectedFilter {
+                            ContentUnavailableView {
+                                Label("No \(filter) Runs", systemImage: "line.3.horizontal.decrease.circle")
+                            } description: {
+                                Text("No runs match the \"\(filter)\" filter in \(timeRange.lowercased()).")
+                            } actions: {
+                                Button("Clear Filter") {
+                                    selectedFilter = nil
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            .padding(.top, 40)
+                        } else if !timeRangeRuns.isEmpty {
+                            let minDistanceUnit = useMetricSystem ? "km" : "mi"
+                            ContentUnavailableView {
+                                Label("No Runs Found", systemImage: "figure.run")
+                            } description: {
+                                Text("No runs meet the minimum distance of \(String(format: "%.1f", minimumRunDistance)) \(minDistanceUnit).")
+                            } actions: {
+                                Button("Reset Distance Filter") {
+                                    minimumRunDistance = useMetricSystem ? 1.0 : 0.6
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .padding(.top, 40)
                         } else {
                             ContentUnavailableView(
                                 "No Runs Found",
