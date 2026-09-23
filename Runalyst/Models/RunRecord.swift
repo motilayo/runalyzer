@@ -54,6 +54,19 @@ final class RunRecord {
         workingDurationSeconds ?? duration
     }
 
+    /// Speed in meters per minute (derived from working average pace).
+    var speedMetersPerMinute: Double? {
+        guard workingAvgPace > 0 else { return nil }
+        return 60_000.0 / workingAvgPace
+    }
+
+    /// Efficiency Factor: Speed (meters/minute) divided by Heart Rate (BPM).
+    /// Represents running economy: distance in meters traveled per heartbeat.
+    var efficiencyFactor: Double? {
+        guard workingAvgHeartRate > 0, let speed = speedMetersPerMinute else { return nil }
+        return speed / workingAvgHeartRate
+    }
+
     // MARK: - Framboise Mathematical Features
     /// Coefficient of variation for pace (sigma / mu)
     var paceCV: Double
