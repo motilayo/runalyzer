@@ -63,11 +63,50 @@ final class WorkoutBridge {
         return intents.filter { $0.scheduledDate >= cutoff }
     }
 
+    nonisolated public static func isGuidedOrThirdPartySession(workout: HKWorkout? = nil, metadata: [String: Any]? = nil) -> Bool {
+        let meta = metadata ?? workout?.metadata
+        if let meta = meta {
+            if let isFitnessPlus = meta[HKMetadataKeyAppleFitnessPlusSession] as? Bool, isFitnessPlus {
+                return true
+            }
+            if let isFitnessPlus = meta["HKAppleFitnessPlusSession"] as? Bool, isFitnessPlus {
+                return true
+            }
+            if let brand = (meta[HKMetadataKeyWorkoutBrandName] as? String) ?? (meta["HKWorkoutBrandName"] as? String) {
+                let lower = brand.lowercased()
+                if lower.contains("fitness+") || lower.contains("apple fitness") || lower.contains("peloton") || lower.contains("nike") {
+                    return true
+                }
+            }
+            let thirdPartyKeywords = ["strava", "nike", "peloton", "garmin", "runkeeper", "zwift", "coros", "trainingpeaks", "fitness+"]
+            for (key, val) in meta {
+                let keyLower = key.lowercased()
+                for kw in thirdPartyKeywords where keyLower.contains(kw) {
+                    return true
+                }
+                if let strVal = val as? String {
+                    let strLower = strVal.lowercased()
+                    for kw in thirdPartyKeywords where strLower.contains(kw) {
+                        return true
+                    }
+                }
+            }
+        }
+        if let workout = workout {
+            let sourceName = workout.sourceRevision.source.name.lowercased()
+            let bundleId = workout.sourceRevision.source.bundleIdentifier.lowercased()
+            let thirdPartyKeywords = ["strava", "nike", "peloton", "garmin", "runkeeper", "zwift", "coros", "trainingpeaks"]
+            for kw in thirdPartyKeywords where sourceName.contains(kw) || bundleId.contains(kw) {
+                return true
+            }
+        }
+        return false
+    }
+
     nonisolated private static func extractAllStrings(from dict: [String: Any]?) -> [String] {
         guard let dict = dict else { return [] }
         var result: [String] = []
-        for (k, val) in dict {
-            result.append(k)
+        for (_, val) in dict {
             if let s = val as? String {
                 result.append(s)
             } else if let arr = val as? [String] {
@@ -106,6 +145,10 @@ final class WorkoutBridge {
         customWorkout: CustomWorkout? = nil,
         zoneConfig: Any? = nil
     ) -> ScheduledDrillIntent? {
+        guard !isGuidedOrThirdPartySession(workout: workout, metadata: workout.metadata) else {
+            return nil
+        }
+
         let workoutDate = workout.startDate
         var allMetadataStrings: [String] = []
 
@@ -239,6 +282,10 @@ final class WorkoutBridge {
         zone2Threshold: Double = 142.0,
         zone1Threshold: Double = 125.0
     ) -> ScheduledDrillIntent? {
+        guard !isGuidedOrThirdPartySession(metadata: metadata) else {
+            return nil
+        }
+
         let allMetadataStrings: [String] = extractAllStrings(from: metadata)
 
         // 1. Direct Metadata Check

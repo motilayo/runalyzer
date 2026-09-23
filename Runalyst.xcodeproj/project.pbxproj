@@ -22,6 +22,7 @@
 		7B2A3C4D5E6F7A8B9C0D1E2F /* DrillIntervalEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C3D4E5F6A7B8C9D0E1F2A3B /* DrillIntervalEvaluator.swift */; };
 		8C3B4D5E6F7A8B9C0D1E2F3A /* DrillPatternRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4E5F6A7B8C9D0E1F2A3B4C /* DrillPatternRecognizer.swift */; };
 		34C493421E7F4ACCB2EE5001 /* PreRunDrillId.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72B03F5BC3D402A96C0C907 /* PreRunDrillId.swift */; };
+		D71E5C4E0D1E4E8A9C0D1E2F /* DrillSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = E82F6D5F1E2F5F9B0D1E2F3A /* DrillSchedule.swift */; };
 		43D90B67B3C2451D924E0314 /* PreRunDrill.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */; };
 		B34F9612C3224FC787FE1029 /* DrillTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */; };
 		D4199BCA5EEC404CA22EC9CA /* HealthKitSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */; };
@@ -94,6 +95,7 @@
 		8C3D4E5F6A7B8C9D0E1F2A3B /* DrillIntervalEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillIntervalEvaluator.swift; path = Runalyst/Engine/DrillIntervalEvaluator.swift; sourceTree = SOURCE_ROOT; };
 		9D4E5F6A7B8C9D0E1F2A3B4C /* DrillPatternRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillPatternRecognizer.swift; path = Runalyst/Engine/DrillPatternRecognizer.swift; sourceTree = SOURCE_ROOT; };
 		A72B03F5BC3D402A96C0C907 /* PreRunDrillId.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PreRunDrillId.swift; path = Runalyst/Models/PreRunDrillId.swift; sourceTree = SOURCE_ROOT; };
+		E82F6D5F1E2F5F9B0D1E2F3A /* DrillSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillSchedule.swift; path = Runalyst/Models/DrillSchedule.swift; sourceTree = SOURCE_ROOT; };
 		CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PreRunDrill.swift; path = Runalyst/Engine/PreRunDrill.swift; sourceTree = SOURCE_ROOT; };
 		F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrillTemplate.swift; path = Runalyst/Models/DrillTemplate.swift; sourceTree = SOURCE_ROOT; };
 		FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthKitSeeder.swift; path = Runalyst/Utilities/HealthKitSeeder.swift; sourceTree = SOURCE_ROOT; };
@@ -256,6 +258,7 @@
 				8C3D4E5F6A7B8C9D0E1F2A3B /* DrillIntervalEvaluator.swift */,
 				9D4E5F6A7B8C9D0E1F2A3B4C /* DrillPatternRecognizer.swift */,
 				A72B03F5BC3D402A96C0C907 /* PreRunDrillId.swift */,
+				E82F6D5F1E2F5F9B0D1E2F3A /* DrillSchedule.swift */,
 				CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */,
 				F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */,
 				FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */,
@@ -422,6 +425,7 @@
 				7B2A3C4D5E6F7A8B9C0D1E2F /* DrillIntervalEvaluator.swift in Sources */,
 				8C3B4D5E6F7A8B9C0D1E2F3A /* DrillPatternRecognizer.swift in Sources */,
 				34C493421E7F4ACCB2EE5001 /* PreRunDrillId.swift in Sources */,
+				D71E5C4E0D1E4E8A9C0D1E2F /* DrillSchedule.swift in Sources */,
 				43D90B67B3C2451D924E0314 /* PreRunDrill.swift in Sources */,
 				B34F9612C3224FC787FE1029 /* DrillTemplate.swift in Sources */,
 				D4199BCA5EEC404CA22EC9CA /* HealthKitSeeder.swift in Sources */,
