@@ -474,13 +474,23 @@ enum DrillIntervalEvaluator {
         return buildSummary(reps: reps, context: context)
     }
 
-    static func checkIsMet(workCadence: Int, context: Context) -> Bool {
+    static func checkIsMet(
+        workCadence: Int,
+        workHeartRate: Int = 0,
+        context: Context
+    ) -> Bool {
         guard let range = context.effectiveRange else {
             return workCadence >= context.baselineCadence
         }
 
         switch context.drillId {
-        case .strides, .neuromuscularPrimer, .hillBounds, .tempoSurges, .fartlekPrimer:
+        case .tempoSurges:
+            // Dual-target surge: met if cadence reaches the surge floor OR if heart rate achieves Zone 4 threshold effort (>= 160 BPM)
+            let cadenceMet = workCadence >= (range.lowerBound - 2) && workCadence <= 195
+            let hrMet = workHeartRate >= 160
+            return cadenceMet || hrMet
+
+        case .strides, .neuromuscularPrimer, .hillBounds, .fartlekPrimer:
             // Sprint & explosive turnover drills: target is a floor (capped at safe physiological limit 195 SPM)
             return workCadence >= (range.lowerBound - 2) && workCadence <= 195
 
@@ -513,7 +523,7 @@ enum DrillIntervalEvaluator {
             repRecHR = 0
         }
 
-        let isMet = checkIsMet(workCadence: repWorkCadence, context: context)
+        let isMet = checkIsMet(workCadence: repWorkCadence, workHeartRate: repWorkHR, context: context)
 
         return DrillIntervalRep(
             repIndex: repIndex,
@@ -603,7 +613,7 @@ enum DrillIntervalEvaluator {
                 repRecHR = 0
             }
 
-            let isMet = checkIsMet(workCadence: repWorkCadence, context: context)
+            let isMet = checkIsMet(workCadence: repWorkCadence, workHeartRate: repWorkHR, context: context)
 
             reps.append(DrillIntervalRep(
                 repIndex: repIndex,
@@ -669,7 +679,7 @@ enum DrillIntervalEvaluator {
             let validRecHR = recBuckets.map(\.meanHR).filter { $0 > 0 }
             let repRecHR = validRecHR.isEmpty ? 0 : Int(round(validRecHR.reduce(0, +) / Double(validRecHR.count)))
 
-            let isMet = checkIsMet(workCadence: repWorkCadence, context: context)
+            let isMet = checkIsMet(workCadence: repWorkCadence, workHeartRate: repWorkHR, context: context)
 
             reps.append(DrillIntervalRep(
                 repIndex: i + 1,

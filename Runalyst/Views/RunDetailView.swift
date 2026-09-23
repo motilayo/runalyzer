@@ -82,32 +82,7 @@ struct RunDetailView: View {
     ]
 
     private var prescribedDrillName: String? {
-        // 1. Explicit tag "drill:<title>"
-        if let tag = runRecord.framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
-            let candidate = String(tag.dropFirst(6))
-            if let canonical = PreRunDrillId.canonicalDrillTitle(for: candidate) {
-                return canonical
-            }
-            return candidate.replacingOccurrences(of: "_", with: " ").capitalized
-        }
-        // 2. PreRunDrillId rawValue in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.rawValue) }) {
-            return drill.title
-        }
-        // 3. PreRunDrillId title in framboiseTags
-        if let drill = PreRunDrillId.allCases.first(where: { runRecord.framboiseTags.contains($0.title) }) {
-            return drill.title
-        }
-        // 4. If detectedTypeRaw is itself a legacy specific drill title (e.g. "Rhythm Intervals")
-        if let canonical = PreRunDrillId.canonicalDrillTitle(for: runRecord.detectedTypeRaw) {
-            return canonical
-        }
-        // 5. Associated completed drill recommendation from insight
-        if let rec = runRecord.insight?.drillRecommendations?.first(where: { $0.isCompleted }),
-           let canonical = PreRunDrillId.canonicalDrillTitle(for: rec.drillTitle) {
-            return canonical
-        }
-        return nil
+        runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
@@ -162,7 +137,7 @@ struct RunDetailView: View {
                 Menu {
                     ForEach(PreRunDrillId.allCases, id: \.self) { drill in
                         Button {
-                            WorkoutBridge.linkDrill(to: runRecord, drillId: drill)
+                            WorkoutBridge.linkDrill(to: runRecord, drillId: drill, baselineCadence: baselineCadence)
                             try? modelContext.save()
                         } label: {
                             if drill.title == drillName {
@@ -208,7 +183,7 @@ struct RunDetailView: View {
             Menu {
                 ForEach(PreRunDrillId.allCases, id: \.self) { drill in
                     Button {
-                        WorkoutBridge.linkDrill(to: runRecord, drillId: drill)
+                        WorkoutBridge.linkDrill(to: runRecord, drillId: drill, baselineCadence: baselineCadence)
                         try? modelContext.save()
                     } label: {
                         Label(drill.title, systemImage: drill.iconName)
@@ -1104,7 +1079,7 @@ struct DrillExecutionScorecard: View {
 
     var body: some View {
         let template = DrillTemplate.template(for: drillId)
-        let thirtyDayCadence = Int(baselineCadence ?? (runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155))
+        let thirtyDayCadence = Int(baselineCadence ?? (runRecord.computeHistoricalBaselineCadence() ?? (runRecord.workingAvgCadence > 0 ? runRecord.workingAvgCadence : 155)))
         let targetCadence = template.calculateTargetCadence(thirtyDayCadence)
         let drillObj = PreRunDrill(id: drillId, previousCadence: thirtyDayCadence, targetCadence: targetCadence)
         let actualCadence = Int(runRecord.workingAvgCadence)
@@ -1142,8 +1117,26 @@ struct DrillExecutionScorecard: View {
         let tierDescription: String
 
         if let summary = intervalSummary, isIntervalDrill {
-            tier = summary.tier
-            tierDescription = summary.verdict
+            if isDualTarget {
+                let intervalsOk = summary.intervalsMet >= (summary.totalIntervals + 1) / 2
+                let zone4Ok = runRecord.percentZone4 >= 0.20
+                if summary.intervalsMet == summary.totalIntervals && runRecord.percentZone4 >= 0.35 {
+                    tier = .exceeded
+                    tierDescription = "Nailed all \(summary.totalIntervals) surges with high threshold capacity (≥35% Zone 4)."
+                } else if (summary.tier == .met || summary.tier == .exceeded) || (intervalsOk && zone4Ok) {
+                    tier = .met
+                    tierDescription = "Landed target surges with sustained threshold effort."
+                } else if intervalsOk || runRecord.percentZone4 >= 0.15 {
+                    tier = .partiallyMet
+                    tierDescription = intervalsOk ? "Hit turnover surges, but overall time in threshold was limited." : "Reached threshold intensity, but surge turnover discipline was developing."
+                } else {
+                    tier = .notMet
+                    tierDescription = summary.verdict
+                }
+            } else {
+                tier = summary.tier
+                tierDescription = summary.verdict
+            }
         } else if isDualTarget {
             // Tempo Surges: Cadence + Zone 4 Threshold
             let cadenceExact: Bool = {
@@ -1173,6 +1166,7 @@ struct DrillExecutionScorecard: View {
                 tier = .notMet
                 tierDescription = "Missed both target cadence and threshold intensity goals."
             }
+
         } else if isHRTarget {
             if let zone = drillId.targetHeartRateZone {
                 if zone == 2 {
@@ -1301,19 +1295,46 @@ struct DrillExecutionScorecard: View {
 
             // Primary Target vs Actual Metric Tiles
             if let summary = intervalSummary, isIntervalDrill {
-                HStack(spacing: 10) {
-                    metricTile(
-                        label: "WORK CADENCE",
-                        value: "\(summary.workCadenceAvg > 0 ? summary.workCadenceAvg : actualCadence) SPM",
-                        valueColor: summary.tier == .notMet ? .red : (summary.tier == .partiallyMet ? .orange : .green),
-                        subtitle: "Target: \(targetCadenceStr) SPM"
-                    )
-                    metricTile(
-                        label: "RECOVERY CADENCE",
-                        value: "\(summary.recoveryCadenceAvg > 0 ? summary.recoveryCadenceAvg : max(130, actualCadence - 20)) SPM",
-                        valueColor: .secondary,
-                        subtitle: "Walk / Easy Jog"
-                    )
+                let workCadenceVal = summary.workCadenceAvg > 0 ? summary.workCadenceAvg : actualCadence
+                let workCadenceTargetMet: Bool = {
+                    if let range = drillObj.effectiveTargetCadence {
+                        return workCadenceVal >= (range.lowerBound - 2) &&
+                            (drillId == .strides || drillId == .tempoSurges ? workCadenceVal <= 195 : workCadenceVal <= range.upperBound + 8)
+                    }
+                    return workCadenceVal >= thirtyDayCadence
+                }()
+                let workColor: Color = workCadenceTargetMet ? .green : (summary.tier == .notMet ? .red : .orange)
+
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        metricTile(
+                            label: "WORK CADENCE",
+                            value: "\(workCadenceVal) SPM",
+                            valueColor: workColor,
+                            subtitle: "Target: \(targetCadenceStr) SPM"
+                        )
+                        metricTile(
+                            label: "RECOVERY CADENCE",
+                            value: "\(summary.recoveryCadenceAvg > 0 ? summary.recoveryCadenceAvg : max(130, actualCadence - 20)) SPM",
+                            valueColor: .secondary,
+                            subtitle: drillId.recoveryLabel
+                        )
+                    }
+
+                    if isDualTarget {
+                        HStack(spacing: 10) {
+                            metricTile(
+                                label: "THRESHOLD GOAL",
+                                value: "≥20% Zone 4",
+                                valueColor: .primary
+                            )
+                            metricTile(
+                                label: "ZONE 4 TIME",
+                                value: String(format: "%.0f%%", runRecord.percentZone4 * 100),
+                                valueColor: runRecord.percentZone4 >= 0.20 ? .green : (runRecord.percentZone4 >= 0.15 ? .orange : .red)
+                            )
+                        }
+                    }
                 }
             } else if isDualTarget {
                 // Dual Target (Cadence + Zone 4 Threshold)

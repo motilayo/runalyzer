@@ -60,7 +60,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked S
             paceCV: 0,
             paceSlope: 0,
             percentZone4: 0,
-            detectedTypeRaw: "steady"
+            detectedTypeRaw: "Steady Effort"
         )
         context.insert(record)
         try context.save()

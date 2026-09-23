@@ -87,7 +87,7 @@ struct DrillTemplate: Sendable {
                 title: "Tempo Surges",
                 defaultPurpose: "Get used to picking up the pace while staying relaxed.",
                 defaultWork: "3 x 2 min work",
-                defaultRecovery: "4 min walk recovery",
+                defaultRecovery: "4 min tempo base",
                 defaultEffort: "Hard / Zone 4",
                 calculateTargetCadence: { baseline in
                     let target = min(185, max(155, Int(Double(baseline) * 1.08)))
