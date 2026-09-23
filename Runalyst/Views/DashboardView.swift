@@ -218,7 +218,14 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private var aiFatigueInsightCard: some View {
+    private var aiInsightCard: some View {
+        let is7Day = timeRange == "7 Days"
+        let iconName = is7Day ? "bolt.heart.fill" : "chart.line.uptrend.xyaxis"
+        let iconColor: Color = is7Day ? .red : .orange
+        let cardTitle = is7Day ? "AI Tactical Coach" : "AI Strategic Analyst"
+        let cardSubtitle = is7Day ? "Readiness & Acute Fatigue" : "Adaptation & Efficiency"
+        let loadingText = is7Day ? "Analyzing readiness & recovery..." : "Analyzing 30-day adaptation..."
+
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
                 let headline = currentHeadline()
@@ -226,7 +233,7 @@ struct DashboardView: View {
 
                 if isFetchingInsight && headline.isEmpty {
                     AnimatedLoadingView(
-                        text: "Analyzing fatigue trends...",
+                        text: loadingText,
                         isHorizontal: true,
                         imageSize: 18,
                         textFont: .subheadline,
@@ -237,15 +244,31 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
                 } else {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkle")
-                            .foregroundColor(.primary)
-                        Text("AI Fatigue Insight")
-                            .font(.subheadline.bold())
+                    HStack(spacing: 8) {
+                        Image(systemName: iconName)
+                            .foregroundColor(iconColor)
+                            .font(.headline)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(cardTitle)
+                                .font(.subheadline.bold())
+                                .foregroundColor(.primary)
+                            Text(cardSubtitle)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    if !headline.isEmpty {
+                        Text(headline)
+                            .font(.headline)
                             .foregroundColor(.primary)
                     }
 
-                    Text(bodyText.isEmpty ? "Complete more runs to view updated fatigue and recovery trends." : bodyText)
+                    let defaultPlaceholder = is7Day
+                        ? "Complete more runs this week to evaluate acute fatigue and recovery trends."
+                        : "Complete more runs over the next 30 days to measure structural aerobic adaptation."
+
+                    Text(bodyText.isEmpty ? defaultPlaceholder : bodyText)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineSpacing(2)
@@ -294,6 +317,10 @@ struct DashboardView: View {
     }
 
     private func checkAndFetchInsight() {
+        guard timeRange != "All Time" else {
+            isFetchingInsight = false
+            return
+        }
         let currentRunCount = runRecords.count
         if currentRunCount != lastInsightRunCount {
             // Invalidate cache
@@ -312,6 +339,7 @@ struct DashboardView: View {
     }
 
     private func fetchInsight() {
+        guard timeRange != "All Time" else { return }
         guard !isFetchingInsight else { return }
         guard !timeRangeRuns.isEmpty else { return }
         isFetchingInsight = true
@@ -331,7 +359,79 @@ struct DashboardView: View {
         let zone4Context = "\(Int(zone4Sum * 100))% Zone 4"
         let cvContext = String(format: "%.3f", avgCV)
         let slopeContext = String(format: "%.3f", avgSlope)
-        let stageContext = "Competitor" // Simplified for now, or could calculate from volume
+        let stageContext = "Competitor"
+
+        let targetTimeRange = timeRange
+        let directiveContext: String
+        let efficiencyContext: String
+        let fatigueContext: String
+        let verticalOscillationContext: String
+
+        if targetTimeRange == "7 Days" {
+            // 7-DAY VIEW: Tactical Coach (Readiness & Acute Fatigue)
+            let heavySessions = timeRangeRuns.filter { run in
+                let type = run.detectedTypeRaw
+                let isHeavy = (type == "Intervals" || type == "Pyramids" || type == "Tempo Run" || type == "Hill Repeats")
+                let highZ4 = run.percentZone4 >= 0.35
+                return isHeavy || highZ4
+            }
+            let heavyCount = heavySessions.count
+
+            let latestRun = timeRangeRuns.first
+            let hasFatigueDrift = latestRun?.framboiseTags.contains("fatigueDrift") ?? false
+            let baseCad = baselineCadence ?? 160
+            let latestCad = latestRun?.workingAvgCadence ?? Double(baseCad)
+            let cadenceDropped = (latestCad > 0) && (Double(baseCad) - latestCad >= 4.0)
+
+            if heavyCount >= 2 || (hasFatigueDrift && cadenceDropped) {
+                directiveContext = "ACUTE_FATIGUE: The runner logged \(heavyCount) heavy sessions in the last 4 to 7 days and late-run cadence turnover declined. PRIORITY: Advise Zone 2 aerobic recovery or full rest day. Safety overrides any race goal."
+                fatigueContext = "\(heavyCount) hard sessions logged; late-run cadence dropped under fatigue."
+            } else if heavyCount == 1 && cadenceDropped {
+                directiveContext = "MODERATE_STRAIN: 1 hard session logged with mild turnover fatigue. Recommend controlled Zone 2 recovery."
+                fatigueContext = "Turnover decay after intense workout. Recommend easy recovery."
+            } else {
+                directiveContext = "HIGH_READINESS: Balanced training load, consistent turnover, and minimal cardiac drift. Athlete is primed for normal quality training."
+                fatigueContext = "Readiness optimal. No acute cardiac or turnover fatigue."
+            }
+            efficiencyContext = ""
+            verticalOscillationContext = ""
+        } else {
+            // 30-DAY VIEW: Strategic Analyst (Adaptation & Efficiency)
+            // Acute fatigue is strictly excluded.
+            let validRuns = timeRangeRuns.filter { $0.workingAvgPace > 0 && $0.workingAvgHeartRate > 0 }
+            let midDate = Calendar.current.date(byAdding: .day, value: -15, to: Date()) ?? Date()
+
+            let recentRuns = validRuns.filter { $0.date >= midDate }
+            let olderRuns = validRuns.filter { $0.date < midDate }
+
+            let recentEF = recentRuns.compactMap(\.efficiencyFactor)
+            let olderEF = olderRuns.compactMap(\.efficiencyFactor)
+
+            let avgRecentEF = recentEF.isEmpty ? 0.0 : (recentEF.reduce(0, +) / Double(recentEF.count))
+            let avgOlderEF = olderEF.isEmpty ? 0.0 : (olderEF.reduce(0, +) / Double(olderEF.count))
+            let efDelta = (avgRecentEF > 0 && avgOlderEF > 0) ? (avgRecentEF - avgOlderEF) : 0.0
+
+            let recentOscs = recentRuns.compactMap { $0.workingAvgVerticalOscillation ?? $0.rawAvgVerticalOscillation }
+            let olderOscs = olderRuns.compactMap { $0.workingAvgVerticalOscillation ?? $0.rawAvgVerticalOscillation }
+            let avgRecentOsc = recentOscs.isEmpty ? 0.0 : (recentOscs.reduce(0, +) / Double(recentOscs.count))
+            let avgOlderOsc = olderOscs.isEmpty ? 0.0 : (olderOscs.reduce(0, +) / Double(olderOscs.count))
+            let oscDelta = (avgRecentOsc > 0 && avgOlderOsc > 0) ? (avgRecentOsc - avgOlderOsc) : 0.0
+
+            let recentHR = recentRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(max(1, recentRuns.count))
+            let olderHR = olderRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(max(1, olderRuns.count))
+            let hrDelta = (recentHR > 0 && olderHR > 0) ? (recentHR - olderHR) : 0.0
+
+            if efDelta > 0.02 || hrDelta < -2.0 || oscDelta < -0.2 {
+                let hrDeltaText = hrDelta < 0 ? "\(Int(abs(hrDelta))) BPM lower" : "stable"
+                directiveContext = "STRUCTURAL_ADAPTATION: Over 4 weeks, aerobic base has expanded significantly. Efficiency Factor increased by \(String(format: "%.2f", efDelta)), heart rate at \(paceContext) is \(hrDeltaText), and vertical oscillation shifted by \(String(format: "%+.1f", oscDelta)) cm. Highlight structural economy and rising lactate threshold. Do NOT mention acute fatigue."
+                efficiencyContext = "Efficiency Factor rose by +\(String(format: "%.2f", efDelta)) m/beat. Aerobic capacity expanding."
+            } else {
+                directiveContext = "STEADY_AEROBIC_BASE: Consistent volume and steady aerobic efficiency over 30 days. Pacing stability and cadence turnover remain well calibrated. Highlight solid physiological foundation. Do NOT mention acute fatigue."
+                efficiencyContext = "Efficiency Factor stable at \(String(format: "%.2f", max(1.2, avgRecentEF))) m/beat."
+            }
+            verticalOscillationContext = avgRecentOsc > 0 ? "Vertical Oscillation: \(String(format: "%.1f", avgRecentOsc)) cm" : "Vertical form steady"
+            fatigueContext = ""
+        }
 
         let runData = AggregateRunDataForAI(
             paceContext: paceContext,
@@ -340,10 +440,12 @@ struct DashboardView: View {
             zone4Context: zone4Context,
             cvContext: cvContext,
             slopeContext: slopeContext,
-            stageContext: stageContext
+            stageContext: stageContext,
+            directiveContext: directiveContext,
+            efficiencyContext: efficiencyContext,
+            fatigueContext: fatigueContext,
+            verticalOscillationContext: verticalOscillationContext
         )
-
-        let targetTimeRange = timeRange
 
         Task {
             do {
@@ -357,9 +459,6 @@ struct DashboardView: View {
                         case "30 Days":
                             self.cachedHeadline30Day = insight.headline
                             self.cachedBody30Day = insight.body
-                        case "All Time":
-                            self.cachedHeadlineAllTime = insight.headline
-                            self.cachedBodyAllTime = insight.body
                         default: break
                         }
                         self.isFetchingInsight = false
@@ -368,7 +467,6 @@ struct DashboardView: View {
             } catch {
                 await MainActor.run {
                     self.isFetchingInsight = false
-                    // Silent failure logic leaves string empty, falls back to default
                 }
             }
         }
@@ -425,12 +523,12 @@ struct DashboardView: View {
     }
 
     private var activePrimerId: PreRunDrillId {
-        if let cadence = baselineCadence, cadence < 150 {
+        if timeRange == "7 Days" && currentHeadline().localizedCaseInsensitiveContains("fatigue") {
+            return .aerobicFlush
+        } else if let cadence = baselineCadence, cadence < 150 {
             return .cadencePyramids
         } else if let cadence = baselineCadence, cadence < 160 {
             return .rhythmIntervals
-        } else if currentHeadline().localizedCaseInsensitiveContains("fatigue") {
-            return .aerobicFlush
         } else {
             return .neuromuscularPrimer
         }
@@ -956,12 +1054,30 @@ struct DashboardView: View {
                 LazyVStack(spacing: 20) {
                     filterControlsSection
 
-                    fitnessBaselineCard
+                    if timeRange == "All Time" {
+                        LifetimeMilestonesCard(allRuns: runRecords)
 
-                    if !timeRangeRuns.isEmpty {
-                        aiFatigueInsightCard
+                        fitnessBaselineCard
 
-                        proactiveCoachCard
+                        ProgressionChartView(allRuns: runRecords)
+                    } else if timeRange == "30 Days" {
+                        fitnessBaselineCard
+
+                        if !timeRangeRuns.isEmpty {
+                            aiInsightCard
+
+                            proactiveCoachCard
+
+                            ProgressionChartView(allRuns: runRecords)
+                        }
+                    } else { // 7 Days
+                        fitnessBaselineCard
+
+                        if !timeRangeRuns.isEmpty {
+                            aiInsightCard
+
+                            proactiveCoachCard
+                        }
                     }
 
                     if !availableFilters.isEmpty {

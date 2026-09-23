@@ -62,6 +62,36 @@ struct AggregateRunDataForAI: Sendable {
     let cvContext: String
     let slopeContext: String
     let stageContext: String
+    let directiveContext: String
+    let efficiencyContext: String
+    let fatigueContext: String
+    let verticalOscillationContext: String
+
+    init(
+        paceContext: String,
+        hrContext: String,
+        cadenceContext: String,
+        zone4Context: String,
+        cvContext: String,
+        slopeContext: String,
+        stageContext: String,
+        directiveContext: String = "",
+        efficiencyContext: String = "",
+        fatigueContext: String = "",
+        verticalOscillationContext: String = ""
+    ) {
+        self.paceContext = paceContext
+        self.hrContext = hrContext
+        self.cadenceContext = cadenceContext
+        self.zone4Context = zone4Context
+        self.cvContext = cvContext
+        self.slopeContext = slopeContext
+        self.stageContext = stageContext
+        self.directiveContext = directiveContext
+        self.efficiencyContext = efficiencyContext
+        self.fatigueContext = fatigueContext
+        self.verticalOscillationContext = verticalOscillationContext
+    }
 }
 
 #if canImport(FoundationModels)
@@ -228,66 +258,96 @@ class CoachingEngine {
         }
     }
     func generateDashboardInsight(for timeFrame: String, runData: AggregateRunDataForAI) async throws -> DashboardFatigueInsight {
+        // All-Time view disables LLM inference entirely; relies on native Apple Charts and volume milestone badges.
+        if timeFrame == "All Time" {
+            return DashboardFatigueInsight(
+                headline: String(localized: "Lifetime Milestones"),
+                body: String(localized: "Review your lifetime volume, personal records, and progression trends below.")
+            )
+        }
+
         guard SystemLanguageModel.default.isAvailable else {
             throw NSError(domain: "CoachingEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foundation Models are not available on this device."])
         }
 
         let language = Locale.current.language.languageCode?.identifier ?? "en"
+        let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
 
-        let focusDirective: String
+        let instructions: String
+        let promptTemplate: String
+
         if timeFrame == "7 Days" {
-            focusDirective = "Focus on week-over-week cadence drops, heart rate spikes, and immediate readiness for acute fatigue."
-        } else if timeFrame == "30 Days" {
-            focusDirective = "Focus on lactate threshold improvements, aerobic base building, and long-term trends for chronic adaptation."
-        } else {
-            focusDirective = "Focus on the runner's current stage progression."
-        }
+            instructions = """
+            persona: tactical_running_coach
+            rules:
+            - Protective and actionable running coach speaking directly to athlete ("you").
+            - Focus strictly on immediate physical strain, cardiac drift, and short-term recovery needs.
+            - If acute fatigue or heavy legs are indicated by the DIRECTIVE, advise Zone 2 or a rest day.
+            - Strictly follow the DIRECTIVE.
+            - Strict Length: maximum of 2 short sentences.
+            - Zero Numbers: no specific metrics, target paces, BPM numbers, or times.
+            - respond_entirely_in_\(language), plain and simple.
+            """
 
-        let instructions = """
-        persona: elite_running_coach
-        rules:
-        - Empathetic running coach; warm, encouraging, conversational tone speaking directly to runner ("you").
-        - Translate physiological data into relatable language; frame feedback positively.
-        - Strict Length: maximum of 3 short sentences.
-        - Tailor feedback to GOAL.
-        - Zero Numbers: no specific metrics, target paces, or times.
-        - \(focusDirective)
-        - respond_entirely_in_\(language), plain and simple.
-        """
+            promptTemplate = """
+            Evaluate tactical readiness and acute recovery for this runner.
+            [AGGREGATE_DATA_START]
+            GOAL: \(trainingGoal)
+            TIMEFRAME: 7 Days (Tactical Readiness)
+            DIRECTIVE: {{DIRECTIVE_CONTEXT}}
+            FATIGUE_TELEMETRY: {{FATIGUE_CONTEXT}}
+            CADENCE_TURNOVER: {{CADENCE_CONTEXT}}
+            CARDIAC_LOAD: {{HR_CONTEXT}}, {{ZONE4_CONTEXT}}
+            PACING_DYNAMICS: {{CV_CONTEXT}}, {{SLOPE_CONTEXT}}
+            [AGGREGATE_DATA_END]
+            """
+        } else {
+            // 30 Days: The Strategic Analyst
+            instructions = """
+            persona: strategic_sports_scientist
+            rules:
+            - Analytical and trend-focused sports scientist speaking directly to athlete ("you").
+            - Focus strictly on structural physiological adaptation, aerobic base expansion, and efficiency gains.
+            - Acute fatigue is IRRELEVANT: NEVER mention short-term fatigue, heavy legs, or taking a rest day today.
+            - Strictly follow the DIRECTIVE.
+            - Strict Length: maximum of 2 short sentences.
+            - Zero Numbers: no specific metrics, target paces, BPM numbers, or times.
+            - respond_entirely_in_\(language), plain and simple.
+            """
+
+            promptTemplate = """
+            Evaluate 30-day physiological adaptation and efficiency for this runner.
+            [AGGREGATE_DATA_START]
+            GOAL: \(trainingGoal)
+            TIMEFRAME: 30 Days (Structural Adaptation & Efficiency)
+            DIRECTIVE: {{DIRECTIVE_CONTEXT}}
+            EFFICIENCY_FACTOR: {{EFFICIENCY_CONTEXT}}
+            BIOMECHANICS: {{OSCILLATION_CONTEXT}}, {{CADENCE_CONTEXT}}
+            CARDIAC_COST: {{HR_CONTEXT}}, {{PACE_CONTEXT}}
+            PACING_TRENDS: {{SLOPE_CONTEXT}}
+            [AGGREGATE_DATA_END]
+            """
+        }
 
         let session = LanguageModelSession(
             model: SystemLanguageModel.default,
             instructions: instructions
         )
 
-        let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
+        var filledPrompt = promptTemplate
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{DIRECTIVE_CONTEXT}}", with: runData.directiveContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{FATIGUE_CONTEXT}}", with: runData.fatigueContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{EFFICIENCY_CONTEXT}}", with: runData.efficiencyContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{OSCILLATION_CONTEXT}}", with: runData.verticalOscillationContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{STAGE_CONTEXT}}", with: runData.stageContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{HR_CONTEXT}}", with: runData.hrContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{ZONE4_CONTEXT}}", with: runData.zone4Context)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{CV_CONTEXT}}", with: runData.cvContext)
+        filledPrompt = filledPrompt.replacingOccurrences(of: "{{SLOPE_CONTEXT}}", with: runData.slopeContext)
 
-        var promptTemplate = """
-        This runner's goes is \(trainingGoal). Give them feedback.
-        [AGGREGATE_DATA_START]
-        GOAL: \(trainingGoal)
-        TIMEFRAME: \(timeFrame)
-        STAGE: {{STAGE_CONTEXT}}
-
-        --- METRICS ---
-        HEART_RATE_BPM: {{HR_CONTEXT}}
-        ZONE4_PERCENT: {{ZONE4_CONTEXT}}
-        CADENCE_SPM: {{CADENCE_CONTEXT}}
-        PACE: {{PACE_CONTEXT}}
-        PACE_VARIABILITY: {{CV_CONTEXT}}
-        PACE_SLOPE: {{SLOPE_CONTEXT}}
-        [AGGREGATE_DATA_END]
-        """
-
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{STAGE_CONTEXT}}", with: runData.stageContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{PACE_CONTEXT}}", with: runData.paceContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{HR_CONTEXT}}", with: runData.hrContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CADENCE_CONTEXT}}", with: runData.cadenceContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{ZONE4_CONTEXT}}", with: runData.zone4Context)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{CV_CONTEXT}}", with: runData.cvContext)
-        promptTemplate = promptTemplate.replacingOccurrences(of: "{{SLOPE_CONTEXT}}", with: runData.slopeContext)
-
-        let dashboardPrompt = promptTemplate
+        let dashboardPrompt = filledPrompt
 
         do {
             let insightContent = try await ModelInferenceSerializer.shared.run {
@@ -297,9 +357,13 @@ class CoachingEngine {
             return insightContent
         } catch {
             logger.error("FoundationModels Generation Error: \(error.localizedDescription)")
+            let fallbackHeadline = (timeFrame == "7 Days") ? String(localized: "Optimal Readiness") : String(localized: "Aerobic Foundation")
+            let fallbackBody = (timeFrame == "7 Days")
+                ? String(localized: "Your recent efforts show balanced strain. Keep your upcoming session controlled in Zone 2.")
+                : String(localized: "Your running economy is stabilizing nicely over the past month. Continue developing your aerobic baseline.")
             return DashboardFatigueInsight(
-                headline: String(localized: "Keep It Up"),
-                body: String(localized: "Keep up the consistent training rhythm.")
+                headline: fallbackHeadline,
+                body: fallbackBody
             )
         }
     }
@@ -400,10 +464,22 @@ class CoachingEngine {
     }
 
     func generateDashboardInsight(for timeFrame: String, runData: AggregateRunDataForAI) async throws -> DashboardFatigueInsight {
-        DashboardFatigueInsight(
-            headline: String(localized: "Keep It Up"),
-            body: String(localized: "Keep up the consistent training rhythm.")
-        )
+        if timeFrame == "7 Days" {
+            return DashboardFatigueInsight(
+                headline: String(localized: "Optimal Readiness"),
+                body: String(localized: "Your recent efforts show balanced strain. Keep your upcoming session controlled in Zone 2.")
+            )
+        } else if timeFrame == "30 Days" {
+            return DashboardFatigueInsight(
+                headline: String(localized: "Aerobic Foundation"),
+                body: String(localized: "Your running economy is stabilizing nicely over the past month. Continue developing your aerobic baseline.")
+            )
+        } else {
+            return DashboardFatigueInsight(
+                headline: String(localized: "Lifetime Milestones"),
+                body: String(localized: "Review your lifetime volume, personal records, and progression trends below.")
+            )
+        }
     }
 }
 #endif
