@@ -111,7 +111,19 @@ struct ContentView: View {
                 .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isSyncing)
                 .animation(.spring(response: 0.35, dampingFraction: 0.85), value: syncProgress?.current)
             } else {
-                OnboardingView()
+                OnboardingView(
+                    isSyncing: isSyncing,
+                    syncProgress: syncProgress,
+                    syncStatusMessage: syncStatusMessage,
+                    onStartSync: {
+                        Task {
+                            await syncData()
+                        }
+                    },
+                    onComplete: {
+                        hasCompletedOnboarding = true
+                    }
+                )
             }
         }
     }
