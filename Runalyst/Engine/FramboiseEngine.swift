@@ -30,6 +30,27 @@ struct BucketData: Sendable {
     }
 }
 
+/// Represents a detected work (surge) and recovery oscillation pair.
+struct SurgeRecoveryCycle: Sendable {
+    let workDuration: Double
+    let recoveryDuration: Double
+    let workCadence: Double
+    let recoveryCadence: Double
+    let workPace: Double
+    let recoveryPace: Double
+    let workHR: Double
+    let recoveryHR: Double
+    let isCorroborated: Bool
+}
+
+/// Structural topological analysis result for run classification.
+struct TopologicalSignature: Sendable {
+    let validCycles: [SurgeRecoveryCycle]
+    let regularityScore: Double
+    var validCycleCount: Int { validCycles.count }
+    var isIntermittent: Bool { validCycleCount >= 3 }
+}
+
 /// The deterministic math engine for Runalyst V2.
 /// Responsible for transforming raw HealthKit continuous streams into structured,
 /// noise-filtered metrics (working averages, CV, linear regression, and rule-based classification).
@@ -184,11 +205,165 @@ actor FramboiseEngine {
         return Double(zone4Count) / Double(bucketHRs.count)
     }
 
-    // MARK: - Classification (Physiological Weighted Engine)
+    // MARK: - Classification (Topological Signature & Physiological Weighted Engine)
+
+    /// Smooths the cadence time series using a 2-bucket (30-second) sliding window average.
+    func smoothCadences(buckets: [BucketData]) -> [Double] {
+        guard !buckets.isEmpty else { return [] }
+        var smoothed: [Double] = []
+        smoothed.reserveCapacity(buckets.count)
+        for index in 0..<buckets.count {
+            let start = max(0, index - 1)
+            let end = min(buckets.count, index + 2)
+            let slice = buckets[start..<end]
+            let avg = slice.map(\.meanCadence).reduce(0, +) / Double(slice.count)
+            smoothed.append(avg)
+        }
+        return smoothed
+    }
+
+    /// Extracts corroborated surge-and-recovery oscillation cycles from the bucket time series.
+    func extractOscillationCycles(buckets: [BucketData]) -> [SurgeRecoveryCycle] {
+        guard buckets.count >= 4 else { return [] }
+
+        let smoothed = smoothCadences(buckets: buckets)
+        let meanCadence = buckets.map(\.meanCadence).reduce(0, +) / Double(buckets.count)
+
+        struct CandidatePhase {
+            let isSurge: Bool
+            var duration: Double
+            var buckets: [BucketData]
+
+            var avgCadence: Double {
+                buckets.isEmpty ? 0 : (buckets.map(\.meanCadence).reduce(0, +) / Double(buckets.count))
+            }
+            var avgPace: Double {
+                buckets.isEmpty ? 0 : (buckets.map(\.meanPaceSecPerKm).reduce(0, +) / Double(buckets.count))
+            }
+            var avgHR: Double {
+                let validHRs = buckets.map(\.meanHR).filter { $0 > 0 }
+                return validHRs.isEmpty ? 0 : (validHRs.reduce(0, +) / Double(validHRs.count))
+            }
+        }
+
+        var phases: [CandidatePhase] = []
+        var currentIsSurge = smoothed[0] >= meanCadence
+        var currentBuckets = [buckets[0]]
+
+        for index in 1..<buckets.count {
+            let isSurge = smoothed[index] >= meanCadence
+            if isSurge == currentIsSurge {
+                currentBuckets.append(buckets[index])
+            } else {
+                let dur = currentBuckets.map(\.durationSeconds).reduce(0, +)
+                phases.append(CandidatePhase(isSurge: currentIsSurge, duration: dur, buckets: currentBuckets))
+                currentIsSurge = isSurge
+                currentBuckets = [buckets[index]]
+            }
+        }
+        if !currentBuckets.isEmpty {
+            let dur = currentBuckets.map(\.durationSeconds).reduce(0, +)
+            phases.append(CandidatePhase(isSurge: currentIsSurge, duration: dur, buckets: currentBuckets))
+        }
+
+        var cycles: [SurgeRecoveryCycle] = []
+        var usedRecoveryIndices: Set<Int> = []
+
+        for index in 0..<phases.count where phases[index].isSurge {
+            let surge = phases[index]
+
+            var recoveryIndex: Int?
+            if index + 1 < phases.count && !phases[index + 1].isSurge && !usedRecoveryIndices.contains(index + 1) {
+                recoveryIndex = index + 1
+            } else if index > 0 && !phases[index - 1].isSurge && !usedRecoveryIndices.contains(index - 1) {
+                recoveryIndex = index - 1
+            }
+
+            guard let recIdx = recoveryIndex else { continue }
+            let recovery = phases[recIdx]
+
+            // Minimum duration guards: Surge >= 15s, Recovery >= 20s
+            guard surge.duration >= 15.0, recovery.duration >= 20.0 else { continue }
+
+            // Multi-signal corroboration (>= 2 of 3 signals):
+            // 1. Cadence: Surge >= Recovery + 8 SPM
+            let cadenceCorroborated = (surge.avgCadence - recovery.avgCadence) >= 8.0
+            // 2. Pace: Surge >= 15 sec/km faster than Recovery (lower sec/km is faster)
+            let paceCorroborated = (recovery.avgPace - surge.avgPace) >= 15.0
+            // 3. Heart Rate: Surge >= Recovery + 5 BPM
+            let hrCorroborated = (surge.avgHR > 0 && recovery.avgHR > 0) ? ((surge.avgHR - recovery.avgHR) >= 5.0) : false
+
+            let corroborationScore = (cadenceCorroborated ? 1 : 0) + (paceCorroborated ? 1 : 0) + (hrCorroborated ? 1 : 0)
+            if corroborationScore >= 2 {
+                usedRecoveryIndices.insert(recIdx)
+                cycles.append(SurgeRecoveryCycle(
+                    workDuration: surge.duration,
+                    recoveryDuration: recovery.duration,
+                    workCadence: surge.avgCadence,
+                    recoveryCadence: recovery.avgCadence,
+                    workPace: surge.avgPace,
+                    recoveryPace: recovery.avgPace,
+                    workHR: surge.avgHR,
+                    recoveryHR: recovery.avgHR,
+                    isCorroborated: true
+                ))
+            }
+        }
+
+        return cycles
+    }
+
+    /// Evaluates the regularity of work and recovery durations across validated oscillation cycles.
+    /// Returns 0.0 to 1.0 (higher = more metronomic/regular).
+    func calculateCycleRegularity(cycles: [SurgeRecoveryCycle]) -> Double {
+        guard cycles.count >= 2 else { return 0.0 }
+        let workDurations = cycles.map(\.workDuration)
+        let recDurations = cycles.map(\.recoveryDuration)
+
+        let meanWork = workDurations.reduce(0, +) / Double(workDurations.count)
+        let meanRec = recDurations.reduce(0, +) / Double(recDurations.count)
+
+        guard meanWork > 0, meanRec > 0 else { return 0.0 }
+
+        let workVariance = workDurations.map { pow($0 - meanWork, 2) }.reduce(0, +) / Double(workDurations.count)
+        let workCV = sqrt(workVariance) / meanWork
+
+        let recVariance = recDurations.map { pow($0 - meanRec, 2) }.reduce(0, +) / Double(recDurations.count)
+        let recCV = sqrt(recVariance) / meanRec
+
+        let score = 1.0 - ((workCV + recCV) / 2.0)
+        return max(0.0, min(1.0, score))
+    }
+
+    /// Evaluates whether the run exhibits monotonic quintile progression (accelerating pace across the run).
+    func evaluateQuintileProgression(buckets: [BucketData]) -> Bool {
+        guard buckets.count >= 5 else { return false }
+        let quintileSize = buckets.count / 5
+        var quintilePaces: [Double] = []
+        for index in 0..<5 {
+            let start = index * quintileSize
+            let end = (index == 4) ? buckets.count : (index + 1) * quintileSize
+            let slice = buckets[start..<end]
+            guard !slice.isEmpty else { return false }
+            let avgPace = slice.map(\.meanPaceSecPerKm).reduce(0, +) / Double(slice.count)
+            quintilePaces.append(avgPace)
+        }
+
+        var fasterTransitions = 0
+        for index in 0..<4 where quintilePaces[index + 1] < quintilePaces[index] {
+            fasterTransitions += 1
+        }
+
+        let minPace = quintilePaces.min() ?? Double.infinity
+        let q5IsFastest = (quintilePaces[4] == minPace)
+
+        return fasterTransitions >= 4 && q5IsFastest
+    }
 
     /// Multi-delta weighted classification engine enforcing turnover stability,
-    /// cardiac strain guardrails, and pacing trends.
+    /// topological oscillation signatures, cardiac strain guardrails, and pacing trends.
     func classifyRun(
+        buckets: [BucketData],
         cv: Double,
         slope: Double,
         zone4: Double,
@@ -198,29 +373,32 @@ actor FramboiseEngine {
         paceDelta: Double? = nil,
         hrDelta: Double? = nil
     ) -> String {
-        // PHASE 1: Structural Gate (Intermittent vs. Continuous)
-        // Intervals and Fartlek ("speed play") require alternating cadence surges and recovery.
-        // A rock-solid turnover (cadenceCV < 0.025) guarantees a continuous run.
-        let isIntermittentCandidate = cadenceCV >= 0.025 && cv >= 0.07
+        // LAYER 1: Structural Gate (Intermittent vs. Continuous)
+        let cycles = extractOscillationCycles(buckets: buckets)
+        let isIntermittent = cycles.count >= 3
+        let regularityScore = isIntermittent ? calculateCycleRegularity(cycles: cycles) : 0.0
 
-        if isIntermittentCandidate {
-            if cv >= 0.12 || cadenceCV >= 0.038 {
+        // LAYER 2: Intermittent Sub-Classification (Intervals vs. Fartlek)
+        if isIntermittent {
+            if regularityScore >= 0.65 {
                 return "Intervals"
             } else {
                 return "Fartlek"
             }
         }
 
-        // PHASE 2: Continuous Structural Archetypes (Pacing Slope & Volume)
+        // LAYER 3: Continuous Structural Archetypes (Trend Morphology & Volume)
+        let isProgression = (durationMinutes >= 20.0 && evaluateQuintileProgression(buckets: buckets))
+            || (slope < -0.225 && durationMinutes >= 20.0)
+        if isProgression {
+            return "Progression Run"
+        }
+
         if durationMinutes >= 68.0 && slope > -0.20 && zone4 < 0.45 {
             return "Long Run"
         }
 
-        if slope < -0.225 && durationMinutes >= 20.0 {
-            return "Progression Run"
-        }
-
-        // PHASE 3: Continuous Intensity Matrix (Zone 4 + HR Strain + Pace Delta)
+        // LAYER 3c: Continuous Intensity Matrix (Zone 4 + HR Strain + Pace Delta)
         // Calculate normalized Intensity Score (0 to 100)
         let z4Score = min(100.0, zone4 * 125.0)
 

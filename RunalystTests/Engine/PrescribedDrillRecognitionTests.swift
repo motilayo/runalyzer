@@ -298,8 +298,17 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
 
         // Reproduces the exact user's run:
         // High HR (170 BPM), high Zone 4 (0.85), pace CV = 0.09, duration = 27 min
-        // BUT cadenceCV = 0.012 (rock-solid turnover at 161-162 SPM)
+        // BUT rock-solid turnover at 161-162 SPM (0 oscillation cycles)
+        var steadyBuckets: [BucketData] = []
+        var now = Date()
+        for i in 0..<54 { // 54 * 30s = 27 min
+            let cadence = (i % 2 == 0) ? 161.0 : 162.0
+            steadyBuckets.append(BucketData(startTime: now, distanceMeters: 80, durationSeconds: 30, meanPaceSecPerKm: 375, meanCadence: cadence, meanHR: 170))
+            now = now.addingTimeInterval(30)
+        }
+
         let classification = await modelManager.predictRunType(
+            buckets: steadyBuckets,
             paceDelta: 0.0,
             hrDelta: 20.0,
             percentZone4: 0.85,
@@ -314,12 +323,13 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
         )
 
         // Must classify as Steady Effort (or Tempo Run), NEVER Fartlek or Intervals!
-        XCTAssertNotEqual(classification, "Fartlek", "Rock-solid cadence (cadenceCV < 0.025) must never be classified as Fartlek")
-        XCTAssertNotEqual(classification, "Intervals", "Rock-solid cadence (cadenceCV < 0.025) must never be classified as Intervals")
+        XCTAssertNotEqual(classification, "Fartlek", "Rock-solid cadence must never be classified as Fartlek")
+        XCTAssertNotEqual(classification, "Intervals", "Rock-solid cadence must never be classified as Intervals")
         XCTAssertTrue(classification == "Steady Effort" || classification == "Tempo Run")
 
         // Direct test on FramboiseEngine weighted scoring
         let directClass = await framboise.classifyRun(
+            buckets: steadyBuckets,
             cv: 0.09,
             slope: -0.05,
             zone4: 0.85,
@@ -335,8 +345,22 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
     func testIntermittentIntervalClassification() async {
         let framboise = FramboiseEngine()
 
-        // Intermittent workout: high cadence volatility (cadenceCV = 0.042) and high pace CV (0.14)
+        // Intermittent structured workout: 4 metronomic reps (60s work, 60s recovery)
+        var intervalBuckets: [BucketData] = []
+        var now = Date()
+        for _ in 0..<4 {
+            for _ in 0..<2 { // 60s work
+                intervalBuckets.append(BucketData(startTime: now, distanceMeters: 100, durationSeconds: 30, meanPaceSecPerKm: 300, meanCadence: 178, meanHR: 168))
+                now = now.addingTimeInterval(30)
+            }
+            for _ in 0..<2 { // 60s recovery
+                intervalBuckets.append(BucketData(startTime: now, distanceMeters: 55, durationSeconds: 30, meanPaceSecPerKm: 540, meanCadence: 135, meanHR: 138))
+                now = now.addingTimeInterval(30)
+            }
+        }
+
         let intervalClass = await framboise.classifyRun(
+            buckets: intervalBuckets,
             cv: 0.14,
             slope: 0.0,
             zone4: 0.50,

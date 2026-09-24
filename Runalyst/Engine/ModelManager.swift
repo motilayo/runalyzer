@@ -18,6 +18,7 @@ actor ModelManager {
 
     /// Predicts the run type using the CoreML model.
     func predictRunType(
+        buckets: [BucketData],
         paceDelta: Double,
         hrDelta: Double,
         percentZone4: Double,
@@ -32,6 +33,7 @@ actor ModelManager {
     ) async -> String {
         let framboise = FramboiseEngine()
         let weightedClass = await framboise.classifyRun(
+            buckets: buckets,
             cv: cv,
             slope: slope,
             zone4: percentZone4,
@@ -59,18 +61,22 @@ actor ModelManager {
                 let prediction = try await classifier.prediction(input: input)
                 var targetClass = prediction.targetClass
 
-                // Physiological Structural Gate:
-                // 1. Cadence Stability Gate (Continuous vs. Intermittent):
-                // If cadenceCV is locked in (< 0.025), the run is continuous with no interval alternation.
-                // It CANNOT be Fartlek or Intervals.
-                if (targetClass == "Fartlek" || targetClass == "Intervals") && cadenceCV < 0.025 {
+                // Topological Structural Guardrail:
+                let cycles = await framboise.extractOscillationCycles(buckets: buckets)
+                // 1. Continuous Run Gate:
+                // If < 3 corroborated oscillation cycles, the run is continuous.
+                // CoreML CANNOT classify it as Fartlek or Intervals.
+                if (targetClass == "Fartlek" || targetClass == "Intervals") && cycles.count < 3 {
                     targetClass = weightedClass
                 }
 
                 // 2. Intermittent Gate:
-                // If cadenceCV and pace CV are both high, the workout has intermittent work/rest intervals.
-                if (targetClass == "Steady Effort" || targetClass == "Easy Run" || targetClass == "Recovery Run" || targetClass == "Tempo Run") && cadenceCV >= 0.038 && cv >= 0.12 {
-                    targetClass = "Intervals"
+                // If >= 3 corroborated cycles and high regularity, override continuous predictions with Intervals.
+                if (targetClass == "Steady Effort" || targetClass == "Easy Run" || targetClass == "Recovery Run" || targetClass == "Tempo Run") && cycles.count >= 3 {
+                    let regularity = await framboise.calculateCycleRegularity(cycles: cycles)
+                    if regularity >= 0.65 {
+                        targetClass = "Intervals"
+                    }
                 }
 
                 return targetClass

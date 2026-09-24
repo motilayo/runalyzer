@@ -581,6 +581,7 @@ struct RunBaselineData: Sendable {
             }
 
             classification = await modelManager.predictRunType(
+                buckets: overlappingWindows,
                 paceDelta: currentPace - baselinePace,
                 hrDelta: currentHR - baselineHR,
                 percentZone4: zone4,
@@ -596,6 +597,7 @@ struct RunBaselineData: Sendable {
         } else {
             let framboise = FramboiseEngine()
             classification = await framboise.classifyRun(
+                buckets: overlappingWindows,
                 cv: cv,
                 slope: slope,
                 zone4: zone4,
