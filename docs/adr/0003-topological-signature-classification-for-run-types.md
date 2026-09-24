@@ -140,7 +140,7 @@ The method signature expands to accept the smoothed bucket time series:
 
 ```swift
 func classifyRun(
-    buckets: [BucketData] = [],  // smoothed 30-second overlapping windows (default empty for scalar-only callers)
+    buckets: [BucketData],       // smoothed 30-second overlapping windows (required)
     cv: Double,                  // retained for Phase 3 (Long Run archetype)
     slope: Double,               // retained for Phase 3 fallback
     zone4: Double,
@@ -152,15 +152,15 @@ func classifyRun(
 ) -> String
 ```
 
-**Backward Compatibility**: The existing scalar-only call sites in `HealthKitManager` and `ModelManager` already have access to the overlapping windows (`overlappingWindows`) computed from `generateOverlappingWindows(from: trimmed)`. These windows will be passed through to the new `classifyRun()` signature. When `buckets.isEmpty` (such as in legacy callers or synthetic scalar unit tests), `classifyRun()` gracefully falls back to the scalar CV heuristic (`cadenceCV >= 0.025 && cv >= 0.07`), ensuring 100% backward compatibility.
+**Clean V2 Migration (No Legacy Fallbacks)**: Because V2 is currently live only on TestFlight and has not yet been deployed to the public App Store, forcing backward compatibility for scalar-only callers is unnecessary. `classifyRun()` and `ModelManager.predictRunType()` strictly require `buckets: [BucketData]`. The legacy scalar-only heuristic (`cadenceCV >= 0.025 && cv >= 0.07`), which was the root cause of the misclassification bug, has been completely eliminated from the codebase rather than preserved as a fallback. All callers and unit tests provide the bucket time series directly.
 
 ### Impact on ModelManager CoreML Guardrails
 
-The structural guardrails in `ModelManager.predictRunType()` currently use `cadenceCV < 0.025` to override CoreML Fartlek/Intervals predictions. These guardrails should be updated to use the same cycle-count logic:
+The structural guardrails in `ModelManager.predictRunType()` currently use `cadenceCV < 0.025` to override CoreML Fartlek/Intervals predictions. These guardrails are updated to use pure topological cycle logic:
 
-1. Pass the `[BucketData]` array through to `ModelManager.predictRunType()`.
-2. Replace the scalar `cadenceCV < 0.025` override with: if `validCycleCount < 3`, override any CoreML Fartlek/Intervals prediction with the `FramboiseEngine` weighted classification.
-3. Replace the scalar `cadenceCV >= 0.038 && cv >= 0.12` intermittent gate with: if `validCycleCount >= 3 && regularityScore >= 0.65`, override continuous CoreML predictions with "Intervals".
+1. Pass the `[BucketData]` array into `ModelManager.predictRunType()`.
+2. Replace scalar overrides with: if `validCycleCount < 3`, override any CoreML Fartlek/Intervals prediction with the `FramboiseEngine` weighted classification.
+3. If `validCycleCount >= 3 && regularityScore >= 0.65`, override continuous CoreML predictions with "Intervals".
 
 ### Positive Consequences
 

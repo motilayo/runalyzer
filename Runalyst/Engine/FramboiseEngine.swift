@@ -363,7 +363,7 @@ actor FramboiseEngine {
     /// Multi-delta weighted classification engine enforcing turnover stability,
     /// topological oscillation signatures, cardiac strain guardrails, and pacing trends.
     func classifyRun(
-        buckets: [BucketData] = [],
+        buckets: [BucketData],
         cv: Double,
         slope: Double,
         zone4: Double,
@@ -374,25 +374,9 @@ actor FramboiseEngine {
         hrDelta: Double? = nil
     ) -> String {
         // LAYER 1: Structural Gate (Intermittent vs. Continuous)
-        let isIntermittent: Bool
-        let regularityScore: Double
-
-        if !buckets.isEmpty {
-            let cycles = extractOscillationCycles(buckets: buckets)
-            if cycles.count >= 3 {
-                isIntermittent = true
-                regularityScore = calculateCycleRegularity(cycles: cycles)
-            } else {
-                isIntermittent = false
-                regularityScore = 0.0
-            }
-        } else {
-            // Backward-compatible fallback for synthetic scalar unit tests / callers without bucket streams
-            let isIntermittentCandidate = cadenceCV >= 0.025 && cv >= 0.07
-            isIntermittent = isIntermittentCandidate
-            let isStructuredInterval = cv >= 0.12 || cadenceCV >= 0.038
-            regularityScore = isStructuredInterval ? 0.70 : 0.50
-        }
+        let cycles = extractOscillationCycles(buckets: buckets)
+        let isIntermittent = cycles.count >= 3
+        let regularityScore = isIntermittent ? calculateCycleRegularity(cycles: cycles) : 0.0
 
         // LAYER 2: Intermittent Sub-Classification (Intervals vs. Fartlek)
         if isIntermittent {
@@ -404,7 +388,7 @@ actor FramboiseEngine {
         }
 
         // LAYER 3: Continuous Structural Archetypes (Trend Morphology & Volume)
-        let isProgression = (!buckets.isEmpty && durationMinutes >= 20.0 && evaluateQuintileProgression(buckets: buckets))
+        let isProgression = (durationMinutes >= 20.0 && evaluateQuintileProgression(buckets: buckets))
             || (slope < -0.225 && durationMinutes >= 20.0)
         if isProgression {
             return "Progression Run"
