@@ -222,9 +222,9 @@ struct DashboardView: View {
         let is7Day = timeRange == "7 Days"
         let iconName = is7Day ? "bolt.heart.fill" : "chart.line.uptrend.xyaxis"
         let iconColor: Color = is7Day ? .red : .orange
-        let cardTitle = is7Day ? "AI Tactical Coach" : "AI Strategic Analyst"
-        let cardSubtitle = is7Day ? "Readiness & Acute Fatigue" : "Adaptation & Efficiency"
-        let loadingText = is7Day ? "Analyzing readiness & recovery..." : "Analyzing 30-day adaptation..."
+        let cardTitle = is7Day ? "AI Tactical Coach" : "Physiological Trends"
+        let cardSubtitle = is7Day ? "Readiness & Acute Fatigue" : "Aerobic Adaptation & Efficiency"
+        let loadingText = is7Day ? "Analyzing readiness & recovery..." : "Analyzing 30-day trends..."
 
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
@@ -1057,9 +1057,7 @@ struct DashboardView: View {
                     if timeRange == "All Time" {
                         LifetimeMilestonesCard(allRuns: runRecords)
 
-                        fitnessBaselineCard
-
-                        ProgressionChartView(allRuns: runRecords)
+                        ProgressionChartView(allRuns: runRecords, defaultHorizon: .allTime)
                     } else if timeRange == "30 Days" {
                         fitnessBaselineCard
 
@@ -1068,7 +1066,7 @@ struct DashboardView: View {
 
                             proactiveCoachCard
 
-                            ProgressionChartView(allRuns: runRecords)
+                            ProgressionChartView(allRuns: runRecords, defaultHorizon: .thirtyDays)
                         }
                     } else { // 7 Days
                         fitnessBaselineCard
