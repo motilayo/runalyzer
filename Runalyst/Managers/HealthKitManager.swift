@@ -591,11 +591,13 @@ struct RunBaselineData: Sendable {
                 slope: slope,
                 durationMinutes: duration / 60.0,
                 cadenceCV: cadenceCV,
-                rawAverageHR: currentHR
+                rawAverageHR: currentHR,
+                buckets: overlappingWindows
             )
         } else {
             let framboise = FramboiseEngine()
             classification = await framboise.classifyRun(
+                buckets: overlappingWindows,
                 cv: cv,
                 slope: slope,
                 zone4: zone4,
