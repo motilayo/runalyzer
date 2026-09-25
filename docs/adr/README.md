@@ -9,7 +9,7 @@ This directory documents key architectural decisions made in the Runalyst projec
 | [0001](0001-record-architecture-decisions.md) | [Record Architecture Decisions](0001-record-architecture-decisions.md) | Accepted | 2026-09-18 |
 | [0002](0002-structural-sequence-parsing-for-interval-workouts.md) | [Structural Sequence Parsing and Work-Only Adherence for Interval Workouts](0002-structural-sequence-parsing-for-interval-workouts.md) | Accepted | 2026-09-18 |
 | [0003](0003-topological-signature-classification-for-run-types.md) | [Topological Signature Classification for Run Types](0003-topological-signature-classification-for-run-types.md) | Accepted | 2026-09-24 |
-| [0004](0004-stride-length-biomechanical-analysis.md) | [Incorporating Stride Length into Biomechanical Analysis and Coaching](0004-stride-length-biomechanical-analysis.md) | Proposed | 2026-09-24 |
+| [0004](0004-stride-length-biomechanical-analysis.md) | [Incorporating Stride Length into Biomechanical Analysis and Coaching](0004-stride-length-biomechanical-analysis.md) | Accepted | 2026-09-24 |
 | [0005](0005-dual-scope-refresh-and-healthkit-sync-lifecycle.md) | [Dual-Scope Refresh and HealthKit Synchronization Lifecycle](0005-dual-scope-refresh-and-healthkit-sync-lifecycle.md) | Proposed | 2026-09-24 |
 
 ---
