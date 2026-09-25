@@ -375,4 +375,55 @@ final class RunRecordModelAndSchemaTests: XCTestCase {
         let standaloneAbout = AboutRunalystView(isEmbedded: false)
         XCTAssertFalse(standaloneAbout.isEmbedded)
     }
+
+    func testRunRecordStrideLengthAndVerticalRatio() {
+        let run = RunRecord(
+            hkWorkoutID: UUID(),
+            date: Date(),
+            totalDistanceMeters: 5000,
+            duration: 1500,
+            rawAvgPace: 300,
+            rawAvgHeartRate: 150,
+            rawAvgCadence: 165,
+            workingAvgPace: 300,
+            workingAvgCadence: 165,
+            workingAvgHeartRate: 150,
+            workingAvgVerticalOscillation: 8.4,
+            rawAvgVerticalOscillation: 8.5,
+            rawAvgStrideLength: 1.18,
+            workingAvgStrideLength: 1.20,
+            paceCV: 0.05,
+            paceSlope: 0.1,
+            percentZone4: 0.2,
+            detectedTypeRaw: "Steady Effort"
+        )
+
+        XCTAssertEqual(run.rawAvgStrideLength, 1.18)
+        XCTAssertEqual(run.workingAvgStrideLength, 1.20)
+        // 8.4 cm / 1.20 m = 7.0%
+        if let vr = run.verticalRatio {
+            XCTAssertEqual(vr, 7.0, accuracy: 0.01)
+        } else {
+            XCTFail("verticalRatio should not be nil")
+        }
+
+        // Fallback to raw when working stride is nil
+        run.workingAvgStrideLength = nil
+        // 8.4 cm / 1.18 m = 7.1186%
+        if let vr = run.verticalRatio {
+            XCTAssertEqual(vr, 8.4 / 1.18, accuracy: 0.01)
+        } else {
+            XCTFail("verticalRatio should not be nil")
+        }
+
+        // Anomaly protection: stride < 0.3m returns nil
+        run.workingAvgStrideLength = 0.15
+        XCTAssertNil(run.verticalRatio)
+
+        // Nil oscillation returns nil
+        run.workingAvgStrideLength = 1.20
+        run.workingAvgVerticalOscillation = nil
+        run.rawAvgVerticalOscillation = nil
+        XCTAssertNil(run.verticalRatio)
+    }
 }

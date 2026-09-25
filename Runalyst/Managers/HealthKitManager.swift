@@ -34,6 +34,8 @@ struct RunRecordDTO: Sendable {
     let workingAvgHeartRate: Double
     let rawAvgVerticalOscillation: Double?
     let workingAvgVerticalOscillation: Double?
+    let rawAvgStrideLength: Double?
+    let workingAvgStrideLength: Double?
     let workingDistanceMeters: Double?
     let workingDurationSeconds: Double?
     let isIndoor: Bool?
@@ -270,13 +272,18 @@ class HealthKitManager: ObservableObject {
               let oscType = HKObjectType.quantityType(forIdentifier: .runningVerticalOscillation) else {
             return []
         }
+        let strideType = HKObjectType.quantityType(forIdentifier: .runningStrideLength)
 
         async let distanceStats = fetchCollection(for: workout, type: distanceType, options: .cumulativeSum)
         async let stepStats = fetchCollection(for: workout, type: stepType, options: .cumulativeSum)
         async let hrStats = fetchCollection(for: workout, type: hrType, options: .discreteAverage)
         async let oscStats = fetchCollection(for: workout, type: oscType, options: .discreteAverage)
+        async let strideStats: [Date: HKStatistics] = {
+            guard let strideType = strideType else { return [:] }
+            return (try? await fetchCollection(for: workout, type: strideType, options: .discreteAverage)) ?? [:]
+        }()
 
-        let (distances, steps, hrs, oscs) = try await (distanceStats, stepStats, hrStats, oscStats)
+        let (distances, steps, hrs, oscs, strides) = try await (distanceStats, stepStats, hrStats, oscStats, strideStats)
 
         var buckets: [BucketData] = []
         var currentDate = workout.startDate
@@ -291,6 +298,7 @@ class HealthKitManager: ObservableObject {
             let stepCount = steps[currentDate]?.sumQuantity()?.doubleValue(for: .count()) ?? 0
             let hr = hrs[currentDate]?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())) ?? 0
             let osc = oscs[currentDate]?.averageQuantity()?.doubleValue(for: HKUnit.meterUnit(with: .centi)) ?? 0
+            let stride = strides[currentDate]?.averageQuantity()?.doubleValue(for: .meter()) ?? 0
 
             let cadence = durationSeconds > 0 ? (stepCount / (durationSeconds / 60.0)) : 0
             let pace = distance > 0 ? (durationSeconds / (distance / 1000.0)) : 0
@@ -302,7 +310,8 @@ class HealthKitManager: ObservableObject {
                 meanPaceSecPerKm: pace,
                 meanCadence: cadence,
                 meanHR: hr,
-                meanVerticalOscillation: osc
+                meanVerticalOscillation: osc,
+                meanStrideLength: stride
             ))
 
             currentDate = nextDate
@@ -419,15 +428,23 @@ struct RunBaselineData: Sendable {
         let totalSteps = try await fetchSum(for: workout, type: stepType, unit: HKUnit.count())
 
         let rawAvgOscillation = try? await fetchAverage(for: workout, type: oscType, unit: HKUnit.meterUnit(with: .centi))
+        let strideType = HKObjectType.quantityType(forIdentifier: .runningStrideLength)
+        let rawAvgStride: Double?
+        if let strideType = strideType {
+            rawAvgStride = try? await fetchAverage(for: workout, type: strideType, unit: .meter())
+        } else {
+            rawAvgStride = nil
+        }
         let isIndoor = workout.metadata?[HKMetadataKeyIndoorWorkout] as? Bool
 
         let buckets = try await fetchBucketedSamples(for: workout)
         let trimmed = await engine.trimDeadStops(buckets: buckets)
-        let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration) = await engine.calculateWorkingAverages(
+        let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration, workingStride) = await engine.calculateWorkingAverages(
             trimmed: trimmed,
             rawWorkoutDuration: duration,
             rawWorkoutDistance: distance,
-            originalBucketCount: buckets.count
+            originalBucketCount: buckets.count,
+            rawAvgStrideLength: rawAvgStride
         )
 
         // Raw cadence is total moving steps over the entire elapsed time (including pauses)
@@ -492,6 +509,10 @@ struct RunBaselineData: Sendable {
         let validRawOsc = (rawAvgOscillation ?? 0) > 0 ? rawAvgOscillation : nil
         let validWorkingOsc = workingOscillation > 0 ? workingOscillation : validRawOsc
         let finalRawOsc = validRawOsc ?? validWorkingOsc
+
+        let validRawStride = (rawAvgStride ?? 0) > 0 ? rawAvgStride : nil
+        let validWorkingStride = (workingStride ?? 0) > 0 ? workingStride : validRawStride
+        let finalRawStride = validRawStride ?? validWorkingStride
 
         let currentPace = workingPace > 0 ? workingPace : rawAvgPace
         let currentHR = workingHR > 0 ? workingHR : rawAvgHeartRate
@@ -664,6 +685,8 @@ struct RunBaselineData: Sendable {
             workingAvgHeartRate: workingHR,
             rawAvgVerticalOscillation: finalRawOsc,
             workingAvgVerticalOscillation: validWorkingOsc,
+            rawAvgStrideLength: finalRawStride,
+            workingAvgStrideLength: validWorkingStride,
             workingDistanceMeters: workingDistance,
             workingDurationSeconds: workingDuration,
             isIndoor: isIndoor,

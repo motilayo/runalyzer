@@ -47,6 +47,32 @@ final class FramboiseEngineTests: XCTestCase {
         XCTAssertEqual(averages.workingOscillation, 9.0, accuracy: 0.01)
     }
 
+    func testCalculateWorkingAverages_StrideLengthAveragingAndFallback() async {
+        let buckets = [
+            BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 160, meanHR: 140, meanStrideLength: 1.10),
+            BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 164, meanHR: 144, meanStrideLength: 0.0), // zero sample
+            BucketData(startTime: Date(), distanceMeters: 200, meanPaceSecPerKm: 300, meanCadence: 162, meanHR: 142, meanStrideLength: 1.30)
+        ]
+
+        let averages = await engine.calculateWorkingAverages(trimmed: buckets)
+        // (1.10 + 1.30) / 2 = 1.20
+        if let workingStride = averages.workingStrideLength {
+            XCTAssertEqual(workingStride, 1.20, accuracy: 0.01)
+        } else {
+            XCTFail("workingStrideLength should not be nil")
+        }
+
+        // Fully active inherits raw stride
+        let fullyActiveAverages = await engine.calculateWorkingAverages(
+            trimmed: buckets,
+            rawWorkoutDuration: 180,
+            rawWorkoutDistance: 600,
+            originalBucketCount: 3,
+            rawAvgStrideLength: 1.22
+        )
+        XCTAssertEqual(fullyActiveAverages.workingStrideLength, 1.22)
+    }
+
     func testFilterRunningSamples_DropsStationaryAndWalking() async {
         let buckets = [
             // Stationary: 0 m/s, 0 SPM -> Drop

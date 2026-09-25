@@ -12,6 +12,21 @@ struct BaselineStats: Sendable {
     let avgCadence: Double
     let avgHR: Double
     let avgOscillation: Double
+    let avgStrideLength: Double?
+
+    init(
+        avgPace: Double,
+        avgCadence: Double,
+        avgHR: Double,
+        avgOscillation: Double,
+        avgStrideLength: Double? = nil
+    ) {
+        self.avgPace = avgPace
+        self.avgCadence = avgCadence
+        self.avgHR = avgHR
+        self.avgOscillation = avgOscillation
+        self.avgStrideLength = avgStrideLength
+    }
 }
 
 struct RunDataForAI: Sendable {
@@ -544,7 +559,20 @@ actor RunAnalyzerActor {
                 let weightedHR = validRuns.map { $0.workingAvgHeartRate * aerobicWeight(for: $0) }.reduce(0, +) / totalWeight
                 let weightedCadence = validRuns.map { $0.workingAvgCadence * aerobicWeight(for: $0) }.reduce(0, +) / totalWeight
                 let weightedOsc = validRuns.map { ($0.workingAvgVerticalOscillation ?? $0.rawAvgVerticalOscillation ?? 9.5) * aerobicWeight(for: $0) }.reduce(0, +) / totalWeight
-                baseline = BaselineStats(avgPace: weightedPace, avgCadence: weightedCadence, avgHR: weightedHR, avgOscillation: weightedOsc)
+
+                let strideRuns = validRuns.filter { ($0.workingAvgStrideLength ?? $0.rawAvgStrideLength ?? 0) > 0 }
+                let totalStrideWeight = strideRuns.map { aerobicWeight(for: $0) }.reduce(0, +)
+                let weightedStride: Double? = totalStrideWeight > 0
+                    ? (strideRuns.map { ($0.workingAvgStrideLength ?? $0.rawAvgStrideLength ?? 0) * aerobicWeight(for: $0) }.reduce(0, +) / totalStrideWeight)
+                    : nil
+
+                baseline = BaselineStats(
+                    avgPace: weightedPace,
+                    avgCadence: weightedCadence,
+                    avgHR: weightedHR,
+                    avgOscillation: weightedOsc,
+                    avgStrideLength: weightedStride
+                )
             }
         }
 
@@ -571,7 +599,35 @@ actor RunAnalyzerActor {
             } else {
                 cadenceSummary = "Cadence dropped by \(Int(abs(cadenceDelta))) SPM, indicating slower turnover or longer ground contact."
             }
-            cadenceContext = "Current: \(Int(run.workingAvgCadence)) SPM, Baseline: \(Int(base.avgCadence)) SPM, Deltas: \(Int(cadenceDelta)). \(cadenceSummary)"
+            let currentVR = run.verticalRatio
+            let currentStride = run.workingAvgStrideLength ?? run.rawAvgStrideLength
+            let baseStride = base.avgStrideLength
+            let strideDelta: Double = {
+                if let current = currentStride, let base = baseStride {
+                    return current - base
+                }
+                return 0.0
+            }()
+            let strideDeltaPercent: Double = {
+                if let current = currentStride, let base = baseStride, base > 0 {
+                    return (current - base) / base
+                }
+                return 0.0
+            }()
+
+            let currentOscVal = run.workingAvgVerticalOscillation ?? run.rawAvgVerticalOscillation
+            var formTelemetry: [String] = []
+            if let stride = currentStride {
+                formTelemetry.append(String(format: "%.2fm stride", stride))
+            }
+            if let osc = currentOscVal {
+                formTelemetry.append(String(format: "%.1fcm osc", osc))
+            }
+            if let vr = currentVR {
+                formTelemetry.append(String(format: "(VR: %.1f%%)", vr))
+            }
+            let formSummary = formTelemetry.isEmpty ? "" : " Form: \(formTelemetry.joined(separator: ", "))."
+            cadenceContext = "Current: \(Int(run.workingAvgCadence)) SPM, Baseline: \(Int(base.avgCadence)) SPM, Deltas: \(Int(cadenceDelta)). \(cadenceSummary)\(formSummary)"
 
             let runPace = PaceFormatter.formatPace(secondsPerKilometer: run.workingAvgPace)
             let basePace = PaceFormatter.formatPace(secondsPerKilometer: base.avgPace)
@@ -600,13 +656,29 @@ actor RunAnalyzerActor {
             let trainingGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
             let goalSuffix = " Runner goal: \(trainingGoal)."
 
-            if run.workingAvgCadence < 150 {
-                directiveContext = "The runner is overstriding (low cadence). Prescribe a drill focused on Form, specifically quickening cadence." + goalSuffix
-            } else if paceDiff < 0 && hrDelta > 0 {
+            let isTrueOverstriding = (run.workingAvgCadence < 155 && (currentVR ?? 0) > 9.5) ||
+                                     ((currentOscVal ?? 0) > 10.0 && strideDeltaPercent > 0.05)
+
+            if paceDiff < 0 && hrDelta > 0 {
                 // GUARDRAIL: fatigue detected — Swift overrides goal with recovery priority
                 directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue. PRIORITY: prescribe Easy Aerobic Recovery and HR control. Recovery overrides any race goal."
+            } else if abs(cadenceDelta) <= 2 && paceDiff < -15 && strideDeltaPercent < -0.08 {
+                // Mechanical stride collapse: cadence held but stride compressed under fatigue
+                directiveContext = "The runner shows mechanical stride collapse (stride compressed by \(Int(abs(strideDeltaPercent * 100)))% despite steady turnover). Prescribe a Form drill to reinforce hip extension and posture under fatigue." + goalSuffix
+            } else if isTrueOverstriding {
+                let vrText = currentVR.map { String(format: "%.1f", $0) } ?? "high"
+                directiveContext = "The runner shows high vertical bounce relative to stride length (VR: \(vrText)%), indicating overstriding and braking forces. Prescribe Cadence Pyramids or Rhythm Intervals to quicken turnover." + goalSuffix
             } else if paceDiff > 0 && hrDelta < 0 {
-                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements. Praise performance and prescribe an optional Speed or Tempo drill." + goalSuffix
+                let accelReason: String
+                if cadenceDelta > 4 && strideDelta <= 0.03 {
+                    accelReason = "Pace increase driven primarily by turnover frequency (+\(Int(cadenceDelta)) SPM)."
+                } else if strideDelta > 0.05 && cadenceDelta <= 2 {
+                    let cm = Int(round(strideDelta * 100))
+                    accelReason = "Pace increase driven by stride extension (+\(cm) cm), maintaining steady rhythm."
+                } else {
+                    accelReason = "Balanced acceleration via both turnover and stride extension."
+                }
+                directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements (\(accelReason)). Praise performance and prescribe an optional Speed or Tempo drill." + goalSuffix
             } else {
                 directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill." + goalSuffix
             }

@@ -460,6 +460,10 @@ class HealthKitSeeder {
             )
 
             let effectiveClassification = prescribed?.correspondingClassification ?? profile.rawValue
+            let seededStride = (distanceMeters > 0 && workingCadence > 0 && workingSec > 0)
+                ? (distanceMeters / ((workingCadence / 60.0) * workingSec))
+                : 1.15
+
             let record = RunRecord(
                 hkWorkoutID: UUID(),
                 date: date,
@@ -473,6 +477,8 @@ class HealthKitSeeder {
                 workingAvgHeartRate: workingHR,
                 workingAvgVerticalOscillation: vertOsc,
                 rawAvgVerticalOscillation: rawOsc,
+                rawAvgStrideLength: seededStride,
+                workingAvgStrideLength: seededStride,
                 workingDistanceMeters: distanceMeters,
                 workingDurationSeconds: workingSec,
                 paceCV: paceCV,
