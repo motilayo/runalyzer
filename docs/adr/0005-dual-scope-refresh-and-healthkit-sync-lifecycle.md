@@ -52,7 +52,7 @@ sequenceDiagram
     autonumber
     actor Runner
     participant Dashboard as DashboardView
-    participant Content as ContentView (syncData)
+    participant Content as "ContentView (syncData)"
     participant HK as HealthKit Store
     participant SwiftData as SwiftData Context
     participant AI as CoachingEngine
@@ -111,7 +111,7 @@ sequenceDiagram
     participant HK as HealthKit Store
     participant Engine as FramboiseEngine
     participant SwiftData as SwiftData Context
-    participant Actor as RunAnalyzerActor
+    participant Analyzer as RunAnalyzerActor
 
     Runner->>Detail: Pull to Refresh
     Detail->>HKManager: refreshWorkoutMetrics(for: runRecord)
@@ -120,9 +120,9 @@ sequenceDiagram
     HKManager->>Engine: Recompute 30s buckets, working stats & topological classification
     Engine-->>HKManager: Working stats, Stride Length, VR, and Classification
     HKManager->>SwiftData: Mutate runRecord in-place & save
-    Detail->>Actor: generateAnalysis(for: runRecord.persistentModelID, force: true)
-    Actor->>Actor: Recompute 30-day baseline relative to run.date
-    Actor->>Detail: Updated CoachingInsight & Drills rendered
+    Detail->>Analyzer: generateAnalysis(for: runRecord.persistentModelID, force: true)
+    Analyzer->>Analyzer: Recompute 30-day baseline relative to run.date
+    Analyzer->>Detail: Updated CoachingInsight & Drills rendered
     Detail->>Runner: Dismiss spinner + Success Haptic
 ```
 
