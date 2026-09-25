@@ -1,6 +1,6 @@
 # 5. Dual-Scope Refresh and HealthKit Synchronization Lifecycle
 
-* **Status**: Proposed
+* **Status**: Accepted
 * **Date**: 2026-09-24
 * **Deciders**: Runalyst Engineering Team
 * **Consulted**: Architecture & Data Engineering Working Group
@@ -12,9 +12,9 @@ Runalyst is a local-first iOS application that bridges HealthKit workout data, c
 
 A major usability and architectural discrepancy exists between what users expect when using SwiftUI's pull-down-to-refresh gesture and what the system currently executes:
 
-1. **Dashboard Refresh Skips HealthKit**: Pulling down to refresh on `DashboardView` (`DashboardView.swift:1163`) currently clears the `@AppStorage` headline text cache and re-prompts the macro LLM (`fetchInsight()`), but **does not trigger HealthKit data synchronization** (`onSync`). If a runner finishes a workout on their Apple Watch while Runalyst is backgrounded, pulling to refresh on the dashboard does nothing to import the new run. HealthKit sync is only triggered during view initialization (`.task`).
-2. **Missing Baseline Recalculation on Dashboard**: `refreshBaselineVO2Max()` is called on `.task` launch but omitted from `.refreshable`.
-3. **The "All-or-Nothing" Re-Ingestion Dilemma**: On `RunDetailView` (`RunDetailView.swift:590`), pull-down-to-refresh re-prompts the AI coaching model with `force: true`. However, it operates exclusively on previously persisted scalars. If new quantity types are added to the ingestion engine (e.g., Stride Length in [ADR 0004](0004-stride-length-biomechanical-analysis.md)) or if run classification algorithms are revised (e.g., Topological Signature Classification in [ADR 0003](0003-topological-signature-classification-for-run-types.md)), the user has no way to refresh a single workout from HealthKit. Their only recourse is the "Resync Health Data & Rebuild AI Insights" button in `SettingsView`, which nukes the entire SwiftData SQLite database, destroys user action history, and forces minutes of sequential LLM re-analysis.
+1. **Dashboard Refresh Skips HealthKit**: Pulling down to refresh on `DashboardView` (`DashboardView.swift:1174`) previously cleared the `@AppStorage` headline text cache and re-prompted the macro LLM (`fetchInsight()`), but **did not trigger HealthKit data synchronization** (`onSync`). If a runner finished a workout on their Apple Watch while Runalyst was backgrounded, pulling to refresh on the dashboard did nothing to import the new run. HealthKit sync was only triggered during view initialization (`.task`).
+2. **Missing Baseline Recalculation on Dashboard**: `refreshBaselineVO2Max()` and `fetchRecentGlobalVO2Maxes(limit: 1)` were called on `.task` launch but omitted from `.refreshable`.
+3. **The "All-or-Nothing" Re-Ingestion Dilemma**: On `RunDetailView` (`RunDetailView.swift:646`), pull-down-to-refresh re-prompted the AI coaching model with `force: true`. However, it operated exclusively on previously persisted scalars. If new quantity types were added to the ingestion engine (e.g., Stride Length in [ADR 0004](0004-stride-length-biomechanical-analysis.md)) or if run classification algorithms were revised (e.g., Topological Signature Classification in [ADR 0003](0003-topological-signature-classification-for-run-types.md)), the user had no way to refresh a single workout from HealthKit. Their only recourse was the "Resync Health Data & Rebuild AI Insights" button in `SettingsView`, which nukes the entire SwiftData SQLite database, destroys user action history, and forces minutes of sequential LLM re-analysis.
 4. **SwiftUI Task Cancellation Vulnerability**: As documented in `AGENTS.md`, SwiftUI `.refreshable` cancels its internal cooperative task if the view hierarchy re-renders during state mutations. Synchronous HealthKit queries and SQLite saves placed directly inside `.refreshable` risk mid-flight aborts.
 
 ## Decision Drivers
@@ -55,38 +55,52 @@ When the user pulls down on the dashboard:
                                       │                                            │
                                       │   [SwiftData] <── (Ingest RunRecords) ─────┘
                                       │
-                                      ├── 3. refreshBaselineVO2Max()
-                                      ├── 4. Invalidate @AppStorage headlines
+                                      ├── 3. fetchRecentGlobalVO2Maxes() + refreshBaselineVO2Max()
+                                      ├── 4. Invalidate all @AppStorage headlines (7-day, 30-day, all-time)
                                       ├── 5. fetchInsight() (Macro readiness & trends via LLM)
                                       └── 6. Dismiss spinner + Success Haptic
 ```
 
 #### Implementation Rules for Macro Scope
-1. **Unstructured Task Safety**: Invoke `onSync` inside an unstructured `Task { ... }` so SwiftUI re-renders do not trigger `CancellationError` mid-sync:
+1. **Unstructured Task Safety & Spinner Coordination**: Invoke `onSync` inside an unstructured `Task { ... }` and await its value (`_ = await syncTask.value`) so SwiftUI keeps the spinner visible during HealthKit sync while protecting the sync from mid-flight aborts if view re-renders:
 
 ```swift
 .refreshable {
     guard !isSyncing else { return }
     isSyncing = true
-    Task {
-        do {
-            if let onSync {
-                await onSync(false)
-            }
-            refreshBaselineVO2Max()
-            sanitizeSpuriousDrillTags()
-            cachedHeadline7Day = ""
-            cachedBody7Day = ""
-            cachedHeadline30Day = ""
-            cachedBody30Day = ""
-            fetchInsight()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+    defer { isSyncing = false }
+
+    let syncTask = Task {
+        if let onSync {
+            await onSync(false)
         }
-        isSyncing = false
     }
+    _ = await syncTask.value
+
+    if let vo2s = try? await HealthKitManager.shared.fetchRecentGlobalVO2Maxes(limit: 1), !vo2s.isEmpty {
+        globalVO2Max = vo2s[0]
+    }
+    refreshBaselineVO2Max()
+    sanitizeSpuriousDrillTags()
+
+    cachedHeadline7Day = ""
+    cachedBody7Day = ""
+    cachedHeadline30Day = ""
+    cachedBody30Day = ""
+    cachedHeadlineAllTime = ""
+    cachedBodyAllTime = ""
+
+    fetchInsight()
+    UINotificationFeedbackGenerator().notificationOccurred(.success)
 }
 ```
-2. **Spinner Decoupling**: The pull-to-refresh spinner dismisses once `onSync` commits new runs to SwiftData and kicks off `fetchInsight()`. If multiple newly imported runs require on-device LLM generation, they continue sequentially in the background through `RunAnalyzerActor` with 5s pacing delays.
+2. **ContentView Async Await**: In `ContentView.swift`, pass an async closure that directly awaits `syncData(force: force)` rather than launching a detached task:
+
+```swift
+DashboardView(onSync: { force in
+    await syncData(force: force)
+})
+```
 
 ---
 
@@ -97,46 +111,90 @@ When the user pulls down on an individual run detail screen:
 ```text
 [Runner] ──(Pull to Refresh)──> [RunDetailView]
                                       │
-                                      ├── 1. HealthKitManager.refreshWorkoutMetrics(for: runRecord)
+                                      ├── 1. HealthKitManager.refreshWorkoutMetrics(for: runRecord, in: context)
                                       │            │
                                       │            ├── Fetch HKWorkout by hkWorkoutID
-                                      │            ├── Re-run FramboiseEngine bucketing & classification
+                                      │            ├── Re-run canonical extractRunRecord() (samples, bucketing, classifier)
+                                      │            ├── Check & preserve TrainingCorrection and userLinkedDrill tags
                                       │            └── Mutate runRecord in-place & save to SwiftData
                                       │
-                                      ├── 2. RunAnalyzerActor.generateAnalysis(for: id, force: true)
-                                      │            └── Recompute 30-day baseline relative to run.date
+                                      ├── 2. CoachingEngine.shared.requestAnalysis(for: runRecord, force: true)
+                                      │            └── Recompute 30-day baseline relative to run.date via RunAnalyzerActor
                                       │
                                       └── 3. Render updated CoachingInsight & Drills + Success Haptic
 ```
 
-#### New Ingestion API on `HealthKitManager`
-Add targeted single-run re-ingestion to `HealthKitManager.swift`:
+#### Canonical Ingestion API on `HealthKitManager`
+Implement targeted single-run re-ingestion in `HealthKitManager.swift`, reusing `extractRunRecord`:
 
 ```swift
-func refreshWorkoutMetrics(for record: RunRecord, context: ModelContext) async throws {
-    guard let workout = try await fetchWorkout(by: record.hkWorkoutID) else {
+func refreshWorkoutMetrics(for record: RunRecord, in context: ModelContext) async throws {
+    guard let workout = try await fetchWorkout(with: record.hkWorkoutID) else {
         throw HKError(.errorNoData)
     }
-    
-    // 1. Fetch full quantity streams (HR, Pace, Cadence, Oscillation, Stride Length)
-    let samples = try await fetchSamples(for: workout)
-    
-    // 2. Re-run FramboiseEngine bucketing and topological signature classification
-    let workingStats = FramboiseEngine.calculateWorkingAverages(from: samples, workout: workout)
-    let detectedType = FramboiseEngine.classifyRun(buckets: workingStats.buckets, ...)
-    
-    // 3. Update record in-place (preserving manual corrections)
-    if record.manualCorrection == nil {
-        record.detectedTypeRaw = detectedType
+
+    // 1. Fetch prior runs for 30-day baseline context
+    let targetDate = record.date
+    let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) ?? targetDate
+    let targetRecordID = record.id
+    let descriptor = FetchDescriptor<RunRecord>(
+        predicate: #Predicate { $0.date >= thirtyDaysAgo && $0.date < targetDate && $0.id != targetRecordID }
+    )
+    let priorRecords = (try? context.fetch(descriptor)) ?? []
+    let priorRuns = priorRecords.map {
+        RunBaselineData(
+            date: $0.date,
+            pace: $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace,
+            hr: $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate,
+            cadence: $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence,
+            duration: $0.duration,
+            isPrescribedDrill: $0.framboiseTags.contains("prescribedDrill")
+        )
     }
-    record.workingAvgPace = workingStats.workingAvgPace
-    record.workingAvgCadence = workingStats.workingAvgCadence
-    record.workingAvgHeartRate = workingStats.workingAvgHeartRate
-    record.rawAvgStrideLength = workingStats.rawAvgStrideLength
-    record.workingAvgStrideLength = workingStats.workingAvgStrideLength
-    record.rawAvgVerticalOscillation = workingStats.rawAvgOscillation
-    record.workingAvgVerticalOscillation = workingStats.workingAvgOscillation
-    
+
+    // 2. Canonical extraction and bucketing
+    let engine = FramboiseEngine()
+    let dto = try await extractRunRecord(from: workout, engine: engine, priorRuns: priorRuns)
+
+    // 3. Check for existing manual user correction
+    let correctionDescriptor = FetchDescriptor<TrainingCorrection>(
+        predicate: #Predicate { $0.runRecordID == targetRecordID }
+    )
+    let hasManualCorrection = (try? context.fetch(correctionDescriptor))?.isEmpty == false
+
+    // 4. Update RunRecord in-place
+    if !hasManualCorrection {
+        record.detectedTypeRaw = dto.detectedTypeRaw
+    }
+    record.totalDistanceMeters = dto.totalDistanceMeters
+    record.duration = dto.duration
+    record.rawAvgPace = dto.rawAvgPace
+    record.rawAvgHeartRate = dto.rawAvgHeartRate
+    record.rawAvgCadence = dto.rawAvgCadence
+    record.workingAvgPace = dto.workingAvgPace
+    record.workingAvgCadence = dto.workingAvgCadence
+    record.workingAvgHeartRate = dto.workingAvgHeartRate
+    record.workingDistanceMeters = dto.workingDistanceMeters
+    record.workingDurationSeconds = dto.workingDurationSeconds
+    record.isIndoor = dto.isIndoor
+    record.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
+    record.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+    record.rawAvgStrideLength = dto.rawAvgStrideLength
+    record.workingAvgStrideLength = dto.workingAvgStrideLength
+    record.paceCV = dto.paceCV
+    record.paceSlope = dto.paceSlope
+    record.percentZone4 = dto.percentZone4
+
+    // Preserve user drill intent tags
+    var mergedTags = dto.framboiseTags
+    if record.framboiseTags.contains("userLinkedDrill") && !mergedTags.contains("userLinkedDrill") {
+        mergedTags.append("userLinkedDrill")
+    }
+    if record.framboiseTags.contains("userUnlinkedDrill") && !mergedTags.contains("userUnlinkedDrill") {
+        mergedTags.append("userUnlinkedDrill")
+    }
+    record.framboiseTags = mergedTags
+
     try context.save()
 }
 ```

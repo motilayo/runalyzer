@@ -54,6 +54,8 @@ class HealthKitManager: ObservableObject {
 
     @Published var isAuthorized: Bool = false
     var onWorkoutsUpdated: (@Sendable () async -> Void)?
+    var workoutFetcher: ((UUID) async throws -> HKWorkout?)?
+    var runRecordExtractor: ((HKWorkout, FramboiseEngine, [RunBaselineData]) async throws -> RunRecordDTO)?
     private var observerQuery: HKObserverQuery?
 
     init(
@@ -187,6 +189,9 @@ class HealthKitManager: ObservableObject {
     }
 
     func fetchWorkout(with uuid: UUID) async throws -> HKWorkout? {
+        if let workoutFetcher = workoutFetcher {
+            return try await workoutFetcher(uuid)
+        }
         let predicate = HKQuery.predicateForObject(with: uuid)
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
@@ -696,6 +701,81 @@ struct RunBaselineData: Sendable {
             detectedTypeRaw: classification,
             framboiseTags: tags
         )
+    }
+
+    func refreshWorkoutMetrics(for record: RunRecord, in context: ModelContext) async throws {
+        guard let workout = try await fetchWorkout(with: record.hkWorkoutID) else {
+            throw HKError(.errorNoData)
+        }
+
+        // 1. Fetch prior runs for 30-day baseline context
+        let targetDate = record.date
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: targetDate) ?? targetDate
+        let targetRecordID = record.id
+        let descriptor = FetchDescriptor<RunRecord>(
+            predicate: #Predicate { $0.date >= thirtyDaysAgo && $0.date < targetDate && $0.id != targetRecordID }
+        )
+        let priorRecords = (try? context.fetch(descriptor)) ?? []
+        let priorRuns = priorRecords.map {
+            RunBaselineData(
+                date: $0.date,
+                pace: $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace,
+                hr: $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate,
+                cadence: $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence,
+                duration: $0.duration,
+                isPrescribedDrill: $0.framboiseTags.contains("prescribedDrill")
+            )
+        }
+
+        // 2. Canonical extraction and bucketing
+        let engine = FramboiseEngine()
+        let dto: RunRecordDTO
+        if let runRecordExtractor = runRecordExtractor {
+            dto = try await runRecordExtractor(workout, engine, priorRuns)
+        } else {
+            dto = try await extractRunRecord(from: workout, engine: engine, priorRuns: priorRuns)
+        }
+
+        // 3. Check for existing manual user correction
+        let correctionDescriptor = FetchDescriptor<TrainingCorrection>(
+            predicate: #Predicate { $0.runRecordID == targetRecordID }
+        )
+        let hasManualCorrection = (try? context.fetch(correctionDescriptor))?.isEmpty == false
+
+        // 4. Update RunRecord in-place
+        if !hasManualCorrection {
+            record.detectedTypeRaw = dto.detectedTypeRaw
+        }
+        record.totalDistanceMeters = dto.totalDistanceMeters
+        record.duration = dto.duration
+        record.rawAvgPace = dto.rawAvgPace
+        record.rawAvgHeartRate = dto.rawAvgHeartRate
+        record.rawAvgCadence = dto.rawAvgCadence
+        record.workingAvgPace = dto.workingAvgPace
+        record.workingAvgCadence = dto.workingAvgCadence
+        record.workingAvgHeartRate = dto.workingAvgHeartRate
+        record.workingDistanceMeters = dto.workingDistanceMeters
+        record.workingDurationSeconds = dto.workingDurationSeconds
+        record.isIndoor = dto.isIndoor
+        record.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
+        record.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+        record.rawAvgStrideLength = dto.rawAvgStrideLength
+        record.workingAvgStrideLength = dto.workingAvgStrideLength
+        record.paceCV = dto.paceCV
+        record.paceSlope = dto.paceSlope
+        record.percentZone4 = dto.percentZone4
+
+        // Preserve user drill intent tags
+        var mergedTags = dto.framboiseTags
+        if record.framboiseTags.contains("userLinkedDrill") && !mergedTags.contains("userLinkedDrill") {
+            mergedTags.append("userLinkedDrill")
+        }
+        if record.framboiseTags.contains("userUnlinkedDrill") && !mergedTags.contains("userUnlinkedDrill") {
+            mergedTags.append("userUnlinkedDrill")
+        }
+        record.framboiseTags = mergedTags
+
+        try context.save()
     }
 
     private func fetchAverage(for workout: HKWorkout, type: HKQuantityType, unit: HKUnit) async throws -> Double {
