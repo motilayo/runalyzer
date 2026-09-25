@@ -52,6 +52,10 @@ final class CoachingEngineDataTests: XCTestCase {
         XCTAssertEqual(stats.avgCadence, 165)
         XCTAssertEqual(stats.avgHR, 145)
         XCTAssertEqual(stats.avgOscillation, 9.5)
+        XCTAssertNil(stats.avgStrideLength)
+
+        let statsWithStride = BaselineStats(avgPace: 300, avgCadence: 165, avgHR: 145, avgOscillation: 9.5, avgStrideLength: 1.18)
+        XCTAssertEqual(statsWithStride.avgStrideLength, 1.18)
     }
 
     func testSparseRunBiometricGuardrail() async throws {

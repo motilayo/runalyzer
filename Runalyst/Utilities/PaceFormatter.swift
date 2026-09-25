@@ -149,15 +149,25 @@ struct MetricDetailExplainer {
                 whyItMatters: "Efficiency: Less time on the ground means lighter, springier steps and less wasted effort.",
                 targetRange: "Target Range: 200 to 250 ms for most runners; under 200 ms when running fast.\n\n• High Contact (> 260 ms): Can mean sinking into each step rather than springing forward.\n• Low Contact (< 200 ms): Quick, springy turnover with light foot strikes."
             )
-        case "stride length":
+        case "avg stride", "stride length":
             return MetricDetailExplainer(
                 title: "Stride Length",
-                overview: "The distance between consecutive footsteps, measured in meters.",
+                overview: "The distance between consecutive footsteps, measured in meters or feet.",
                 modeContext: isWorkoutStats
                     ? "Workout Stats: Blends in shorter recovery walking steps, making your average look shorter."
                     : "Working Stats: Your stride length at your regular running speed.",
                 whyItMatters: "Efficiency: Your stride should open up naturally from pushing behind you, not by reaching your foot too far in front.",
                 targetRange: "Target Range: Usually 1.0 to 1.4 m depending on your height, pace, and cadence.\n\n• Overstriding: Reaching forward acts like a brake and strains your knees.\n• Short Stride: Often means tight hips or not pushing off fully."
+            )
+        case "vert. ratio", "vertical ratio":
+            return MetricDetailExplainer(
+                title: "Vertical Ratio",
+                overview: "The percentage of vertical bounce relative to your forward stride length.",
+                modeContext: isWorkoutStats
+                    ? "Workout Stats: Includes walking breaks, which can elevate your vertical ratio."
+                    : "Working Stats: Calculated strictly during active running to benchmark mechanical running economy.",
+                whyItMatters: "Efficiency: Lower is better. A lower vertical ratio means more of your energy propels you forward rather than bouncing up and down.",
+                targetRange: "Target Range: Under 8.0% indicates excellent economy. 8.0%–9.5% is typical. Above 9.5% signals excessive bounce or overstriding."
             )
         case "pace cv", "cv (var)":
             return MetricDetailExplainer(

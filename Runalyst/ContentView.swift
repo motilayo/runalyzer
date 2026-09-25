@@ -198,6 +198,8 @@ struct ContentView: View {
                             workingAvgHeartRate: dto.workingAvgHeartRate,
                             workingAvgVerticalOscillation: dto.workingAvgVerticalOscillation,
                             rawAvgVerticalOscillation: dto.rawAvgVerticalOscillation,
+                            rawAvgStrideLength: dto.rawAvgStrideLength,
+                            workingAvgStrideLength: dto.workingAvgStrideLength,
                             workingDistanceMeters: dto.workingDistanceMeters,
                             workingDurationSeconds: dto.workingDurationSeconds,
                             paceCV: dto.paceCV,

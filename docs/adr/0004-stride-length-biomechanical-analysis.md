@@ -1,6 +1,6 @@
 # 4. Incorporating Stride Length into Biomechanical Analysis and Coaching
 
-* **Status**: Proposed
+* **Status**: Accepted
 * **Date**: 2026-09-24
 * **Deciders**: Runalyst Engineering Team
 * **Consulted**: Architecture & AI Coaching Working Group

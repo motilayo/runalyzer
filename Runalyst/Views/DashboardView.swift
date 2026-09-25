@@ -417,19 +417,30 @@ struct DashboardView: View {
             let avgOlderOsc = olderOscs.isEmpty ? 0.0 : (olderOscs.reduce(0, +) / Double(olderOscs.count))
             let oscDelta = (avgRecentOsc > 0 && avgOlderOsc > 0) ? (avgRecentOsc - avgOlderOsc) : 0.0
 
+            let recentVRs = recentRuns.compactMap(\.verticalRatio)
+            let olderVRs = olderRuns.compactMap(\.verticalRatio)
+            let avgRecentVR = recentVRs.isEmpty ? 0.0 : (recentVRs.reduce(0, +) / Double(recentVRs.count))
+            let avgOlderVR = olderVRs.isEmpty ? 0.0 : (olderVRs.reduce(0, +) / Double(olderVRs.count))
+            let vrDelta = (avgRecentVR > 0 && avgOlderVR > 0) ? (avgRecentVR - avgOlderVR) : 0.0
+
             let recentHR = recentRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(max(1, recentRuns.count))
             let olderHR = olderRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(max(1, olderRuns.count))
             let hrDelta = (recentHR > 0 && olderHR > 0) ? (recentHR - olderHR) : 0.0
 
-            if efDelta > 0.02 || hrDelta < -2.0 || oscDelta < -0.2 {
+            if efDelta > 0.02 || hrDelta < -2.0 || oscDelta < -0.2 || vrDelta < -0.3 {
                 let hrDeltaText = hrDelta < 0 ? "\(Int(abs(hrDelta))) BPM lower" : "stable"
-                directiveContext = "STRUCTURAL_ADAPTATION: Over 4 weeks, aerobic base has expanded significantly. Efficiency Factor increased by \(String(format: "%.2f", efDelta)), heart rate at \(paceContext) is \(hrDeltaText), and vertical oscillation shifted by \(String(format: "%+.1f", oscDelta)) cm. Highlight structural economy and rising lactate threshold. Do NOT mention acute fatigue."
+                let vrDeltaText = avgRecentVR > 0 ? ", Vertical Ratio: \(String(format: "%.1f", avgRecentVR))%" : ""
+                directiveContext = "STRUCTURAL_ADAPTATION: Over 4 weeks, aerobic base has expanded significantly. Efficiency Factor increased by \(String(format: "%.2f", efDelta)), heart rate at \(paceContext) is \(hrDeltaText), and vertical oscillation shifted by \(String(format: "%+.1f", oscDelta)) cm\(vrDeltaText). Highlight structural economy and rising lactate threshold. Do NOT mention acute fatigue."
                 efficiencyContext = "Efficiency Factor rose by +\(String(format: "%.2f", efDelta)) m/beat. Aerobic capacity expanding."
             } else {
                 directiveContext = "STEADY_AEROBIC_BASE: Consistent volume and steady aerobic efficiency over 30 days. Pacing stability and cadence turnover remain well calibrated. Highlight solid physiological foundation. Do NOT mention acute fatigue."
                 efficiencyContext = "Efficiency Factor stable at \(String(format: "%.2f", max(1.2, avgRecentEF))) m/beat."
             }
-            verticalOscillationContext = avgRecentOsc > 0 ? "Vertical Oscillation: \(String(format: "%.1f", avgRecentOsc)) cm" : "Vertical form steady"
+            if avgRecentVR > 0 {
+                verticalOscillationContext = "Vertical Oscillation: \(String(format: "%.1f", avgRecentOsc)) cm (VR: \(String(format: "%.1f", avgRecentVR))%)"
+            } else {
+                verticalOscillationContext = avgRecentOsc > 0 ? "Vertical Oscillation: \(String(format: "%.1f", avgRecentOsc)) cm" : "Vertical form steady"
+            }
             fatigueContext = ""
         }
 

@@ -68,6 +68,32 @@ struct RunDetailView: View {
         return runs.map { $0.val * $0.dur }.reduce(0, +) / totalDuration
     }
 
+    private var baselineStrideLength: Double? {
+        let runs = baselineRuns.compactMap { run -> (val: Double, dur: Double)? in
+            guard let stride = run.workingAvgStrideLength ?? run.rawAvgStrideLength, stride > 0 else { return nil }
+            return (stride, run.duration)
+        }
+        guard !runs.isEmpty else { return nil }
+        let totalDuration = runs.map(\.dur).reduce(0, +)
+        guard totalDuration > 0 else {
+            return runs.map(\.val).reduce(0, +) / Double(runs.count)
+        }
+        return runs.map { $0.val * $0.dur }.reduce(0, +) / totalDuration
+    }
+
+    private var baselineVerticalRatio: Double? {
+        let runs = baselineRuns.compactMap { run -> (val: Double, dur: Double)? in
+            guard let vr = run.verticalRatio, vr > 0 else { return nil }
+            return (vr, run.duration)
+        }
+        guard !runs.isEmpty else { return nil }
+        let totalDuration = runs.map(\.dur).reduce(0, +)
+        guard totalDuration > 0 else {
+            return runs.map(\.val).reduce(0, +) / Double(runs.count)
+        }
+        return runs.map { $0.val * $0.dur }.reduce(0, +) / totalDuration
+    }
+
     private var formattedRunDate: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -436,6 +462,25 @@ struct RunDetailView: View {
                     StatBox(title: "Avg HR", value: currentHR > 0 ? "\(Int(round(currentHR)))" : "--", unit: currentHR > 0 ? "BPM" : "", currentValue: currentHR > 0 ? currentHR : nil, baselineValue: (showRawMetrics || currentHR <= 0) ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
                     StatBox(title: "Avg Cadence", value: currentCadence > 0 ? "\(Int(currentCadence))" : "--", unit: currentCadence > 0 ? "SPM" : "", currentValue: currentCadence > 0 ? currentCadence : nil, baselineValue: (showRawMetrics || currentCadence <= 0) ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
 
+                    let currentStride = showRawMetrics ? (runRecord.rawAvgStrideLength ?? runRecord.workingAvgStrideLength) : (runRecord.workingAvgStrideLength ?? runRecord.rawAvgStrideLength)
+                    let currentStrideConverted: Double? = {
+                        guard let stride = currentStride, stride > 0 else { return nil }
+                        return useMetricSystem ? stride : (stride * 3.28084)
+                    }()
+                    let baselineStrideConverted: Double? = {
+                        guard let base = baselineStrideLength, base > 0 else { return nil }
+                        return useMetricSystem ? base : (base * 3.28084)
+                    }()
+                    StatBox(
+                        title: "Avg Stride",
+                        value: currentStrideConverted.map { String(format: "%.2f", $0) } ?? "--",
+                        unit: currentStride != nil ? (useMetricSystem ? "m" : "ft") : "",
+                        currentValue: currentStrideConverted,
+                        baselineValue: showRawMetrics ? nil : baselineStrideConverted,
+                        polarity: .higherIsBetter,
+                        isWorkoutStats: showRawMetrics
+                    )
+
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
                     StatBox(
                         title: "Vert. Osc.",
@@ -443,6 +488,17 @@ struct RunDetailView: View {
                         unit: currentOscillation != nil ? "cm" : "",
                         currentValue: currentOscillation,
                         baselineValue: showRawMetrics ? nil : baselineOscillation,
+                        polarity: .lowerIsBetter,
+                        isWorkoutStats: showRawMetrics
+                    )
+
+                    let currentVR = runRecord.verticalRatio
+                    StatBox(
+                        title: "Vert. Ratio",
+                        value: currentVR.map { String(format: "%.1f", $0) } ?? "--",
+                        unit: currentVR != nil ? "%" : "",
+                        currentValue: currentVR,
+                        baselineValue: showRawMetrics ? nil : baselineVerticalRatio,
                         polarity: .lowerIsBetter,
                         isWorkoutStats: showRawMetrics
                     )
@@ -565,13 +621,16 @@ struct RunDetailView: View {
 
                 let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
                    (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
+                let needsStrideRepair = (runRecord.rawAvgStrideLength == nil && runRecord.workingAvgStrideLength == nil)
                 let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
-                if needsOscRepair || needsWorkingRepair {
+                if needsOscRepair || needsStrideRepair || needsWorkingRepair {
                     if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
                         let engine = FramboiseEngine()
                         if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
                             runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
                             runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
+                            runRecord.rawAvgStrideLength = dto.rawAvgStrideLength
+                            runRecord.workingAvgStrideLength = dto.workingAvgStrideLength
                             runRecord.workingDistanceMeters = dto.workingDistanceMeters
                             runRecord.workingDurationSeconds = dto.workingDurationSeconds
                             runRecord.workingAvgPace = dto.workingAvgPace

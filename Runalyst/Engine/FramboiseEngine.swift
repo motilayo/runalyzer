@@ -10,6 +10,7 @@ struct BucketData: Sendable {
     let meanCadence: Double
     let meanHR: Double
     let meanVerticalOscillation: Double
+    let meanStrideLength: Double
 
     init(
         startTime: Date,
@@ -18,7 +19,8 @@ struct BucketData: Sendable {
         meanPaceSecPerKm: Double,
         meanCadence: Double,
         meanHR: Double,
-        meanVerticalOscillation: Double = 0.0
+        meanVerticalOscillation: Double = 0.0,
+        meanStrideLength: Double = 0.0
     ) {
         self.startTime = startTime
         self.distanceMeters = distanceMeters
@@ -27,6 +29,7 @@ struct BucketData: Sendable {
         self.meanCadence = meanCadence
         self.meanHR = meanHR
         self.meanVerticalOscillation = meanVerticalOscillation
+        self.meanStrideLength = meanStrideLength
     }
 }
 
@@ -84,16 +87,19 @@ actor FramboiseEngine {
         trimmed: [BucketData],
         rawWorkoutDuration: Double? = nil,
         rawWorkoutDistance: Double? = nil,
-        originalBucketCount: Int? = nil
-    ) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double, workingDistance: Double, workingDuration: Double) {
-        guard !trimmed.isEmpty else { return (0, 0, 0, 0, 0, 0) }
+        originalBucketCount: Int? = nil,
+        rawAvgStrideLength: Double? = nil
+    ) -> (workingPace: Double, workingCadence: Double, workingHR: Double, workingOscillation: Double, workingDistance: Double, workingDuration: Double, workingStrideLength: Double?) {
+        guard !trimmed.isEmpty else { return (0, 0, 0, 0, 0, 0, nil) }
 
         var totalDistanceMeters: Double = 0
         var totalCadence: Double = 0
         var totalHR: Double = 0
         var totalOscillation: Double = 0
+        var totalStrideLength: Double = 0
         var oscillationBucketCount: Int = 0
         var validHRBucketCount: Int = 0
+        var strideBucketCount: Int = 0
 
         for bucket in trimmed {
             totalDistanceMeters += bucket.distanceMeters
@@ -107,6 +113,11 @@ actor FramboiseEngine {
             if bucket.meanVerticalOscillation > 0 {
                 totalOscillation += bucket.meanVerticalOscillation
                 oscillationBucketCount += 1
+            }
+
+            if bucket.meanStrideLength > 0 {
+                totalStrideLength += bucket.meanStrideLength
+                strideBucketCount += 1
             }
         }
 
@@ -131,7 +142,17 @@ actor FramboiseEngine {
         let workingHR = validHRBucketCount > 0 ? (totalHR / Double(validHRBucketCount)) : 0.0
         let workingOscillation = oscillationBucketCount > 0 ? (totalOscillation / Double(oscillationBucketCount)) : 0.0
 
-        return (workingPace, workingCadence, workingHR, workingOscillation, workingDistanceMetersFinal, workingDuration)
+        let workingStrideLength: Double? = {
+            if isFullyActive, let rawStride = rawAvgStrideLength, rawStride > 0 {
+                return rawStride
+            }
+            if strideBucketCount > 0 {
+                return totalStrideLength / Double(strideBucketCount)
+            }
+            return rawAvgStrideLength
+        }()
+
+        return (workingPace, workingCadence, workingHR, workingOscillation, workingDistanceMetersFinal, workingDuration, workingStrideLength)
     }
 
     // MARK: - Mathematical Features

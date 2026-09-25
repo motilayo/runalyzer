@@ -46,6 +46,21 @@ final class RunRecord {
     /// Raw average vertical oscillation (cm)
     var rawAvgVerticalOscillation: Double?
 
+    // MARK: - Biomechanical Stride Metrics (meters)
+    /// Raw average stride length (meters)
+    var rawAvgStrideLength: Double?
+    /// True working average stride length, excluding dead stops (meters)
+    var workingAvgStrideLength: Double?
+
+    /// Computed Vertical Ratio (percentage of vertical bounce relative to forward stride)
+    var verticalRatio: Double? {
+        guard let stride = workingAvgStrideLength ?? rawAvgStrideLength, stride >= 0.3,
+              let oscCm = workingAvgVerticalOscillation ?? rawAvgVerticalOscillation, oscCm > 0 else {
+            return nil
+        }
+        return oscCm / stride
+    }
+
     var effectiveWorkingDistanceMeters: Double {
         workingDistanceMeters ?? totalDistanceMeters
     }
@@ -101,6 +116,8 @@ final class RunRecord {
         workingAvgHeartRate: Double,
         workingAvgVerticalOscillation: Double? = nil,
         rawAvgVerticalOscillation: Double? = nil,
+        rawAvgStrideLength: Double? = nil,
+        workingAvgStrideLength: Double? = nil,
         workingDistanceMeters: Double? = nil,
         workingDurationSeconds: TimeInterval? = nil,
         isIndoor: Bool? = nil,
@@ -124,6 +141,8 @@ final class RunRecord {
         self.workingAvgHeartRate = workingAvgHeartRate
         self.workingAvgVerticalOscillation = workingAvgVerticalOscillation
         self.rawAvgVerticalOscillation = rawAvgVerticalOscillation
+        self.rawAvgStrideLength = rawAvgStrideLength
+        self.workingAvgStrideLength = workingAvgStrideLength
         self.workingDistanceMeters = workingDistanceMeters
         self.workingDurationSeconds = workingDurationSeconds
         self.isIndoor = isIndoor
