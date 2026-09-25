@@ -1172,7 +1172,23 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
+                guard !isSyncing else { return }
+                isSyncing = true
+                defer { isSyncing = false }
+
+                let syncTask = Task {
+                    if let onSync {
+                        await onSync(false)
+                    }
+                }
+                _ = await syncTask.value
+
+                if let vo2s = try? await HealthKitManager.shared.fetchRecentGlobalVO2Maxes(limit: 1), !vo2s.isEmpty {
+                    globalVO2Max = vo2s[0]
+                }
+                refreshBaselineVO2Max()
                 sanitizeSpuriousDrillTags()
+
                 // Invalidate cache
                 cachedHeadline7Day = ""
                 cachedBody7Day = ""
@@ -1181,6 +1197,7 @@ struct DashboardView: View {
                 cachedHeadlineAllTime = ""
                 cachedBodyAllTime = ""
                 fetchInsight()
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)

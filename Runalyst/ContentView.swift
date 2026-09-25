@@ -26,9 +26,7 @@ struct ContentView: View {
         Group {
             if hasCompletedOnboarding {
                 DashboardView(onSync: { force in
-                    Task {
-                        await syncData(force: force)
-                    }
+                    await syncData(force: force)
                 })
                 .task {
                     Task {

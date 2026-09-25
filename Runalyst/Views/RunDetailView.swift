@@ -619,26 +619,6 @@ struct RunDetailView: View {
                     }
                 }
 
-                let needsOscRepair = (runRecord.rawAvgVerticalOscillation == nil || runRecord.rawAvgVerticalOscillation == 0) &&
-                   (runRecord.workingAvgVerticalOscillation == nil || runRecord.workingAvgVerticalOscillation == 0)
-                let needsStrideRepair = (runRecord.rawAvgStrideLength == nil && runRecord.workingAvgStrideLength == nil)
-                let needsWorkingRepair = runRecord.workingDistanceMeters == nil || runRecord.workingDurationSeconds == nil
-                if needsOscRepair || needsStrideRepair || needsWorkingRepair {
-                    if let workout = try? await HealthKitManager.shared.fetchWorkout(with: runRecord.hkWorkoutID) {
-                        let engine = FramboiseEngine()
-                        if let dto = try? await HealthKitManager.shared.extractRunRecord(from: workout, engine: engine) {
-                            runRecord.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
-                            runRecord.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
-                            runRecord.rawAvgStrideLength = dto.rawAvgStrideLength
-                            runRecord.workingAvgStrideLength = dto.workingAvgStrideLength
-                            runRecord.workingDistanceMeters = dto.workingDistanceMeters
-                            runRecord.workingDurationSeconds = dto.workingDurationSeconds
-                            runRecord.workingAvgPace = dto.workingAvgPace
-                            try? modelContext.save()
-                        }
-                    }
-                }
-
                 if runRecord.insight == nil {
                     if #available(iOS 26.0, *) {
                         await CoachingEngine.shared.requestAnalysis(for: runRecord)
@@ -647,11 +627,19 @@ struct RunDetailView: View {
             }
         }
         .refreshable {
-            if #available(iOS 26.0, *) {
-                isGeneratingInsight = true
-                await CoachingEngine.shared.requestAnalysis(for: runRecord, force: true)
-                isGeneratingInsight = false
+            isGeneratingInsight = true
+            defer { isGeneratingInsight = false }
+
+            do {
+                try await HealthKitManager.shared.refreshWorkoutMetrics(for: runRecord, in: modelContext)
+            } catch {
+                print("Single run HealthKit refresh failed: \(error.localizedDescription)")
             }
+
+            if #available(iOS 26.0, *) {
+                await CoachingEngine.shared.requestAnalysis(for: runRecord, force: true)
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80)
