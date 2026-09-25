@@ -47,53 +47,45 @@ Chosen option: **Option 1 (Dual-Scope Refresh Architecture)**, because it aligns
 
 When the user pulls down on the dashboard:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Runner
-    participant Dashboard as DashboardView
-    participant Content as "ContentView (syncData)"
-    participant HK as HealthKit Store
-    participant SwiftData as SwiftData Context
-    participant AI as CoachingEngine
-
-    Runner->>Dashboard: Pull to Refresh
-    Dashboard->>Dashboard: Check !isSyncing (Guard against concurrent syncs)
-    Dashboard->>Content: Task { await onSync(false) } (Unstructured)
-    Content->>HK: Fetch new workouts since latest local date
-    HK-->>Content: Return new HKWorkouts
-    Content->>SwiftData: Ingest & save new RunRecords (deduped by UUID)
-    Content-->>Dashboard: Sync completed
-    Dashboard->>HK: refreshBaselineVO2Max()
-    Dashboard->>Dashboard: Invalidate cached headlines (@AppStorage)
-    Dashboard->>AI: fetchInsight() (Macro readiness & trends)
-    Dashboard->>Runner: Dismiss spinner + Success Haptic
+```text
+[Runner] ──(Pull to Refresh)──> [DashboardView]
+                                      │
+                                      ├── 1. Check !isSyncing (Guard against concurrent syncs)
+                                      ├── 2. Task { await onSync(false) } ──> [HealthKit]
+                                      │                                            │
+                                      │   [SwiftData] <── (Ingest RunRecords) ─────┘
+                                      │
+                                      ├── 3. refreshBaselineVO2Max()
+                                      ├── 4. Invalidate @AppStorage headlines
+                                      ├── 5. fetchInsight() (Macro readiness & trends via LLM)
+                                      └── 6. Dismiss spinner + Success Haptic
 ```
 
 #### Implementation Rules for Macro Scope
 1. **Unstructured Task Safety**: Invoke `onSync` inside an unstructured `Task { ... }` so SwiftUI re-renders do not trigger `CancellationError` mid-sync:
-   ```swift
-   .refreshable {
-       guard !isSyncing else { return }
-       isSyncing = true
-       Task {
-           do {
-               if let onSync {
-                   await onSync(false)
-               }
-               refreshBaselineVO2Max()
-               sanitizeSpuriousDrillTags()
-               cachedHeadline7Day = ""
-               cachedBody7Day = ""
-               cachedHeadline30Day = ""
-               cachedBody30Day = ""
-               fetchInsight()
-               UINotificationFeedbackGenerator().notificationOccurred(.success)
-           }
-           isSyncing = false
-       }
-   }
-   ```
+
+```swift
+.refreshable {
+    guard !isSyncing else { return }
+    isSyncing = true
+    Task {
+        do {
+            if let onSync {
+                await onSync(false)
+            }
+            refreshBaselineVO2Max()
+            sanitizeSpuriousDrillTags()
+            cachedHeadline7Day = ""
+            cachedBody7Day = ""
+            cachedHeadline30Day = ""
+            cachedBody30Day = ""
+            fetchInsight()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+        isSyncing = false
+    }
+}
+```
 2. **Spinner Decoupling**: The pull-to-refresh spinner dismisses once `onSync` commits new runs to SwiftData and kicks off `fetchInsight()`. If multiple newly imported runs require on-device LLM generation, they continue sequentially in the background through `RunAnalyzerActor` with 5s pacing delays.
 
 ---
@@ -102,28 +94,19 @@ sequenceDiagram
 
 When the user pulls down on an individual run detail screen:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Runner
-    participant Detail as RunDetailView
-    participant HKManager as HealthKitManager
-    participant HK as HealthKit Store
-    participant Engine as FramboiseEngine
-    participant SwiftData as SwiftData Context
-    participant Analyzer as RunAnalyzerActor
-
-    Runner->>Detail: Pull to Refresh
-    Detail->>HKManager: refreshWorkoutMetrics(for: runRecord)
-    HKManager->>HK: Query HKWorkout where UUID == runRecord.hkWorkoutID
-    HK-->>HKManager: Return HKWorkout & quantity series
-    HKManager->>Engine: Recompute 30s buckets, working stats & topological classification
-    Engine-->>HKManager: Working stats, Stride Length, VR, and Classification
-    HKManager->>SwiftData: Mutate runRecord in-place & save
-    Detail->>Analyzer: generateAnalysis(for: runRecord.persistentModelID, force: true)
-    Analyzer->>Analyzer: Recompute 30-day baseline relative to run.date
-    Analyzer->>Detail: Updated CoachingInsight & Drills rendered
-    Detail->>Runner: Dismiss spinner + Success Haptic
+```text
+[Runner] ──(Pull to Refresh)──> [RunDetailView]
+                                      │
+                                      ├── 1. HealthKitManager.refreshWorkoutMetrics(for: runRecord)
+                                      │            │
+                                      │            ├── Fetch HKWorkout by hkWorkoutID
+                                      │            ├── Re-run FramboiseEngine bucketing & classification
+                                      │            └── Mutate runRecord in-place & save to SwiftData
+                                      │
+                                      ├── 2. RunAnalyzerActor.generateAnalysis(for: id, force: true)
+                                      │            └── Recompute 30-day baseline relative to run.date
+                                      │
+                                      └── 3. Render updated CoachingInsight & Drills + Success Haptic
 ```
 
 #### New Ingestion API on `HealthKitManager`
