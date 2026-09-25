@@ -1,42 +1,33 @@
-# Runalyst v2.1.0 — Topological Classification & Longitudinal Progression 🏃‍♂️📈
+# Runalyst v2.2.0 — Stride Biomechanics & Dual-Scope Sync Lifecycle 🏃‍♂️⚡
 
-Runalyst 2.1 introduces major advancements in biomechanical intelligence, longitudinal training analytics, and guided onboarding. Powered by continuous-topology time-series classification and native Apple Charts, Runalyst delivers deeper physiological insights, refined prescribed drill adherence, and interactive temporal scoping.
+Runalyst 2.2 brings deep biomechanical stride analysis and an overhauled dual-scope synchronization architecture to on-device running intelligence. With native Apple Watch stride length telemetry, dynamic overstriding detection, and isolated single-run refresh lifecycles, Runalyst delivers faster, safer, and more nuanced AI coaching than ever before.
 
 ---
 
-### 🌟 What's New in v2.1.0
+### 🌟 What's New in v2.2.0
 
-#### 1. 📐 Continuous Topological Signature Classification (ADR-0003)
-- **Time-Series Classification Engine**: Replaced legacy scalar heuristics with continuous topological signature matching (`FramboiseEngine.classifyRunTopologically`).
-- **Elimination of Fallbacks**: Fully eliminated legacy scalar classification fallbacks in favor of continuous metric curve analysis (cadence stability CV, heart rate kinetics, pace variance).
-- **Nuanced Run Type Recognition**: Superior discrimination across *Intervals*, *Tempo Surges*, *Strides*, *Steady Effort*, *Long Run*, and *Recovery Run*.
-- **Architectural Documentation**: Standardized design decision formally documented in `docs/adr/0003-topological-signature-classification-for-run-types.md`.
+#### 1. 📏 Biomechanical Stride Length Analytics & Overstriding Detection (ADR-0004)
+- **Native Stride Length Telemetry**: Extracted directly from Apple Watch `HKQuantityTypeIdentifier.runningStrideLength` with seamless metric (meters) and imperial (feet/inches) formatting.
+- **Dynamic Overstriding & Vertical Ratio**: Calculates running stride ratio (vertical oscillation / stride length) to identify bounding, excessive ground impact, and kinetic energy loss.
+- **Cadence–Stride Dynamic Interplay**: Evaluates how cadence interacts with stride length across paces, distinguishing rhythm stability from overstriding-induced fatigue.
+- **AI Coaching Engine Integration**: FoundationModels coaching engine enhanced to synthesize stride length observations, form cues, and tailored drills (Cadence Pyramids, Strides, Rhythm Intervals).
+- **8-Card Biomechanical Grid**: Upgraded workout detail metrics to an 8-card responsive layout displaying Average Pace, Cadence, Vertical Oscillation, Ground Contact Time, Stride Length, Heart Rate, Elevation, and Aerobic Efficiency.
 
-#### 2. 📊 Dashboard Temporal Scoping & Native Apple Charts Progression
-- **Multi-Window Temporal Scoping**: Interactive timeframe filters (*7D*, *30D*, *90D*, *1Y*, *All Time*) across the Hero Dashboard to observe trends across distinct training blocks.
-- **Longitudinal Progression Visualization**: Native Apple Charts interactive visualizer (`ProgressionChartView`) tracking Cadence, Pace, and Vertical Oscillation over time with smooth area gradients.
-- **Run Type Filter Chips**: Streamlined single-select carousel allowing runners to isolate biomechanical progression for specific workout archetypes.
-- **Physiological Trends**: Dedicated cardiovascular and aerobic trends view, decoupling global VO2 Max tracking from short-window workout cards.
-
-#### 3. 🎯 Strict Drill Signature Matching & Asymmetric Tolerances
-- **Exact Drill Signatures**: Enforced strict interval schedule signatures and cadence bounds to eliminate false-positive automatic drill matching.
-- **Guided Workout Protection**: Automatic exemption for structured, guided workouts to preserve manual execution intent.
-- **Asymmetric Rhythm Tolerances**: Refined tolerance algorithms accounting for the physiological difference between active work intervals and aerobic recovery.
-- **Prioritized Activity Statistics**: Direct extraction and utilization of native Apple Watch activity metrics when available.
-
-#### 4. 🚀 First-Install Onboarding Walkthrough & Spotlight
-- **Interactive First-Launch Experience**: Multi-step onboarding tour introducing new runners to AI biomechanical coaching.
-- **Background HealthKit Ingestion**: Seamless asynchronous health data synchronization with animated loading feedback.
-- **Explainer Spotlights**: Tap-to-inspect (ⓘ) modal explainers educating runners on Cadence CV, Vertical Oscillation, Ground Contact Time, and Aerobic Stability.
+#### 2. 🔄 Dual-Scope Refresh & HealthKit Sync Lifecycle (ADR-0005)
+- **Decoupled Refresh Scopes**: Architecturally separates global macro-sync from single-run micro-refresh, eliminating expensive historical database re-scans when inspecting a single run.
+- **Micro-Scope Run Detail Refresh**: Pull-to-refresh on `RunDetailView` re-queries the authentic `HKWorkout`, updates SwiftData in-place, and re-analyzes coaching insights without locking or resetting other runs.
+- **User Correction Preservation**: Micro-refresh strictly preserves user manual classification corrections (`TrainingCorrection`) and custom drill links (`userLinkedDrill` / `userUnlinkedDrill`).
+- **Macro-Scope Dashboard Pull-to-Refresh**: Re-queries global VO2 Max, recalculates 30-day baseline biometrics, invalidates temporal headline caches, and triggers macro readiness coaching.
+- **Task Safety & Cancellation Handling**: Gracefully handles pull-to-refresh cancellation during SwiftUI view re-renders, preventing duplicate concurrent background tasks.
 
 ---
 
 ### 🛠️ Technical Improvements & Architecture
-- **Expanded Test Suite**: Test coverage broadened from 69 to 95 automated unit and integration tests across 5 specialized test domains (`RunalystTests`) with 100% pass rate.
-- **Modular Test Architecture**: Separated monolithic test files into domain-specific suites (`CardiacGuardrailTests`, `FramboiseEngineTests`, `PrescribedDrillRecognitionTests`, `ProgressionAndTemporalScopingTests`).
+- **Expanded Test Suite**: Test coverage broadened from 95 to 101 automated unit and integration tests across 5 specialized test domains (`RunalystTests`) with 100% pass rate.
+- **New Unit & Integration Tests**: Added rigorous test suites for stride length conversions, schema persistence, vertical ratio math, and dual-scope sync lifecycle execution in `HealthKitManagerTests`, `FramboiseEngineTests`, and `RunRecordModelAndSchemaTests`.
 - **Strict SwiftLint Quality Gate**: 100% compliance across all 48 Swift source files with zero violations under `--strict`.
-- **Refined Working Stats Engine**: Enhanced zero-trimming and duration boundary filtering for uninterrupted steady efforts.
+- **Architectural Standards Enforced**: Codified ADR-0004 and ADR-0005 guidelines directly into `AGENTS.md` and updated ADR indices.
 
 ---
 
-**Full Changelog**: https://github.com/motilayo/runalyzer/compare/v2.0.0...v2.1.0
+**Full Changelog**: https://github.com/motilayo/runalyzer/compare/v2.1.0...v2.2.0
