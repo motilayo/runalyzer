@@ -446,7 +446,7 @@ struct ProgressionChartView: View {
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
                         AxisGridLine()
-                        AxisValueLabel {
+                        AxisValueLabel(anchor: .trailing) {
                             if selectedMetric == .efficiencyFactor {
                                 if let val = value.as(Double.self) {
                                     Text(String(format: "%.2f", val))

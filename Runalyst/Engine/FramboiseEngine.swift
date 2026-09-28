@@ -1,7 +1,7 @@
 import Foundation
 import HealthKit
 
-/// Represents a single 60-second slice of a run for analysis.
+/// Represents a single slice of a run for analysis (nominally 60s, but can be 30s or variable).
 struct BucketData: Sendable {
     let startTime: Date
     let distanceMeters: Double
@@ -248,7 +248,6 @@ actor FramboiseEngine {
         guard buckets.count >= 4 else { return [] }
 
         let smoothed = smoothCadences(buckets: buckets)
-        let meanCadence = buckets.map(\.meanCadence).reduce(0, +) / Double(buckets.count)
 
         struct CandidatePhase {
             let isSurge: Bool
@@ -268,12 +267,21 @@ actor FramboiseEngine {
         }
 
         var phases: [CandidatePhase] = []
-        var currentIsSurge = smoothed[0] >= meanCadence
-        var currentBuckets = [buckets[0]]
+        var currentIsSurge = false
+        var currentBuckets: [BucketData] = []
 
-        for index in 1..<buckets.count {
-            let isSurge = smoothed[index] >= meanCadence
-            if isSurge == currentIsSurge {
+        for index in 0..<buckets.count {
+            let windowSize = 10
+            let windowStart = max(0, index - windowSize / 2)
+            let windowEnd = min(buckets.count - 1, index + windowSize / 2)
+            let window = buckets[windowStart...windowEnd]
+            let localMeanCadence = window.map(\.meanCadence).reduce(0, +) / Double(window.count)
+            let isSurge = smoothed[index] >= localMeanCadence
+
+            if index == 0 {
+                currentIsSurge = isSurge
+                currentBuckets.append(buckets[index])
+            } else if isSurge == currentIsSurge {
                 currentBuckets.append(buckets[index])
             } else {
                 let dur = currentBuckets.map(\.durationSeconds).reduce(0, +)
@@ -298,6 +306,10 @@ actor FramboiseEngine {
                 recoveryIndex = index + 1
             } else if index > 0 && !phases[index - 1].isSurge && !usedRecoveryIndices.contains(index - 1) {
                 recoveryIndex = index - 1
+            } else if index > 0 && !phases[index - 1].isSurge {
+                // Terminal surge fallback: If the workout ends after the final surge (index + 1 >= phases.count),
+                // allow pairing with the immediate preceding recovery interval even if already used.
+                recoveryIndex = index - 1
             }
 
             guard let recIdx = recoveryIndex else { continue }
@@ -306,16 +318,26 @@ actor FramboiseEngine {
             // Minimum duration guards: Surge >= 15s, Recovery >= 20s
             guard surge.duration >= 15.0, recovery.duration >= 20.0 else { continue }
 
-            // Multi-signal corroboration (>= 2 of 3 signals):
-            // 1. Cadence: Surge >= Recovery + 8 SPM
-            let cadenceCorroborated = (surge.avgCadence - recovery.avgCadence) >= 8.0
-            // 2. Pace: Surge >= 15 sec/km faster than Recovery (lower sec/km is faster)
-            let paceCorroborated = (recovery.avgPace - surge.avgPace) >= 15.0
-            // 3. Heart Rate: Surge >= Recovery + 5 BPM
-            let hrCorroborated = (surge.avgHR > 0 && recovery.avgHR > 0) ? ((surge.avgHR - recovery.avgHR) >= 5.0) : false
+            // Multi-signal corroboration:
+            // 1. Cadence: Surge >= Recovery + 5 SPM (realistic turnover increase)
+            let cadenceDiff = surge.avgCadence - recovery.avgCadence
+            let cadenceCorroborated = cadenceDiff >= 5.0
+
+            // 2. Pace: Surge >= 15 sec/km faster than Recovery
+            let paceDiff = recovery.avgPace - surge.avgPace
+            let paceCorroborated = paceDiff >= 15.0
+
+            // 3. Heart Rate: Surge >= Recovery + 3 BPM (accounting for cardiac lag / EPOC in recovery jogs)
+            let hrDiff = (surge.avgHR > 0 && recovery.avgHR > 0) ? (surge.avgHR - recovery.avgHR) : 0.0
+            let hrCorroborated = hrDiff >= 3.0
 
             let corroborationScore = (cadenceCorroborated ? 1 : 0) + (paceCorroborated ? 1 : 0) + (hrCorroborated ? 1 : 0)
-            if corroborationScore >= 2 {
+
+            // Dominant Pace Surge: A substantial pace surge (>= 30 s/km) with supporting biometric signal
+            // (>= 3 SPM cadence increase or >= 2 BPM HR increase), or >= 45 s/km sheer pace differential.
+            let isDominantPaceSurge = (paceDiff >= 30.0 && (cadenceDiff >= 3.0 || hrDiff >= 2.0)) || (paceDiff >= 45.0)
+
+            if corroborationScore >= 2 || isDominantPaceSurge {
                 usedRecoveryIndices.insert(recIdx)
                 cycles.append(SurgeRecoveryCycle(
                     workDuration: surge.duration,
@@ -371,14 +393,19 @@ actor FramboiseEngine {
         }
 
         var fasterTransitions = 0
-        for index in 0..<4 where quintilePaces[index + 1] < quintilePaces[index] {
-            fasterTransitions += 1
+        var slowerTransitions = 0
+        for index in 0..<4 {
+            if quintilePaces[index + 1] < quintilePaces[index] - 2.0 {
+                fasterTransitions += 1
+            } else if quintilePaces[index + 1] > quintilePaces[index] + 2.0 {
+                slowerTransitions += 1
+            }
         }
 
         let minPace = quintilePaces.min() ?? Double.infinity
-        let q5IsFastest = (quintilePaces[4] == minPace)
+        let q5IsFastest = (quintilePaces[4] <= minPace + 0.5)
 
-        return fasterTransitions >= 4 && q5IsFastest
+        return fasterTransitions >= 3 && slowerTransitions == 0 && q5IsFastest
     }
 
     /// Multi-delta weighted classification engine enforcing turnover stability,
@@ -392,10 +419,11 @@ actor FramboiseEngine {
         cadenceCV: Double = 0.0,
         averageHR: Double? = nil,
         paceDelta: Double? = nil,
-        hrDelta: Double? = nil
+        hrDelta: Double? = nil,
+        cycles: [SurgeRecoveryCycle]? = nil
     ) -> String {
         // LAYER 1: Structural Gate (Intermittent vs. Continuous)
-        let cycles = extractOscillationCycles(buckets: buckets)
+        let cycles = cycles ?? extractOscillationCycles(buckets: buckets)
         let isIntermittent = cycles.count >= 3
         let regularityScore = isIntermittent ? calculateCycleRegularity(cycles: cycles) : 0.0
 
@@ -409,8 +437,7 @@ actor FramboiseEngine {
         }
 
         // LAYER 3: Continuous Structural Archetypes (Trend Morphology & Volume)
-        let isProgression = (durationMinutes >= 20.0 && evaluateQuintileProgression(buckets: buckets))
-            || (slope < -0.225 && durationMinutes >= 20.0)
+        let isProgression = durationMinutes >= 20.0 && cv < 0.09 && evaluateQuintileProgression(buckets: buckets)
         if isProgression {
             return "Progression Run"
         }

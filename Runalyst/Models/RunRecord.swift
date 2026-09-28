@@ -188,6 +188,7 @@ extension RunRecord {
 
     /// Canonical user-facing drill title associated with this run, if any (e.g. "Tempo Surges", "Cadence Pyramids").
     var prescribedDrillName: String? {
+        guard !isDeleted else { return nil }
         // 1. Explicit tag "drill:<title>"
         if let tag = framboiseTags.first(where: { $0.hasPrefix("drill:") }) {
             let candidate = String(tag.dropFirst(6))
@@ -218,6 +219,7 @@ extension RunRecord {
 
     /// Canonical user-facing run classification (e.g. "Steady Effort", "Easy Run", "Intervals").
     var normalizedClassification: String {
+        guard !isDeleted else { return "Steady Effort" }
         let trimmed = detectedTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed.localizedCaseInsensitiveCompare("steady") == .orderedSame {
             return "Steady Effort"
@@ -234,6 +236,7 @@ extension RunRecord {
 
     /// Checks if this run matches the provided filter chip (either canonical classification or drill name).
     func matchesFilter(_ filter: String) -> Bool {
+        guard !isDeleted else { return false }
         let cleanFilter = filter.trimmingCharacters(in: .whitespacesAndNewlines)
         if normalizedClassification.localizedCaseInsensitiveCompare(cleanFilter) == .orderedSame {
             return true

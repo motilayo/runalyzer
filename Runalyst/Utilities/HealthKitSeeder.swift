@@ -189,7 +189,7 @@ class HealthKitSeeder {
                     let chunkStart = workoutStartTime.addingTimeInterval(TimeInterval(chunkIndex * 15))
                     let chunkEnd = chunkStart.addingTimeInterval(15)
 
-                    let metrics = generate15SecondMetrics(for: profile, workoutIndex: index, chunkIndex: chunkIndex, progress: progress)
+                    let metrics = Self.generate15SecondMetrics(for: profile, workoutIndex: index, chunkIndex: chunkIndex, progress: progress)
 
                     let distanceQuantity = HKQuantity(unit: .meter(), doubleValue: metrics.distanceMeters)
                     let speedQuantity = HKQuantity(
@@ -262,6 +262,7 @@ class HealthKitSeeder {
                 allSamples.append(vo2Sample)
 
                 try await builder.addSamples(allSamples)
+                try await builder.endCollection(at: workoutEndTime)
                 let workout = try await builder.finishWorkout()
                 if let workout = workout {
                     savedWorkouts.append(workout)
@@ -314,7 +315,7 @@ class HealthKitSeeder {
                 default: return 0.0
                 }
             }()
-            let workingPaceSec = max(240.0, basePace + profilePaceOffset + Double.random(in: -3...3))
+            let workingPaceSec = max(275.0, basePace + profilePaceOffset + Double.random(in: -3...3))
             let distanceMeters = (workingSec / workingPaceSec) * 1000.0
             let distanceKm = distanceMeters / 1000.0
 
@@ -505,7 +506,7 @@ class HealthKitSeeder {
         print("✅ Successfully seeded \(totalRuns) SwiftData RunRecords directly with 3-month progression and aligned drill IDs!")
     }
 
-    private func generate15SecondMetrics(
+    static func generate15SecondMetrics(
         for profile: MockRunProfile,
         workoutIndex: Int,
         chunkIndex: Int,
@@ -558,29 +559,29 @@ class HealthKitSeeder {
                 hr = Double.random(in: 135...140)
                 cadence = 0
             } else {
-                distance = (Double.random(in: 175...185) * speedFactor) / 4.0
+                distance = (Double.random(in: 162...172) * speedFactor) / 4.0
                 hr = Double.random(in: 148...152) + hrShift
                 cadence = Double.random(in: 164...166) + cadenceShift
             }
 
         case .tempo:
-            distance = (Double.random(in: 210...220) * speedFactor) / 4.0
-            hr = Double.random(in: 175...182)
-            cadence = Double.random(in: 172...176) + (cadenceShift * 0.5)
+            distance = (Double.random(in: 175...185) * speedFactor) / 4.0
+            hr = Double.random(in: 172...179)
+            cadence = Double.random(in: 170...174) + (cadenceShift * 0.5)
 
         case .intervals:
             let isWorkInterval = (minuteIndex % 5) < 3
             let isRestStop = minuteIndex == 14 || minuteIndex == 24
             if isWorkInterval {
-                distance = (Double.random(in: 220...240) * speedFactor) / 4.0
-                hr = Double.random(in: 180...190)
-                cadence = Double.random(in: 175...182) + (cadenceShift * 0.5)
+                distance = (Double.random(in: 185...195) * speedFactor) / 4.0
+                hr = Double.random(in: 178...186)
+                cadence = Double.random(in: 174...178) + (cadenceShift * 0.5)
             } else if isRestStop {
                 distance = 0
                 hr = Double.random(in: 125...135)
                 cadence = 0
             } else {
-                distance = (Double.random(in: 110...125) * speedFactor) / 4.0
+                distance = (Double.random(in: 120...135) * speedFactor) / 4.0
                 hr = Double.random(in: 135...145) + hrShift
                 cadence = Double.random(in: 150...156) + cadenceShift
             }
@@ -588,9 +589,9 @@ class HealthKitSeeder {
         case .fartlek:
             let isFast = (minuteIndex % 4) == 0
             if isFast {
-                distance = (Double.random(in: 230...250) * speedFactor) / 4.0
-                hr = Double.random(in: 175...185)
-                cadence = Double.random(in: 178...184) + (cadenceShift * 0.5)
+                distance = (Double.random(in: 185...195) * speedFactor) / 4.0
+                hr = Double.random(in: 175...183)
+                cadence = Double.random(in: 174...178) + (cadenceShift * 0.5)
             } else {
                 distance = (Double.random(in: 140...150) * speedFactor) / 4.0
                 hr = Double.random(in: 135...145) + hrShift
@@ -599,13 +600,13 @@ class HealthKitSeeder {
 
         case .progression:
             let minuteProgress = Double(minuteIndex) / 45.0
-            distance = ((145.0 + (minuteProgress * 65.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
-            hr = 135.0 + (minuteProgress * 45.0) + Double.random(in: -3...3)
-            cadence = 155.0 + (minuteProgress * 20.0) + cadenceShift + Double.random(in: -2...2)
+            distance = ((140.0 + (minuteProgress * 40.0) + Double.random(in: -4...4)) * speedFactor) / 4.0
+            hr = 135.0 + (minuteProgress * 40.0) + Double.random(in: -3...3)
+            cadence = 155.0 + (minuteProgress * 15.0) + cadenceShift + Double.random(in: -2...2)
 
         case .longRun:
             let minuteProgress = Double(minuteIndex) / 90.0
-            distance = ((175.0 - (minuteProgress * 15.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
+            distance = ((155.0 - (minuteProgress * 15.0) + Double.random(in: -5...5)) * speedFactor) / 4.0
             hr = 145.0 + (minuteProgress * 20.0) + Double.random(in: -3...3)
             cadence = 165.0 - (minuteProgress * 5.0) + cadenceShift + Double.random(in: -2...2)
 
@@ -618,17 +619,17 @@ class HealthKitSeeder {
                 cadence = 0
             } else {
                 let effort = cycle < 4 ? Double(cycle) : Double(7 - cycle)
-                distance = ((160.0 + (effort * 25.0)) * speedFactor) / 4.0
-                hr = 145.0 + (effort * 12.0)
-                cadence = 162.0 + (effort * 4.0) + (cadenceShift * 0.5)
+                distance = ((148.0 + (effort * 10.0)) * speedFactor) / 4.0
+                hr = 145.0 + (effort * 8.0)
+                cadence = 160.0 + (effort * 3.0) + (cadenceShift * 0.5)
             }
 
         case .hillRepeats:
             let isUphill = (minuteIndex % 3) == 0
             let isPauseAtBottom = minuteIndex == 14 || minuteIndex == 26
             if isUphill {
-                distance = (Double.random(in: 130...145) * speedFactor) / 4.0
-                hr = Double.random(in: 178...188)
+                distance = (Double.random(in: 130...140) * speedFactor) / 4.0
+                hr = Double.random(in: 175...185)
                 cadence = Double.random(in: 156...162) + (cadenceShift * 0.5)
             } else if isPauseAtBottom {
                 distance = 0
@@ -647,7 +648,7 @@ class HealthKitSeeder {
                 hr = Double.random(in: 130...140)
                 cadence = 0
             } else {
-                distance = (Double.random(in: 170...180) * speedFactor) / 4.0
+                distance = (Double.random(in: 155...165) * speedFactor) / 4.0
                 hr = Double.random(in: 145...155) + hrShift
                 cadence = Double.random(in: 160...165) + cadenceShift
             }
@@ -657,11 +658,13 @@ class HealthKitSeeder {
         // Lower turnover & beginner stage = higher vertical oscillation and longer ground contact time
         let baseOsc = 10.4 - (progress * 2.4)
         let baseGCT = 275.0 - (progress * 42.0)
-        let baseStride = 0.94 + (progress * 0.26)
 
-        let osc = cadence > 0 ? max(6.8, baseOsc + Double.random(in: -0.4...0.4)) : 0.0
-        let gct = cadence > 0 ? max(210.0, baseGCT + Double.random(in: -8...8)) : 0.0
-        let stride = cadence > 0 ? max(0.85, baseStride + ((distance - 150) / 600.0)) : 0.0
+        let osc = cadence > 0 ? max(6.8, baseOsc + Double.random(in: -0.3...0.3)) : 0.0
+        let gct = cadence > 0 ? max(210.0, baseGCT + Double.random(in: -6...6)) : 0.0
+
+        // Exact physical derivation from Velocity Equation: Stride (m) = Distance (m) / StepCount
+        let stepsInChunk = (cadence / 60.0) * 15.0
+        let stride = (stepsInChunk > 0 && distance > 0) ? min(1.8, max(0.6, distance / stepsInChunk)) : 0.0
 
         return (distanceMeters: distance, heartRate: max(100.0, hr), cadence: max(0, cadence), oscillation: osc, gct: gct, stride: stride)
     }

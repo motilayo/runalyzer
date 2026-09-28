@@ -39,12 +39,13 @@ struct DashboardView: View {
 
     private var timeRangeRuns: [RunRecord] {
         let now = Date()
+        let activeRuns = runRecords.filter { !$0.isDeleted && $0.modelContext != nil }
         if timeRange == "7 Days", let limit = Calendar.current.date(byAdding: .day, value: -7, to: now) {
-            return runRecords.filter { $0.date >= limit }
+            return activeRuns.filter { $0.date >= limit }
         } else if timeRange == "30 Days", let limit = Calendar.current.date(byAdding: .day, value: -30, to: now) {
-            return runRecords.filter { $0.date >= limit }
+            return activeRuns.filter { $0.date >= limit }
         }
-        return runRecords
+        return activeRuns
     }
 
     private var filteredRunRecords: [RunRecord] {
@@ -170,7 +171,7 @@ struct DashboardView: View {
         var classifications = Set<String>()
         var drills = Set<String>()
 
-        for run in runRecords {
+        for run in runRecords where !run.isDeleted && run.modelContext != nil {
             classifications.insert(run.normalizedClassification)
             if let drillName = run.prescribedDrillName {
                 drills.insert(drillName)
@@ -377,18 +378,62 @@ struct DashboardView: View {
             }
             let heavyCount = heavySessions.count
 
+            // Check for consecutive hard sessions (less than 36 hours apart)
+            var hasBackToBackHeavy = false
+            if heavySessions.count >= 2 {
+                for index in 0..<(heavySessions.count - 1) {
+                    let interval = heavySessions[index].date.timeIntervalSince(heavySessions[index + 1].date)
+                    if interval > 0 && interval < 36 * 3600 {
+                        hasBackToBackHeavy = true
+                        break
+                    }
+                }
+            }
+
             let latestRun = timeRangeRuns.first
             let hasFatigueDrift = latestRun?.framboiseTags.contains("fatigueDrift") ?? false
-            let baseCad = baselineCadence ?? 160
-            let latestCad = latestRun?.workingAvgCadence ?? Double(baseCad)
-            let cadenceDropped = (latestCad > 0) && (Double(baseCad) - latestCad >= 4.0)
 
-            if heavyCount >= 2 || (hasFatigueDrift && cadenceDropped) {
-                directiveContext = "ACUTE_FATIGUE: The runner logged \(heavyCount) heavy sessions in the last 4 to 7 days and late-run cadence turnover declined. PRIORITY: Advise Zone 2 aerobic recovery or full rest day. Safety overrides any race goal."
-                fatigueContext = "\(heavyCount) hard sessions logged; late-run cadence dropped under fatigue."
-            } else if heavyCount == 1 && cadenceDropped {
-                directiveContext = "MODERATE_STRAIN: 1 hard session logged with mild turnover fatigue. Recommend controlled Zone 2 recovery."
-                fatigueContext = "Turnover decay after intense workout. Recommend easy recovery."
+            // Resolve personalized baseline cadence: prefer 30-day historical, then previous 7-day, then current 7-day
+            let personalizedBaselineCadence: Double = {
+                if let historical = latestRun?.computeHistoricalBaselineCadence(in: runRecords) {
+                    return historical
+                }
+                if let prev = previousBaselineCadence {
+                    return Double(prev)
+                }
+                if let base = baselineCadence {
+                    return Double(base)
+                }
+                return 160.0
+            }()
+
+            let latestCad = latestRun?.workingAvgCadence ?? personalizedBaselineCadence
+            let cadenceDiff = personalizedBaselineCadence - latestCad
+            let cadenceDropped = (latestCad > 0) && (cadenceDiff >= 3.5)
+
+            // High acute density: 6+ runs in 7 days
+            let isHighDensity = timeRangeRuns.count >= 6
+
+            let isCriticalFatigue = (heavyCount >= 3 && (cadenceDropped || hasFatigueDrift))
+                || (hasBackToBackHeavy && (cadenceDropped || hasFatigueDrift))
+                || (isHighDensity && heavyCount >= 2 && cadenceDropped && hasFatigueDrift)
+
+            let isModerateFatigue = heavyCount >= 2
+                || cadenceDropped
+                || hasFatigueDrift
+                || hasBackToBackHeavy
+                || (isHighDensity && heavyCount >= 1)
+
+            if isCriticalFatigue {
+                let dropText = cadenceDropped ? " with confirmed turnover decay of \(Int(round(cadenceDiff))) SPM" : ""
+                directiveContext = "CRITICAL_FATIGUE: Acute cumulative overload detected (\(heavyCount) hard sessions\(dropText)). PRIORITY: Advise a full rest day or very short gentle recovery walk. Safety and adaptation override race goals."
+                fatigueContext = "\(heavyCount) hard sessions; verified turnover decay under high acute density. Full rest recommended."
+            } else if isModerateFatigue {
+                let turnoverNote = cadenceDropped
+                    ? "Turnover shows mild decay (-3 to -4 SPM) after intense work."
+                    : "Cadence turnover remains stable, but acute training density is high."
+                directiveContext = "MODERATE_FATIGUE: Productive training fatigue from recent quality work. \(turnoverNote) PRIORITY: Advise an easy Zone 2 recovery jog or light cross-training to consolidate fitness without overreaching."
+                fatigueContext = "Moderate training strain from recent quality sessions. Recommend easy aerobic recovery in Zone 2."
             } else {
                 directiveContext = "HIGH_READINESS: Balanced training load, consistent turnover, and minimal cardiac drift. Athlete is primed for normal quality training."
                 fatigueContext = "Readiness optimal. No acute cardiac or turnover fatigue."
@@ -1287,7 +1332,8 @@ struct HeroCardView: View {
     }
 
     private var prescribedDrillName: String? {
-        runRecord.prescribedDrillName
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return nil }
+        return runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
@@ -1298,6 +1344,7 @@ struct HeroCardView: View {
     }
 
     private func cleanUpInvalidDrillTagsIfNeeded() {
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return }
         if runRecord.framboiseTags.contains("prescribedDrill") && prescribedDrillName == nil {
             runRecord.framboiseTags.removeAll { tag in
                 tag == "prescribedDrill" || tag.hasPrefix("drill:")
@@ -1510,7 +1557,8 @@ struct RunListRowView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var prescribedDrillName: String? {
-        runRecord.prescribedDrillName
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return nil }
+        return runRecord.prescribedDrillName
     }
 
     var body: some View {

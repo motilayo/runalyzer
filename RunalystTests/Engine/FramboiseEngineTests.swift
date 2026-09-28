@@ -385,4 +385,251 @@ final class FramboiseEngineTests: XCTestCase {
         XCTAssertNotEqual(classification, "Intervals")
         XCTAssertTrue(classification == "Steady Effort" || classification == "Easy Run")
     }
+
+    func testProgressiveIntervals_CorrectlyIdentifiedAsIntervals() async {
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // Warmup: 6 minutes (12 buckets of 30s) at 145 SPM, 450 s/km
+        for _ in 0..<12 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 66.6, durationSeconds: 30, meanPaceSecPerKm: 450, meanCadence: 145, meanHR: 130))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // 3 progressive intervals
+        let workPaces = [340.0, 320.0, 300.0]
+        let workCadences = [160.0, 168.0, 174.0]
+
+        for i in 0..<3 {
+            // Work: 2 minutes (4 buckets)
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 30.0 / (workPaces[i] / 1000.0), durationSeconds: 30, meanPaceSecPerKm: workPaces[i], meanCadence: workCadences[i], meanHR: 165 + Double(i * 5)))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+            // Recovery: 2 minutes (4 buckets) at 142 SPM, 460 s/km
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 65.2, durationSeconds: 30, meanPaceSecPerKm: 460, meanCadence: 142, meanHR: 140))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+        }
+
+        let cycles = await engine.extractOscillationCycles(buckets: buckets)
+        XCTAssertGreaterThanOrEqual(cycles.count, 3, "Progressive intervals must detect >= 3 oscillation cycles with rolling baseline")
+
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.15,
+            slope: 0.0,
+            zone4: 0.50,
+            durationMinutes: 30.0,
+            cadenceCV: 0.050,
+            averageHR: 155.0
+        )
+        XCTAssertEqual(classification, "Intervals")
+    }
+
+    func testWarmupAndCooldownWithoutQuintiles_DoesNotClassifyAsProgression() async {
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // 5 quintiles (4 buckets each)
+        // Q1: Warmup (400 s/km)
+        // Q2: Cruise (350 s/km)
+        // Q3: Slower (360 s/km) - breaks monotonicity
+        // Q4: Fast (330 s/km)
+        // Q5: Fastest (320 s/km)
+        let paces = [400.0, 350.0, 360.0, 330.0, 320.0]
+        for pace in paces {
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 30.0 / (pace / 1000.0), durationSeconds: 30, meanPaceSecPerKm: pace, meanCadence: 160, meanHR: 150))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+        }
+
+        let isProgression = await engine.evaluateQuintileProgression(buckets: buckets)
+        XCTAssertFalse(isProgression, "Non-monotonic middle splits must fail quintile progression")
+
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.06,
+            slope: -0.50, // Strong negative slope
+            zone4: 0.20,
+            durationMinutes: 25.0,
+            cadenceCV: 0.015,
+            averageHR: 152.0
+        )
+        XCTAssertNotEqual(classification, "Progression Run", "Scalar slope should not override quintile failure")
+        XCTAssertTrue(classification == "Steady Effort" || classification == "Easy Run")
+    }
+
+    func testHillySteadyRun_DoesNotFalsePositiveIntervals() async {
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // Hilly steady run: constant effort/cadence, but pace fluctuates wildly
+        let paces = [360.0, 300.0, 420.0, 350.0, 290.0, 430.0, 360.0] // Flat, Downhill, Uphill, etc.
+        for pace in paces {
+            for _ in 0..<4 {
+                // Cadence stays strictly at 160 SPM
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 30.0 / (pace / 1000.0), durationSeconds: 30, meanPaceSecPerKm: pace, meanCadence: 160, meanHR: 155))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+        }
+
+        let cycles = await engine.extractOscillationCycles(buckets: buckets)
+        XCTAssertLessThan(cycles.count, 3, "Pace fluctuations without cadence surges should not trigger oscillation cycles")
+    }
+
+    func testProgressionRun_WithEarlyPlateau_ClassifiesCorrectly() async {
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // Q1 = 400, Q2 = 400 (Plateau), Q3 = 375, Q4 = 350, Q5 = 325
+        // This has 3 faster transitions (Q2->Q3, Q3->Q4, Q4->Q5)
+        let paces = [400.0, 400.0, 375.0, 350.0, 325.0]
+        for pace in paces {
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 30.0 / (pace / 1000.0), durationSeconds: 30, meanPaceSecPerKm: pace, meanCadence: 162, meanHR: 150))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+        }
+
+        let isProgression = await engine.evaluateQuintileProgression(buckets: buckets)
+        XCTAssertTrue(isProgression, "Progression run with an early plateau and 3 faster transitions must pass")
+    }
+
+    func testModelManager_ProgressiveIntervals_OverridesCoreMLToIntervals() async {
+        let modelManager = ModelManager()
+
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // Warmup: 6 minutes (12 buckets of 30s) at 145 SPM, 450 s/km
+        for _ in 0..<12 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 66.6, durationSeconds: 30, meanPaceSecPerKm: 450, meanCadence: 145, meanHR: 130))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // 3 progressive intervals
+        let workPaces = [340.0, 320.0, 300.0]
+        let workCadences = [160.0, 168.0, 174.0]
+
+        for i in 0..<3 {
+            // Work: 2 minutes (4 buckets)
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 30.0 / (workPaces[i] / 1000.0), durationSeconds: 30, meanPaceSecPerKm: workPaces[i], meanCadence: workCadences[i], meanHR: 165 + Double(i * 5)))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+            // Recovery: 2 minutes (4 buckets) at 142 SPM, 460 s/km
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 65.2, durationSeconds: 30, meanPaceSecPerKm: 460, meanCadence: 142, meanHR: 140))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+        }
+
+        let classification = await modelManager.predictRunType(
+            buckets: buckets,
+            paceDelta: -50.0,
+            hrDelta: 25.0,
+            percentZone4: 0.55,
+            cadenceDelta: 12.0,
+            verticalOscillation: 9.0,
+            runnerStage: 1,
+            cv: 0.13,
+            slope: -0.30,
+            durationMinutes: 30.0,
+            cadenceCV: 0.048,
+            rawAverageHR: 155.0
+        )
+
+        XCTAssertEqual(classification, "Intervals", "Progressive intervals through ModelManager must classify as Intervals")
+    }
+
+    func testLongIntervalsWithTerminalRepAndActiveRecovery_ClassifiesAsIntervals() async {
+        // Simulates 31:24 workout: Warm-up + 3 long intervals (5.5m) with active recovery (2.5m)
+        // Interval 3 ends at the completion of the workout (terminal rep).
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // Warm-up: 7.5 min (15 windows of 30s) at 152 SPM, 448 s/km, 138 HR
+        for _ in 0..<15 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 67.0, durationSeconds: 30, meanPaceSecPerKm: 448, meanCadence: 152, meanHR: 138))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // Rep 1: 5.5 min (11 windows) at 158 SPM (+6 SPM), 350 s/km (98 s/km faster), 156 HR
+        for _ in 0..<11 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 85.7, durationSeconds: 30, meanPaceSecPerKm: 350, meanCadence: 158, meanHR: 156))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // Recovery 1: 2.5 min (5 windows) at 153 SPM, 440 s/km, 153 HR
+        for _ in 0..<5 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 68.2, durationSeconds: 30, meanPaceSecPerKm: 440, meanCadence: 153, meanHR: 153))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // Rep 2: 5.5 min (11 windows) at 163 SPM (+7 SPM), 320 s/km (120 s/km faster), 164 HR
+        for _ in 0..<11 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 93.8, durationSeconds: 30, meanPaceSecPerKm: 320, meanCadence: 163, meanHR: 164))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // Recovery 2: 2.5 min (5 windows) at 156 SPM, 430 s/km, 161 HR
+        for _ in 0..<5 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 69.8, durationSeconds: 30, meanPaceSecPerKm: 430, meanCadence: 156, meanHR: 161))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        // Rep 3 (Terminal): 5.5 min (11 windows) at 170 SPM, 305 s/km, 172 HR (Ends workout)
+        for _ in 0..<11 {
+            buckets.append(BucketData(startTime: currentTime, distanceMeters: 98.4, durationSeconds: 30, meanPaceSecPerKm: 305, meanCadence: 170, meanHR: 172))
+            currentTime = currentTime.addingTimeInterval(30)
+        }
+
+        let cycles = await engine.extractOscillationCycles(buckets: buckets)
+        XCTAssertGreaterThanOrEqual(cycles.count, 3, "All 3 long interval cycles including terminal rep must be corroborated")
+
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.16,
+            slope: -0.24,
+            zone4: 0.49,
+            durationMinutes: 31.4,
+            cadenceCV: 0.066,
+            averageHR: 156.0
+        )
+        XCTAssertEqual(classification, "Intervals", "3-rep long interval session must classify as Intervals, never Progression Run")
+    }
+
+    func testHighCVWorkout_WithAcceleratingQuintiles_DoesNotClassifyAsProgression() async {
+        // A workout with accelerating quintiles but high pace CV (cv >= 0.09) must NOT be Progression Run
+        var buckets: [BucketData] = []
+        var currentTime = Date()
+
+        // 5 accelerating quintiles
+        let paces = [440.0, 385.0, 370.0, 340.0, 320.0]
+        for pace in paces {
+            for _ in 0..<4 {
+                buckets.append(BucketData(startTime: currentTime, distanceMeters: 30.0 / (pace / 1000.0), durationSeconds: 30, meanPaceSecPerKm: pace, meanCadence: 160, meanHR: 150))
+                currentTime = currentTime.addingTimeInterval(30)
+            }
+        }
+
+        let isQuintilesAccelerating = await engine.evaluateQuintileProgression(buckets: buckets)
+        XCTAssertTrue(isQuintilesAccelerating)
+
+        // When CV is high (e.g. 0.14 from intermittent surges), classifyRun must not return Progression Run
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.14,
+            slope: -0.25,
+            zone4: 0.40,
+            durationMinutes: 25.0,
+            cadenceCV: 0.045,
+            averageHR: 150.0,
+            cycles: [] // Even if 0 cycles were found, high CV prevents Progression Run
+        )
+        XCTAssertNotEqual(classification, "Progression Run", "High pace CV (>= 0.09) must prevent Progression Run classification")
+    }
 }

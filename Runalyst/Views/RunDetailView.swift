@@ -108,7 +108,8 @@ struct RunDetailView: View {
     ]
 
     private var prescribedDrillName: String? {
-        runRecord.prescribedDrillName
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return nil }
+        return runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
@@ -119,6 +120,7 @@ struct RunDetailView: View {
     }
 
     private func normalizeDrillClassification() {
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return }
         // Clean up any invalid drill tags on runs that are not genuine drills
         cleanUpInvalidDrillTagsIfNeeded()
 
@@ -142,6 +144,7 @@ struct RunDetailView: View {
     }
 
     private func cleanUpInvalidDrillTagsIfNeeded() {
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return }
         // A run is only a prescribed drill if it has a confirmed authentic drill name
         if runRecord.framboiseTags.contains("prescribedDrill") && prescribedDrillName == nil {
             runRecord.framboiseTags.removeAll { tag in
@@ -592,6 +595,7 @@ struct RunDetailView: View {
             .padding(.vertical)
 
             .task(id: runRecord.id) {
+                guard !runRecord.isDeleted, runRecord.modelContext != nil else { return }
                 // Auto-resolve or reconcile drill recognition against authentic HealthKit workout metadata / scheduled intent
                 // ONLY if the run has NO drill assigned yet and user hasn't manually linked or unlinked one
                 if prescribedDrillName == nil && !runRecord.framboiseTags.contains("userLinkedDrill") && !runRecord.framboiseTags.contains("userUnlinkedDrill") {

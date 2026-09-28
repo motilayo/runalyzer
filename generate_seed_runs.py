@@ -38,8 +38,8 @@ def generate_smooth_seed_data(num_samples=15000):
 
         # Pick a base archetype smoothly
         archetype = random.choices(
-            ["Recovery", "Easy", "Steady", "Progression", "Tempo", "Fartlek", "Intervals", "Rhythm Intervals", "Cadence Pyramids", "Tempo Surges", "Strides"],
-            weights=[0.10, 0.15, 0.15, 0.10, 0.10, 0.10, 0.10, 0.05, 0.05, 0.05, 0.05]
+            ["Recovery", "Easy", "Steady", "Progression", "Tempo", "Fartlek", "Intervals", "Progressive Intervals", "Rhythm Intervals", "Cadence Pyramids", "Tempo Surges", "Strides"],
+            weights=[0.10, 0.15, 0.15, 0.08, 0.10, 0.09, 0.08, 0.05, 0.05, 0.05, 0.05, 0.05]
         )[0]
         
         if archetype == "Recovery":
@@ -101,7 +101,7 @@ def generate_smooth_seed_data(num_samples=15000):
             hr_delta = random.gauss(15, 5)
             percent_zone4 = random.betavariate(4, 4)
             cv = random.gauss(0.052, 0.008)
-            pace_slope = random.gauss(-0.338, 0.075)      # Negative slope
+            pace_slope = random.gauss(-0.25, 0.05)      # Narrowed negative slope
             cadence_delta = random.gauss(5, 2)
             duration_mins = random.gauss(50, 15)
             cadence_cv = max(0.008, min(0.024, random.gauss(0.016, 0.004)))
@@ -137,6 +137,17 @@ def generate_smooth_seed_data(num_samples=15000):
             pace_slope = random.gauss(0.0, 0.038)
             cadence_delta = random.gauss(15, 3)
             duration_mins = random.gauss(25, 8)
+            cadence_cv = max(0.035, min(0.090, random.gauss(0.048, 0.010)))
+            workout_class = "Intervals"
+            
+        elif archetype == "Progressive Intervals":
+            pace_delta = random.gauss(-70, 15)         # Faster overall
+            hr_delta = random.gauss(30, 5)
+            percent_zone4 = random.betavariate(8, 2)
+            cv = random.gauss(0.13, 0.015)             # High variance
+            pace_slope = random.gauss(-0.30, 0.06)     # Negative slope (progressing through intervals)
+            cadence_delta = random.gauss(14, 3)
+            duration_mins = random.gauss(30, 8)
             cadence_cv = max(0.035, min(0.090, random.gauss(0.048, 0.010)))
             workout_class = "Intervals"
             

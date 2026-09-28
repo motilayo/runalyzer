@@ -31,6 +31,11 @@ def train_and_export():
 
     # Test suite covering crucial real-world cases:
     test_cases = [
+        ("Progressive Intervals (should be Intervals, not Progression)", {
+            "paceDelta": -50.0, "hrDelta": 25.0, "percentZone4": 0.55,
+            "cadenceDelta": 12.0, "verticalOscillation": 9.0, "cv": 0.13,
+            "paceSlope": -0.30, "runnerStage": 1, "durationMinutes": 30.0, "cadenceCV": 0.048
+        }, "Intervals"),
         ("Rhythm Intervals Drill", {
             "paceDelta": -60.0, "hrDelta": 25.0, "percentZone4": 0.8,
             "cadenceDelta": 10.0, "verticalOscillation": 9.5, "cv": 0.12,

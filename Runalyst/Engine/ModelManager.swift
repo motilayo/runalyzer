@@ -32,6 +32,7 @@ actor ModelManager {
         rawAverageHR: Double? = nil
     ) async -> String {
         let framboise = FramboiseEngine()
+        let cycles = await framboise.extractOscillationCycles(buckets: buckets)
         let weightedClass = await framboise.classifyRun(
             buckets: buckets,
             cv: cv,
@@ -41,7 +42,8 @@ actor ModelManager {
             cadenceCV: cadenceCV,
             averageHR: rawAverageHR,
             paceDelta: paceDelta,
-            hrDelta: hrDelta
+            hrDelta: hrDelta,
+            cycles: cycles
         )
 
         if let classifier = self.runClassifier {
@@ -62,7 +64,6 @@ actor ModelManager {
                 var targetClass = prediction.targetClass
 
                 // Topological Structural Guardrail:
-                let cycles = await framboise.extractOscillationCycles(buckets: buckets)
                 // 1. Continuous Run Gate:
                 // If < 3 corroborated oscillation cycles, the run is continuous.
                 // CoreML CANNOT classify it as Fartlek or Intervals.
@@ -71,11 +72,13 @@ actor ModelManager {
                 }
 
                 // 2. Intermittent Gate:
-                // If >= 3 corroborated cycles and high regularity, override continuous predictions with Intervals.
-                if (targetClass == "Steady Effort" || targetClass == "Easy Run" || targetClass == "Recovery Run" || targetClass == "Tempo Run") && cycles.count >= 3 {
+                // If >= 3 corroborated cycles, override continuous predictions with Intervals or Fartlek.
+                if targetClass != "Intervals" && targetClass != "Fartlek" && cycles.count >= 3 {
                     let regularity = await framboise.calculateCycleRegularity(cycles: cycles)
                     if regularity >= 0.65 {
                         targetClass = "Intervals"
+                    } else {
+                        targetClass = "Fartlek"
                     }
                 }
 
