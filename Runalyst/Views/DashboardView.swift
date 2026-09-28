@@ -39,12 +39,13 @@ struct DashboardView: View {
 
     private var timeRangeRuns: [RunRecord] {
         let now = Date()
+        let activeRuns = runRecords.filter { !$0.isDeleted && $0.modelContext != nil }
         if timeRange == "7 Days", let limit = Calendar.current.date(byAdding: .day, value: -7, to: now) {
-            return runRecords.filter { $0.date >= limit }
+            return activeRuns.filter { $0.date >= limit }
         } else if timeRange == "30 Days", let limit = Calendar.current.date(byAdding: .day, value: -30, to: now) {
-            return runRecords.filter { $0.date >= limit }
+            return activeRuns.filter { $0.date >= limit }
         }
-        return runRecords
+        return activeRuns
     }
 
     private var filteredRunRecords: [RunRecord] {
@@ -170,7 +171,7 @@ struct DashboardView: View {
         var classifications = Set<String>()
         var drills = Set<String>()
 
-        for run in runRecords {
+        for run in runRecords where !run.isDeleted && run.modelContext != nil {
             classifications.insert(run.normalizedClassification)
             if let drillName = run.prescribedDrillName {
                 drills.insert(drillName)
@@ -1287,7 +1288,8 @@ struct HeroCardView: View {
     }
 
     private var prescribedDrillName: String? {
-        runRecord.prescribedDrillName
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return nil }
+        return runRecord.prescribedDrillName
     }
 
     private var drillPillText: String {
@@ -1298,6 +1300,7 @@ struct HeroCardView: View {
     }
 
     private func cleanUpInvalidDrillTagsIfNeeded() {
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return }
         if runRecord.framboiseTags.contains("prescribedDrill") && prescribedDrillName == nil {
             runRecord.framboiseTags.removeAll { tag in
                 tag == "prescribedDrill" || tag.hasPrefix("drill:")
@@ -1510,7 +1513,8 @@ struct RunListRowView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
 
     private var prescribedDrillName: String? {
-        runRecord.prescribedDrillName
+        guard !runRecord.isDeleted, runRecord.modelContext != nil else { return nil }
+        return runRecord.prescribedDrillName
     }
 
     var body: some View {

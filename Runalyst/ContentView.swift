@@ -160,16 +160,18 @@ struct ContentView: View {
 
             let engine = FramboiseEngine()
 
-            var priorRunData: [HealthKitManager.RunBaselineData] = currentExistingRuns.map {
-                HealthKitManager.RunBaselineData(
-                    date: $0.date,
-                    pace: $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace,
-                    hr: $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate,
-                    cadence: $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence,
-                    duration: $0.duration,
-                    isPrescribedDrill: $0.framboiseTags.contains("prescribedDrill")
-                )
-            }
+            var priorRunData: [HealthKitManager.RunBaselineData] = currentExistingRuns
+                .filter { !$0.isDeleted && $0.modelContext != nil }
+                .map {
+                    HealthKitManager.RunBaselineData(
+                        date: $0.date,
+                        pace: $0.workingAvgPace > 0 ? $0.workingAvgPace : $0.rawAvgPace,
+                        hr: $0.workingAvgHeartRate > 0 ? $0.workingAvgHeartRate : $0.rawAvgHeartRate,
+                        cadence: $0.workingAvgCadence > 0 ? $0.workingAvgCadence : $0.rawAvgCadence,
+                        duration: $0.duration,
+                        isPrescribedDrill: $0.framboiseTags.contains("prescribedDrill")
+                    )
+                }
 
             // 3. Extract and insert new runs incrementally (newest first)
             let sortedNewWorkouts = newWorkouts.sorted { $0.startDate > $1.startDate }
