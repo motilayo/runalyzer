@@ -24,14 +24,14 @@ Investigation identified five interrelated structural failures across `Framboise
    In progressive interval workouts or workouts with an easy warm-up, early intervals are run at lower cadences (e.g. 158–162 SPM) than later intervals (e.g. 172–175 SPM). Because the global average is dragged up by the late-run efforts, early surges hover near or below the global mean, causing zero-crossing segmentation to fragment or miss the early work intervals.
 
 2. **Active Recovery & Cardiac Lag Corroboration Rigidities**:
-   Corroboration required $\ge 2$ of:
-   - Cadence delta $\ge 8.0$ SPM
-   - Pace delta $\ge 15.0$ sec/km
-   - HR delta $\ge 5.0$ BPM
+   Corroboration required >= 2 of:
+   - Cadence delta >= 8.0 SPM
+   - Pace delta >= 15.0 sec/km
+   - HR delta >= 5.0 BPM
    In workouts where runners pace intervals primarily via stride length (e.g. 0.85m to 1.1m) and perform active recovery jogs (rather than walking or standing still), cadence only increases by 5–7 SPM and heart rate only dips 2–4 BPM due to excess post-exercise oxygen consumption (EPOC). Despite a massive 90–135 sec/km pace difference, both cadence (< 8) and HR (< 5) failed, causing true intervals to be discarded.
 
 3. **Terminal Interval Recovery Pairing Deadlock**:
-   When a workout ends immediately upon completing the final interval (e.g. 3 work intervals separated by 2 recoveries), the final work interval has no succeeding recovery phase (`index + 1 >= phases.count`). If the preceding recovery was already claimed by the prior cycle, the final interval could not pair with any recovery, capping total cycles at 2 ($< 3$).
+   When a workout ends immediately upon completing the final interval (e.g. 3 work intervals separated by 2 recoveries), the final work interval has no succeeding recovery phase (`index + 1 >= phases.count`). If the preceding recovery was already claimed by the prior cycle, the final interval could not pair with any recovery, capping total cycles at 2 (< 3).
 
 4. **Progressive Intervals Trapping in Quintile Progression**:
    When intervals progress in speed (e.g. Warmup ~7:30/km -> Rep 1 ~5:30/km -> Rep 2 ~5:15/km -> Rep 3 ~5:05/km), averaging across five time quintiles produces monotonic pace acceleration (Q1 > Q2 > Q3 > Q4 > Q5), satisfying `evaluateQuintileProgression`. Without checking pace variance (`cv < 0.09`), intermittent workouts masquerade as smooth continuous progression runs.
@@ -46,16 +46,16 @@ Investigation identified five interrelated structural failures across `Framboise
 ## Decision Drivers
 
 1. **Adaptive Baseline Segmentation**: Interval detection must account for warm-up drift without depending on a single static session-wide threshold.
-2. **Physiological Corroboration Realism**: Corroboration must reflect active recovery kinematics and cardiac lag, recognizing dominant pace surges ($\ge 30$ s/km).
+2. **Physiological Corroboration Realism**: Corroboration must reflect active recovery kinematics and cardiac lag, recognizing dominant pace surges (>= 30 s/km).
 3. **Terminal Interval Preservation**: Workouts terminating on the final work interval must be capable of completing cycle corroboration against the preceding recovery.
 4. **Variance-Gated Progression**: "Progression Run" must require true continuous pace progression with low pace variance (`cv < 0.09`), preventing intermittent workouts from qualifying.
-5. **Topological Ground Truth Dominance**: When topological cycle detection validates $\ge 3$ corroborated intermittent cycles, no continuous classification label from CoreML or heuristics may supersede it.
+5. **Topological Ground Truth Dominance**: When topological cycle detection validates >= 3 corroborated intermittent cycles, no continuous classification label from CoreML or heuristics may supersede it.
 
 ## Decision Outcome
 
 Chosen solution incorporates:
 1. **Rolling Local Baseline Segmentation**: Segments candidate phases using a rolling local window in `extractOscillationCycles`.
-2. **Calibrated Multi-Signal & Dominant Pace Corroboration**: Cadence threshold calibrated to $\ge 5.0$ SPM, HR threshold to $\ge 3.0$ BPM, and dominant pace surges ($\ge 30.0$ s/km with biometric support or $\ge 45.0$ s/km) validated.
+2. **Calibrated Multi-Signal & Dominant Pace Corroboration**: Cadence threshold calibrated to >= 5.0 SPM, HR threshold to >= 3.0 BPM, and dominant pace surges (>= 30.0 s/km with biometric support or >= 45.0 s/km) validated.
 3. **Terminal Rep Pairing**: Allows terminal work intervals to evaluate against the immediate preceding recovery interval.
 4. **Variance-Guarded Progression**: Progression classification requires `cv < 0.09` in addition to monotonic quintile acceleration, preventing interval sessions from misclassifying.
 5. **Universal Structural Gate**: `ModelManager.swift` overrides any continuous prediction with `Intervals` or `Fartlek` whenever `cycles.count >= 3`.
@@ -68,7 +68,7 @@ Chosen solution incorporates:
 
 ### Negative Consequences / Tradeoffs
 
-* **Stricter Progression Criteria**: Workouts with a very mild pace drift without true quintile progression will correctly fall into "Steady Effort" rather than "Progression Run". Even with the relaxed $\ge 3$ transitions, some marginal progression runs may be lost compared to the overly-permissive `slope < -0.225` heuristic.
+* **Stricter Progression Criteria**: Workouts with a very mild pace drift without true quintile progression will correctly fall into "Steady Effort" rather than "Progression Run". Even with the relaxed >= 3 transitions, some marginal progression runs may be lost compared to the overly-permissive `slope < -0.225` heuristic.
 * **Algorithm Complexity**: Using a rolling local baseline requires a slightly more complex sliding window pass compared to computing a single global arithmetic mean.
 * **Regression Risk**: Changing the fundamental phase segmentation algorithm risks altering cycle counts on previously correctly classified runs. Extensive regression testing must be applied to `Steady Effort` and `Fartlek` test cases to ensure the local baseline doesn't introduce phantom cycles.
 
