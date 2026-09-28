@@ -1,33 +1,34 @@
-# Runalyst v2.2.0 — Stride Biomechanics & Dual-Scope Sync Lifecycle 🏃‍♂️⚡
+# Runalyst v2.2.1 — Interval Corroboration Calibration & Tactical Fatigue Readiness 🏃‍♂️🎯
 
-Runalyst 2.2 brings deep biomechanical stride analysis and an overhauled dual-scope synchronization architecture to on-device running intelligence. With native Apple Watch stride length telemetry, dynamic overstriding detection, and isolated single-run refresh lifecycles, Runalyst delivers faster, safer, and more nuanced AI coaching than ever before.
+Runalyst 2.2.1 is a targeted patch release that refines continuous topological interval recognition, safeguards progressive interval sessions against false continuous classification, and introduces a calibrated three-tier fatigue readiness architecture to the AI Tactical Coach.
 
 ---
 
-### 🌟 What's New in v2.2.0
+### 🌟 What's New in v2.2.1
 
-#### 1. 📏 Biomechanical Stride Length Analytics & Overstriding Detection (ADR-0004)
-- **Native Stride Length Telemetry**: Extracted directly from Apple Watch `HKQuantityTypeIdentifier.runningStrideLength` with seamless metric (meters) and imperial (feet/inches) formatting.
-- **Dynamic Overstriding & Vertical Ratio**: Calculates running stride ratio (vertical oscillation / stride length) to identify bounding, excessive ground impact, and kinetic energy loss.
-- **Cadence–Stride Dynamic Interplay**: Evaluates how cadence interacts with stride length across paces, distinguishing rhythm stability from overstriding-induced fatigue.
-- **AI Coaching Engine Integration**: FoundationModels coaching engine enhanced to synthesize stride length observations, form cues, and tailored drills (Cadence Pyramids, Strides, Rhythm Intervals).
-- **8-Card Biomechanical Grid**: Upgraded workout detail metrics to an 8-card responsive layout displaying Average Pace, Cadence, Vertical Oscillation, Ground Contact Time, Stride Length, Heart Rate, Elevation, and Aerobic Efficiency.
+#### 1. ⏱️ Topological Interval Corroboration & Terminal Rep Pairing (ADR-0006)
+- **Calibrated Multi-Signal Corroboration**: Calibrated active recovery surge validation thresholds (`cadenceDiff >= 5.0` SPM, `hrDiff >= 3.0` BPM) to accommodate cardiac lag, EPOC, and active recovery kinematics without rejecting valid intervals.
+- **Dominant Pace Surge Validation**: Added direct recognition for prominent pace surges (`paceDiff >= 30.0` s/km with biometric backing, or `paceDiff >= 45.0` s/km) to capture interval efforts driven primarily by stride extension rather than cadence alone.
+- **Terminal Rep Pairing**: Workouts terminating on a final hard interval without a subsequent recovery jog now reliably pair with the preceding recovery phase to validate completion of the final cycle.
+- **Progression Pace Variance Guardrail**: Added a pace coefficient of variation guardrail (`cv < 0.09`) to continuous progression detection, preventing high-variance, fast-finishing interval workouts from misclassifying as "Progression Run".
+- **SwiftData Fault Safety**: Reinforced detached model context access with safe state checking in `RunRecord`.
 
-#### 2. 🔄 Dual-Scope Refresh & HealthKit Sync Lifecycle (ADR-0005)
-- **Decoupled Refresh Scopes**: Architecturally separates global macro-sync from single-run micro-refresh, eliminating expensive historical database re-scans when inspecting a single run.
-- **Micro-Scope Run Detail Refresh**: Pull-to-refresh on `RunDetailView` re-queries the authentic `HKWorkout`, updates SwiftData in-place, and re-analyzes coaching insights without locking or resetting other runs.
-- **User Correction Preservation**: Micro-refresh strictly preserves user manual classification corrections (`TrainingCorrection`) and custom drill links (`userLinkedDrill` / `userUnlinkedDrill`).
-- **Macro-Scope Dashboard Pull-to-Refresh**: Re-queries global VO2 Max, recalculates 30-day baseline biometrics, invalidates temporal headline caches, and triggers macro readiness coaching.
-- **Task Safety & Cancellation Handling**: Gracefully handles pull-to-refresh cancellation during SwiftUI view re-renders, preventing duplicate concurrent background tasks.
+#### 2. 🛡️ Three-Tier Tactical Fatigue Readiness & Personalized Baseline Cadence
+- **Calibrated Three-Tier Fatigue Architecture**:
+  - **Tier 1 (Critical Fatigue / Acute Overload)**: Triggered strictly upon genuine physiological overreaching (3+ heavy workouts in 7 days or back-to-back workouts within 36 hours with verified turnover decay or cardiac drift), prescribing full rest.
+  - **Tier 2 (Moderate / Productive Fatigue)**: Identifies standard quality training load (2 heavy workouts, mild turnover decay, or high acute density) and prescribes Zone 2 active aerobic recovery rather than alarmist rest warnings.
+  - **Tier 3 (High Readiness)**: Confirms balanced training density and stable biomechanics, priming the athlete for scheduled quality sessions.
+- **Personalized Rolling Baseline Cadence**: Prioritizes the runner's authentic 30-day duration-weighted cadence, falling back to 7-day historical windows, preventing arbitrary 160 SPM baseline penalties for natural 152–158 SPM runners.
+- **Accurate Telemetry Directives**: Informs the FoundationModels prompt whether turnover declined (`cadenceDelta >= 3.5` SPM) or remained stable during high training density.
 
 ---
 
 ### 🛠️ Technical Improvements & Architecture
-- **Expanded Test Suite**: Test coverage broadened from 95 to 101 automated unit and integration tests across 5 specialized test domains (`RunalystTests`) with 100% pass rate.
-- **New Unit & Integration Tests**: Added rigorous test suites for stride length conversions, schema persistence, vertical ratio math, and dual-scope sync lifecycle execution in `HealthKitManagerTests`, `FramboiseEngineTests`, and `RunRecordModelAndSchemaTests`.
+- **Expanded Test Suite**: Test coverage broadened from 101 to 112 automated unit and integration tests across 5 specialized test domains (`RunalystTests`) with 100% pass rate.
+- **New Unit Tests**: Added regression coverage for 3-rep terminal interval workouts, pace CV variance guardrails, and tactical coach fatigue tier evaluation.
 - **Strict SwiftLint Quality Gate**: 100% compliance across all 48 Swift source files with zero violations under `--strict`.
-- **Architectural Standards Enforced**: Codified ADR-0004 and ADR-0005 guidelines directly into `AGENTS.md` and updated ADR indices.
+- **Architectural Documentation**: Standardized design decision codified in `docs/adr/0006-multi-signal-topological-interval-segmentation-and-progression-guardrails.md`.
 
 ---
 
-**Full Changelog**: https://github.com/motilayo/runalyzer/compare/v2.1.0...v2.2.0
+**Full Changelog**: https://github.com/motilayo/runalyzer/compare/v2.2.0...v2.2.1
