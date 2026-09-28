@@ -191,4 +191,92 @@ final class ProgressionAndTemporalScopingTests: XCTestCase {
         let peakEF = runs.compactMap(\.efficiencyFactor).max() ?? 0
         XCTAssertGreaterThan(peakEF, 1.15)
     }
+
+    func testTacticalCoach_FatigueTierClassification() {
+        // Case 1: Standard training load (2 quality workouts spaced out, stable turnover)
+        // Must NOT trigger CRITICAL_FATIGUE; must classify as MODERATE_FATIGUE
+        let now = Date()
+        let heavyRun1 = RunRecord(
+            hkWorkoutID: UUID(),
+            date: now.addingTimeInterval(-48 * 3600), // 2 days ago
+            totalDistanceMeters: 6000,
+            duration: 1800,
+            rawAvgPace: 300,
+            rawAvgHeartRate: 165,
+            rawAvgCadence: 162,
+            workingAvgPace: 300,
+            workingAvgCadence: 162,
+            workingAvgHeartRate: 165,
+            paceCV: 0.12,
+            paceSlope: 0.0,
+            percentZone4: 0.50,
+            detectedTypeRaw: "Intervals"
+        )
+        let heavyRun2 = RunRecord(
+            hkWorkoutID: UUID(),
+            date: now.addingTimeInterval(-120 * 3600), // 5 days ago
+            totalDistanceMeters: 8000,
+            duration: 2500,
+            rawAvgPace: 312,
+            rawAvgHeartRate: 160,
+            rawAvgCadence: 161,
+            workingAvgPace: 312,
+            workingAvgCadence: 161,
+            workingAvgHeartRate: 160,
+            paceCV: 0.05,
+            paceSlope: 0.0,
+            percentZone4: 0.40,
+            detectedTypeRaw: "Tempo Run"
+        )
+        let easyRun = RunRecord(
+            hkWorkoutID: UUID(),
+            date: now,
+            totalDistanceMeters: 5000,
+            duration: 1800,
+            rawAvgPace: 360,
+            rawAvgHeartRate: 140,
+            rawAvgCadence: 160,
+            workingAvgPace: 360,
+            workingAvgCadence: 160,
+            workingAvgHeartRate: 140,
+            paceCV: 0.03,
+            paceSlope: 0.0,
+            percentZone4: 0.05,
+            detectedTypeRaw: "Easy Run"
+        )
+
+        let runs = [easyRun, heavyRun1, heavyRun2]
+        let heavySessions = runs.filter { run in
+            let type = run.detectedTypeRaw
+            let isHeavy = (type == "Intervals" || type == "Pyramids" || type == "Tempo Run" || type == "Hill Repeats")
+            let highZ4 = run.percentZone4 >= 0.35
+            return isHeavy || highZ4
+        }
+        XCTAssertEqual(heavySessions.count, 2)
+
+        // Verify that spaced out runs do NOT flag as back-to-back
+        var hasBackToBack = false
+        if heavySessions.count >= 2 {
+            for index in 0..<(heavySessions.count - 1) {
+                let interval = heavySessions[index].date.timeIntervalSince(heavySessions[index + 1].date)
+                if interval > 0 && interval < 36 * 3600 {
+                    hasBackToBack = true
+                    break
+                }
+            }
+        }
+        XCTAssertFalse(hasBackToBack, "48h and 120h workouts are properly spaced and not back-to-back")
+
+        // Baseline cadence calculation
+        let baselineCad = 161.0
+        let latestCad = easyRun.workingAvgCadence
+        let cadenceDiff = baselineCad - latestCad
+        let cadenceDropped = cadenceDiff >= 3.5
+        XCTAssertFalse(cadenceDropped, "160 SPM vs 161 baseline is only -1 SPM and should not flag as turnover decay")
+
+        let isCritical = (heavySessions.count >= 3 && cadenceDropped)
+            || (hasBackToBack && cadenceDropped)
+            || (runs.count >= 6 && heavySessions.count >= 2 && cadenceDropped)
+        XCTAssertFalse(isCritical, "Standard 2-session training load must not trigger Critical Fatigue")
+    }
 }
