@@ -14,17 +14,19 @@ Meets all [Apple App Store Preview Specifications](https://developer.apple.com/a
 * **Audio Track:** AAC 44.1 kHz Stereo (required by App Store Connect validator)
 * **Content:** Real on-device application walkthrough (Dashboard -> Run Details & AI Analysis -> Pre-Run Drills Library -> Cadence Progression)
 
-### Deliverables:
-1. **`Runalyst_AppPreview_1290x2796.mp4`** (1.5 MB)
-   * Target: iPhone 6.9" & 6.7" Super Retina Displays (iPhone 16 Pro Max, 15 Pro Max, 14 Pro Max)
-2. **`Runalyst_AppPreview_886x1920.mp4`** (1.1 MB)
-   * Target: Universal tall aspect ratio accepted across all modern iPhones
-3. **`Runalyst_AppPreview_iPad_1200x1600.mp4`** (1.1 MB)
-   * Target: iPad Standard Scaled Preview (`1200 × 1600 px`) for iPad 12.9" and 13" displays
+### Primary Deliverables for App Store Connect:
+1. **`Runalyst_AppPreview_886x1920.mp4`** (1.7 MB)
+   * **Target:** iPhone App Preview slot (`886 × 1920 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+2. **`Runalyst_AppPreview_iPad_1200x1600.mp4`** (1.5 MB)
+   * **Target:** iPad App Preview slot (`1200 × 1600 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+
+### Alternative Native Full-Resolution Previews:
+3. **`Runalyst_AppPreview_1290x2796.mp4`** (1.5 MB)
+   * Target: iPhone 6.9" & 6.7" Super Retina Displays (`1290 × 2796 px`)
 4. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (1.9 MB)
-   * Target: iPad 12.9" Display slot in App Store Connect (`2048 × 2732 px`)
+   * Target: iPad 12.9" Pro Display slot (`2048 × 2732 px`)
 5. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (1.9 MB)
-   * Target: iPad 13" Display slot in App Store Connect (`2064 × 2752 px`)
+   * Target: iPad 13" Pro Display slot (`2064 × 2752 px`)
 
 ---
 
