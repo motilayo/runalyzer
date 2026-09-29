@@ -70,6 +70,21 @@ Ready for direct App Store Connect product page upload:
 
 ---
 
+## 4. iPad App Store Presentation Screenshot Carousel (12.9" & 13")
+Location:
+* `Media/Screenshots/iPad_2048x2732/` (Standard 12.9" iPad Pro specification: **2048 × 2732 px**)
+* `Media/Screenshots/iPad_2064x2752/` (13" iPad Pro M4 specification: **2064 × 2752 px**)
+
+Features high-resolution tablet presentation cards framing the app UI with category badges, bold typography, and ambient lighting. Ready for direct upload to the App Store Connect iPad 12.9" / 13" display slots:
+1. `01_Intelligent_Biometrics.png`
+2. `02_AI_Coaching.png`
+3. `03_Targeted_Drills.png`
+4. `04_Longitudinal_Progression.png`
+5. `05_HealthKit_Privacy.png`
+
+---
+
 ## Automation Scripts
-* `generate_app_store_screenshots.py` — Re-renders all screenshot presentation cards with custom fonts, device frames, and ambient lighting.
+* `generate_app_store_screenshots.py` — Renders iPhone screenshot presentation cards (1284×2778 and 1242×2688).
+* `generate_ipad_screenshots.py` — Renders iPad screenshot presentation cards (2048×2732 and 2064×2752).
 * `generate_promo_video.py` — Renders motion frames and compiles both 9:16 vertical and 16:9 landscape marketing videos without audio.
