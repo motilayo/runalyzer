@@ -113,10 +113,10 @@ struct AggregateRunDataForAI: Sendable {
 @available(iOS 26.0, *)
 @Generable
 struct DashboardFatigueInsight {
-    @Guide(description: "Constrain strictly to a 2–4 word title. Use a positive or descriptive tone.")
+    @Guide(description: "Constrain strictly to a 2–4 word title capturing the primary coaching takeaway (e.g. 'Ready For Speed', 'Active Recovery Needed', 'On Track For Goal', 'Time To Step Up').")
     var headline: String
 
-    @Guide(description: "Write exactly 1 to 2 short sentences translating physiological data into relatable, everyday language. Frame feedback positively. Zero numbers.")
+    @Guide(description: "Write 1 to 4 flowing, natural sentences in plain English like an experienced personal running coach speaking directly to the runner. Follow the directive and connect to their stated goal. Zero numbers.")
     var body: String
 }
 
@@ -293,22 +293,24 @@ class CoachingEngine {
 
         if timeFrame == "7 Days" {
             instructions = """
-            persona: tactical_running_coach
+            persona: personal_running_coach
             rules:
-            - Protective and actionable running coach speaking directly to athlete ("you").
-            - Focus strictly on immediate physical strain, cardiac drift, and short-term recovery needs.
-            - Distinguish between moderate productive fatigue (advise light Zone 2 recovery) and critical fatigue (advise full rest day).
-            - Strictly follow the DIRECTIVE recommendation and tone.
-            - Strict Length: maximum of 2 short sentences.
+            - You are an experienced, trusted personal running coach speaking directly to the runner ("you").
+            - Write in natural, flowing, plain English. Avoid robotic phrasing, dramatic metaphors, or philosophical lecturing.
+            - Purpose: Guide the runner on what kind of run or session to do next, and what to focus on improving next.
+            - Advise what type of run to do next (e.g. easy recovery jog, rest day, tempo run, long run, or intervals).
+            - Give them a clear focus to work on improving (e.g. bringing heart rate down, quickening cadence turnover, maintaining a steady pace, or building duration).
+            - strictly_follow_the_DIRECTIVE_for_tone_and_drill_selection.
+            - Strict Length: exactly 1 to 4 flowing sentences.
             - Zero Numbers: no specific metrics, target paces, BPM numbers, or times.
-            - respond_entirely_in_\(language), plain and simple.
+            - Respond entirely in \(language).
             """
 
             promptTemplate = """
-            Evaluate tactical readiness and acute recovery for this runner.
+            Coach this runner on what session to do next and what to focus on improving, based on their recent 7-day training and stated goal.
             [AGGREGATE_DATA_START]
             GOAL: \(trainingGoal)
-            TIMEFRAME: 7 Days (Tactical Readiness)
+            TIMEFRAME: 7 Days (Immediate Next Run & Focus)
             DIRECTIVE: {{DIRECTIVE_CONTEXT}}
             FATIGUE_TELEMETRY: {{FATIGUE_CONTEXT}}
             CADENCE_TURNOVER: {{CADENCE_CONTEXT}}
@@ -317,24 +319,26 @@ class CoachingEngine {
             [AGGREGATE_DATA_END]
             """
         } else {
-            // 30 Days: The Strategic Analyst
+            // 30 Days: Goal Readiness & Trajectory
             instructions = """
-            persona: strategic_sports_scientist
+            persona: personal_running_coach
             rules:
-            - Analytical and trend-focused sports scientist speaking directly to athlete ("you").
-            - Focus strictly on structural physiological adaptation, aerobic base expansion, and efficiency gains.
-            - Acute fatigue is IRRELEVANT: NEVER mention short-term fatigue, heavy legs, or taking a rest day today.
-            - Strictly follow the DIRECTIVE.
-            - Strict Length: maximum of 2 short sentences.
+            - You are an experienced, trusted personal running coach speaking directly to the runner ("you").
+            - Write in natural, flowing, plain English. Avoid robotic phrasing, dramatic metaphors, or philosophical lecturing.
+            - Purpose: Gauge how close the runner is to their stated goal or how ready they are to chase it based on 30-day performance.
+            - Clearly tell the runner whether they are on track for their goal, need to step it up because they have more to give, or need to ease up because they are overworking and declining.
+            - Connect their 30-day consistency and efficiency directly to their stated goal.
+            - strictly_follow_the_DIRECTIVE_for_tone_and_drill_selection.
+            - Strict Length: exactly 1 to 4 flowing sentences.
             - Zero Numbers: no specific metrics, target paces, BPM numbers, or times.
-            - respond_entirely_in_\(language), plain and simple.
+            - Respond entirely in \(language).
             """
 
             promptTemplate = """
-            Evaluate 30-day physiological adaptation and efficiency for this runner.
+            Evaluate 30-day goal readiness and trajectory for this runner toward their stated goal.
             [AGGREGATE_DATA_START]
             GOAL: \(trainingGoal)
-            TIMEFRAME: 30 Days (Structural Adaptation & Efficiency)
+            TIMEFRAME: 30 Days (Goal Readiness & Trajectory)
             DIRECTIVE: {{DIRECTIVE_CONTEXT}}
             EFFICIENCY_FACTOR: {{EFFICIENCY_CONTEXT}}
             BIOMECHANICS: {{OSCILLATION_CONTEXT}}, {{CADENCE_CONTEXT}}
@@ -372,10 +376,10 @@ class CoachingEngine {
             return insightContent
         } catch {
             logger.error("FoundationModels Generation Error: \(error.localizedDescription)")
-            let fallbackHeadline = (timeFrame == "7 Days") ? String(localized: "Optimal Readiness") : String(localized: "Aerobic Foundation")
+            let fallbackHeadline = (timeFrame == "7 Days") ? String(localized: "Ready for Next Run") : String(localized: "On Track for Goal")
             let fallbackBody = (timeFrame == "7 Days")
-                ? String(localized: "Your recent efforts show balanced strain. Keep your upcoming session controlled in Zone 2.")
-                : String(localized: "Your running economy is stabilizing nicely over the past month. Continue developing your aerobic baseline.")
+                ? String(localized: "Your recent runs show solid consistency. For your next run, focus on keeping your effort controlled and your turnover light.")
+                : String(localized: "Your 30-day training shows steady progression toward your goal. Keep building on this foundation with consistent weekly volume.")
             return DashboardFatigueInsight(
                 headline: fallbackHeadline,
                 body: fallbackBody
@@ -481,13 +485,13 @@ class CoachingEngine {
     func generateDashboardInsight(for timeFrame: String, runData: AggregateRunDataForAI) async throws -> DashboardFatigueInsight {
         if timeFrame == "7 Days" {
             return DashboardFatigueInsight(
-                headline: String(localized: "Optimal Readiness"),
-                body: String(localized: "Your recent efforts show balanced strain. Keep your upcoming session controlled in Zone 2.")
+                headline: String(localized: "Ready for Next Run"),
+                body: String(localized: "Your recent runs show solid consistency. For your next run, focus on keeping your effort controlled and your turnover light.")
             )
         } else if timeFrame == "30 Days" {
             return DashboardFatigueInsight(
-                headline: String(localized: "Aerobic Foundation"),
-                body: String(localized: "Your running economy is stabilizing nicely over the past month. Continue developing your aerobic baseline.")
+                headline: String(localized: "On Track for Goal"),
+                body: String(localized: "Your 30-day training shows steady progression toward your goal. Keep building on this foundation with consistent weekly volume.")
             )
         } else {
             return DashboardFatigueInsight(
