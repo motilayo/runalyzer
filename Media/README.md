@@ -45,22 +45,26 @@ Designed for social launches, landing page hero backgrounds, Product Hunt, and a
 ---
 
 ## 3. App Store Presentation Screenshot Carousel
-Location: `Media/Screenshots/AppStore/`
+Location: `Media/Screenshots/AppStore/` (and `Media/Screenshots/AppStore_1242x2688/`)
 
-High-resolution framed device cards (**1290 × 2796**) ready for App Store Connect product page upload:
-1. **`01_Intelligent_Biometrics.png`** (551 KB)
+Meets Apple App Store Connect specifications for 6.7" and 6.5" displays:
+* Primary Target (**1284 × 2778**): `Media/Screenshots/AppStore/`
+* Alternative Target (**1242 × 2688**): `Media/Screenshots/AppStore_1242x2688/`
+
+Ready for direct App Store Connect product page upload:
+1. **`01_Intelligent_Biometrics.png`**
    * Headline: *Intelligent Running Biometrics*
    * Subtitle: *Live cadence deltas & 30-day relative baselines*
-2. **`02_AI_Coaching.png`** (573 KB)
+2. **`02_AI_Coaching.png`**
    * Headline: *On-Device AI Coaching*
    * Subtitle: *Apple FoundationModels guidance tailored to fatigue*
-3. **`03_Targeted_Drills.png`** (496 KB)
+3. **`03_Targeted_Drills.png`**
    * Headline: *Targeted Form Drills*
    * Subtitle: *Prescriptive cadence pyramids & active recovery*
-4. **`04_Longitudinal_Progression.png`** (393 KB)
+4. **`04_Longitudinal_Progression.png`**
    * Headline: *Longitudinal Progression*
    * Subtitle: *Track efficiency factor gains and cadence over time*
-5. **`05_HealthKit_Privacy.png`** (456 KB)
+5. **`05_HealthKit_Privacy.png`**
    * Headline: *100% Private & HealthKit-Native*
    * Subtitle: *Zero cloud tracking. Seamless Apple Watch sync.*
 

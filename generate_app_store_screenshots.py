@@ -4,8 +4,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 OUTPUT_DIR = "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-WIDTH = 1290
-HEIGHT = 2796
+# Target App Store Connect Specifications:
+# 6.7" / 6.5" Display: 1284 x 2778 (or 1242 x 2688)
+WIDTH = 1284
+HEIGHT = 2778
 
 # Load fonts
 FONT_HEAD_BOLD = "/System/Library/Fonts/SFNS.ttf"
