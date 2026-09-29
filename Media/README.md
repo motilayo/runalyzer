@@ -17,10 +17,8 @@ Meets all [Apple App Store Preview Specifications](https://developer.apple.com/a
 ### Deliverables:
 1. **`Runalyst_AppPreview_1290x2796.mp4`** (2.4 MB)
    * Target: iPhone 6.9" & 6.7" Super Retina Displays (iPhone 16 Pro Max, 15 Pro Max, 14 Pro Max)
-2. **`Runalyst_AppPreview_886x1920.mp4`** (1.6 MB)
+2. **`Runalyst_AppPreview_886x1920.mp4`** (1.7 MB)
    * Target: Universal tall aspect ratio accepted across all modern iPhones
-3. **`raw_tour.mp4`** (9.9 MB)
-   * Uncompressed capture straight from the simulator display
 
 ---
 
@@ -37,9 +35,9 @@ Designed for social launches, landing page hero backgrounds, Product Hunt, and a
   * *100% Private & HealthKit-Native*
 
 ### Deliverables:
-1. **`Runalyst_Promo_9x16.mp4`** (1080 × 1920, 4.4 MB)
+1. **`Runalyst_Promo_9x16.mp4`** (1080 × 1920, 5.8 MB)
    * Target: Instagram Reels, TikTok, YouTube Shorts, Apple Search Ads
-2. **`Runalyst_Promo_16x9.mp4`** (1920 × 1080, 2.8 MB)
+2. **`Runalyst_Promo_16x9.mp4`** (1920 × 1080, 4.1 MB)
    * Target: Twitter/X, Product Hunt, YouTube Landscape, Website Hero
 
 ---
