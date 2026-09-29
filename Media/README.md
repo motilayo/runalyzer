@@ -15,10 +15,14 @@ Meets all [Apple App Store Preview Specifications](https://developer.apple.com/a
 * **Content:** Real on-device application walkthrough (Dashboard -> Run Details & AI Analysis -> Pre-Run Drills Library -> Cadence Progression)
 
 ### Deliverables:
-1. **`Runalyst_AppPreview_1290x2796.mp4`** (2.4 MB)
+1. **`Runalyst_AppPreview_1290x2796.mp4`** (1.5 MB)
    * Target: iPhone 6.9" & 6.7" Super Retina Displays (iPhone 16 Pro Max, 15 Pro Max, 14 Pro Max)
-2. **`Runalyst_AppPreview_886x1920.mp4`** (1.7 MB)
+2. **`Runalyst_AppPreview_886x1920.mp4`** (1.1 MB)
    * Target: Universal tall aspect ratio accepted across all modern iPhones
+3. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (1.9 MB)
+   * Target: iPad 12.9" Display slot in App Store Connect
+4. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (1.9 MB)
+   * Target: iPad 13" Display slot in App Store Connect
 
 ---
 
