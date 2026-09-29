@@ -11,6 +11,8 @@ This directory documents key architectural decisions made in the Runalyst projec
 | [0003](0003-topological-signature-classification-for-run-types.md) | [Topological Signature Classification for Run Types](0003-topological-signature-classification-for-run-types.md) | Accepted | 2026-09-24 |
 | [0004](0004-stride-length-biomechanical-analysis.md) | [Incorporating Stride Length into Biomechanical Analysis and Coaching](0004-stride-length-biomechanical-analysis.md) | Accepted | 2026-09-24 |
 | [0005](0005-dual-scope-refresh-and-healthkit-sync-lifecycle.md) | [Dual-Scope Refresh and HealthKit Synchronization Lifecycle](0005-dual-scope-refresh-and-healthkit-sync-lifecycle.md) | Accepted | 2026-09-24 |
+| [0006](0006-multi-signal-topological-interval-segmentation-and-progression-guardrails.md) | [Multi-Signal Topological Interval Segmentation and Progression Guardrails](0006-multi-signal-topological-interval-segmentation-and-progression-guardrails.md) | Accepted | 2026-09-28 |
+| [0007](0007-golden-telemetry-fixtures-and-biomechanical-test-veracity.md) | [Golden Telemetry Fixtures and Biomechanical Test Veracity](0007-golden-telemetry-fixtures-and-biomechanical-test-veracity.md) | Accepted | 2026-09-28 |
 
 ---
 

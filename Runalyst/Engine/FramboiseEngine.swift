@@ -271,7 +271,7 @@ actor FramboiseEngine {
         var currentBuckets: [BucketData] = []
 
         for index in 0..<buckets.count {
-            let windowSize = 10
+            let windowSize = 20
             let windowStart = max(0, index - windowSize / 2)
             let windowEnd = min(buckets.count - 1, index + windowSize / 2)
             let window = buckets[windowStart...windowEnd]
@@ -295,6 +295,28 @@ actor FramboiseEngine {
             phases.append(CandidatePhase(isSurge: currentIsSurge, duration: dur, buckets: currentBuckets))
         }
 
+        // Debounce: Merge brief glitch phases (< 20 seconds) into surrounding contiguous phase of the same type
+        var debouncedPhases: [CandidatePhase] = []
+        for phase in phases {
+            if let last = debouncedPhases.last, last.isSurge == phase.isSurge {
+                debouncedPhases[debouncedPhases.count - 1].buckets.append(contentsOf: phase.buckets)
+                debouncedPhases[debouncedPhases.count - 1].duration += phase.duration
+            } else if debouncedPhases.count >= 2,
+                      phase.isSurge,
+                      let prev = debouncedPhases.last,
+                      !prev.isSurge,
+                      prev.duration < 20.0,
+                      debouncedPhases[debouncedPhases.count - 2].isSurge {
+                let glitch = debouncedPhases.removeLast()
+                debouncedPhases[debouncedPhases.count - 1].buckets.append(contentsOf: glitch.buckets)
+                debouncedPhases[debouncedPhases.count - 1].buckets.append(contentsOf: phase.buckets)
+                debouncedPhases[debouncedPhases.count - 1].duration += (glitch.duration + phase.duration)
+            } else {
+                debouncedPhases.append(phase)
+            }
+        }
+        phases = debouncedPhases
+
         var cycles: [SurgeRecoveryCycle] = []
         var usedRecoveryIndices: Set<Int> = []
 
@@ -302,12 +324,16 @@ actor FramboiseEngine {
             let surge = phases[index]
 
             var recoveryIndex: Int?
-            if index + 1 < phases.count && !phases[index + 1].isSurge && !usedRecoveryIndices.contains(index + 1) {
+            if index + 1 < phases.count,
+               !phases[index + 1].isSurge,
+               !usedRecoveryIndices.contains(index + 1),
+               phases[index + 1].duration >= 20.0,
+               phases[index + 1].avgPace > surge.avgPace + 5.0 {
                 recoveryIndex = index + 1
             } else if index > 0 && !phases[index - 1].isSurge && !usedRecoveryIndices.contains(index - 1) {
                 recoveryIndex = index - 1
             } else if index > 0 && !phases[index - 1].isSurge {
-                // Terminal surge fallback: If the workout ends after the final surge (index + 1 >= phases.count),
+                // Terminal surge fallback: If no valid succeeding recovery exists,
                 // allow pairing with the immediate preceding recovery interval even if already used.
                 recoveryIndex = index - 1
             }
@@ -337,7 +363,12 @@ actor FramboiseEngine {
             // (>= 3 SPM cadence increase or >= 2 BPM HR increase), or >= 45 s/km sheer pace differential.
             let isDominantPaceSurge = (paceDiff >= 30.0 && (cadenceDiff >= 3.0 || hrDiff >= 2.0)) || (paceDiff >= 45.0)
 
-            if corroborationScore >= 2 || isDominantPaceSurge {
+            // Valid interval cycle requires either:
+            // 1. Dominant pace surge (>= 30-45 s/km)
+            // 2. Corroborated biometric & velocity surge (corroborationScore >= 2 AND work is faster than recovery: paceDiff >= 5.0 s/km)
+            let isCorroboratedCycle = (corroborationScore >= 2 && paceDiff >= 5.0) || isDominantPaceSurge
+
+            if isCorroboratedCycle {
                 usedRecoveryIndices.insert(recIdx)
                 cycles.append(SurgeRecoveryCycle(
                     workDuration: surge.duration,
@@ -422,12 +453,18 @@ actor FramboiseEngine {
         hrDelta: Double? = nil,
         cycles: [SurgeRecoveryCycle]? = nil
     ) -> String {
-        // LAYER 1: Structural Gate (Intermittent vs. Continuous)
+        // LAYER 1: Continuous Monotonic Progression (Strict low-variance progressive acceleration)
+        let isProgression = durationMinutes >= 20.0 && cv < 0.09 && evaluateQuintileProgression(buckets: buckets)
+        if isProgression {
+            return "Progression Run"
+        }
+
+        // LAYER 2: Structural Gate (Intermittent vs. Continuous)
         let cycles = cycles ?? extractOscillationCycles(buckets: buckets)
         let isIntermittent = cycles.count >= 3
         let regularityScore = isIntermittent ? calculateCycleRegularity(cycles: cycles) : 0.0
 
-        // LAYER 2: Intermittent Sub-Classification (Intervals vs. Fartlek)
+        // LAYER 3: Intermittent Sub-Classification (Intervals vs. Fartlek)
         if isIntermittent {
             if regularityScore >= 0.65 {
                 return "Intervals"
@@ -436,12 +473,7 @@ actor FramboiseEngine {
             }
         }
 
-        // LAYER 3: Continuous Structural Archetypes (Trend Morphology & Volume)
-        let isProgression = durationMinutes >= 20.0 && cv < 0.09 && evaluateQuintileProgression(buckets: buckets)
-        if isProgression {
-            return "Progression Run"
-        }
-
+        // LAYER 4: Continuous Structural Archetypes (Volume & Fatigue)
         if durationMinutes >= 68.0 && slope > -0.20 && zone4 < 0.45 {
             return "Long Run"
         }
