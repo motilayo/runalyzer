@@ -242,8 +242,9 @@ struct RunDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: 20) {
                 // Formatted run date header
                 HStack {
                     Text(formattedRunDate)
@@ -507,6 +508,7 @@ struct RunDetailView: View {
                     )
                 }
                 .padding(.horizontal)
+                .id("metricsGrid")
 
                 // MARK: Drills Section
                 let isOlderThan7Days = (Calendar.current.dateComponents([.day], from: runRecord.date, to: Date()).day ?? 0) > 7
@@ -653,6 +655,17 @@ struct RunDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             normalizeDrillClassification()
+        }
+        .task {
+            if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == "AUTO_TOUR" {
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_500_000_000)
+                    withAnimation(.easeInOut(duration: 2.2)) {
+                        scrollProxy.scrollTo("metricsGrid", anchor: .top)
+                    }
+                }
+            }
+        }
         }
     }
 

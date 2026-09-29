@@ -22,9 +22,44 @@ struct ContentView: View {
     @State private var syncError: String?
     @State private var showError = false
 
+    private var previewScreen: String? {
+        ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"]
+    }
+
     var body: some View {
         Group {
-            if hasCompletedOnboarding {
+            if let previewScreen {
+                switch previewScreen {
+                case "RUN_DETAIL":
+                    if let run = existingRuns.first {
+                        NavigationStack {
+                            RunDetailView(runRecord: run)
+                        }
+                    } else {
+                        DashboardView(onSync: nil)
+                    }
+                case "DRILLS":
+                    NavigationStack {
+                        DrillsLibraryView()
+                    }
+                case "SETTINGS":
+                    NavigationStack {
+                        SettingsView(onForceSync: nil)
+                    }
+                case "PROGRESSION":
+                    NavigationStack {
+                        ScrollView {
+                            ProgressionChartView(allRuns: existingRuns, defaultHorizon: .allTime)
+                                .padding()
+                        }
+                        .navigationTitle("Cadence Progression")
+                    }
+                case "AUTO_TOUR":
+                    AppStoreTourView(existingRuns: existingRuns)
+                default:
+                    DashboardView(onSync: nil)
+                }
+            } else if hasCompletedOnboarding {
                 DashboardView(onSync: { force in
                     await syncData(force: force)
                 })
@@ -122,6 +157,12 @@ struct ContentView: View {
                         hasCompletedOnboarding = true
                     }
                 )
+            }
+        }
+        .task {
+            if ProcessInfo.processInfo.environment["RUNALYST_FORCE_SEED"] == "true" || (existingRuns.count < 30 && previewScreen != nil) {
+                logger.info("Auto-seeding 38 mock runs for preview/video recording...")
+                HealthKitSeeder.shared.seedDirectToSwiftData(context: modelContext)
             }
         }
     }
@@ -311,6 +352,62 @@ struct ContentView: View {
                 self.showError = true
             }
         }
+    }
+}
+
+struct AppStoreTourView: View {
+    var existingRuns: [RunRecord]
+    @State private var tourStep: Int = 0
+
+    var body: some View {
+        ZStack {
+            switch tourStep {
+            case 0:
+                DashboardView(onSync: nil)
+                    .transition(.opacity)
+            case 1:
+                if let targetRun = runFirstWithMetrics {
+                    NavigationStack {
+                        RunDetailView(runRecord: targetRun)
+                    }
+                    .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+                } else {
+                    DashboardView(onSync: nil)
+                }
+            case 2:
+                NavigationStack {
+                    DrillsLibraryView()
+                }
+                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+            case 3:
+                NavigationStack {
+                    ScrollView {
+                        ProgressionChartView(allRuns: existingRuns, defaultHorizon: .allTime)
+                            .padding()
+                    }
+                    .navigationTitle("Cadence Progression")
+                }
+                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
+            default:
+                DashboardView(onSync: nil)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.6), value: tourStep)
+        .task {
+            // Choreographed 26-second tour for App Store Preview (15-30s Apple requirement)
+            try? await Task.sleep(nanoseconds: 7_000_000_000) // 7s on Dashboard
+            withAnimation { tourStep = 1 }                    // 8s on Run Detail
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            withAnimation { tourStep = 2 }                    // 6s on Drills Library
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            withAnimation { tourStep = 3 }                    // 5s on Cadence Progression
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+        }
+    }
+
+    private var runFirstWithMetrics: RunRecord? {
+        existingRuns.first { ($0.workingAvgCadence ?? 0) > 0 } ?? existingRuns.first
     }
 }
 

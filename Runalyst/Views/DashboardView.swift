@@ -1109,11 +1109,12 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 20) {
-                    filterControlsSection
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    LazyVStack(spacing: 20) {
+                        filterControlsSection
 
-                    if timeRange == "All Time" {
+                        if timeRange == "All Time" {
                         LifetimeMilestonesCard(allRuns: runRecords)
 
                         ProgressionChartView(allRuns: runRecords, defaultHorizon: .allTime)
@@ -1189,6 +1190,7 @@ struct DashboardView: View {
                                     .buttonStyle(.plain)
                                 }
                             }
+                            .id("pastRunsSection")
                         }
                     }
                 }
@@ -1201,6 +1203,14 @@ struct DashboardView: View {
                 RunDetailView(runRecord: runRecord)
             }
             .task {
+                if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == "AUTO_TOUR" {
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_200_000_000)
+                        withAnimation(.easeInOut(duration: 2.2)) {
+                            scrollProxy.scrollTo("pastRunsSection", anchor: .top)
+                        }
+                    }
+                }
                 sanitizeSpuriousDrillTags()
                 do {
                     try await HealthKitManager.shared.requestAuthorization()
@@ -1271,6 +1281,7 @@ struct DashboardView: View {
             }
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(.regularMaterial, for: .navigationBar)
+            }
         }
     }
 }
