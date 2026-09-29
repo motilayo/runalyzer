@@ -19,10 +19,12 @@ Meets all [Apple App Store Preview Specifications](https://developer.apple.com/a
    * Target: iPhone 6.9" & 6.7" Super Retina Displays (iPhone 16 Pro Max, 15 Pro Max, 14 Pro Max)
 2. **`Runalyst_AppPreview_886x1920.mp4`** (1.1 MB)
    * Target: Universal tall aspect ratio accepted across all modern iPhones
-3. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (1.9 MB)
-   * Target: iPad 12.9" Display slot in App Store Connect
-4. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (1.9 MB)
-   * Target: iPad 13" Display slot in App Store Connect
+3. **`Runalyst_AppPreview_iPad_1200x1600.mp4`** (1.1 MB)
+   * Target: iPad Standard Scaled Preview (`1200 × 1600 px`) for iPad 12.9" and 13" displays
+4. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (1.9 MB)
+   * Target: iPad 12.9" Display slot in App Store Connect (`2048 × 2732 px`)
+5. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (1.9 MB)
+   * Target: iPad 13" Display slot in App Store Connect (`2064 × 2752 px`)
 
 ---
 
