@@ -10,6 +10,7 @@ struct DashboardView: View {
 
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @AppStorage("minimumRunDistance") private var minimumRunDistance: Double = 1.0
+    @AppStorage("trainingGoal") private var trainingGoal: String = "Base Building"
 
     @State private var isSyncing: Bool = true
     @State private var selectedFilter: String?
@@ -426,23 +427,22 @@ struct DashboardView: View {
 
             if isCriticalFatigue {
                 let dropText = cadenceDropped ? " with confirmed turnover decay of \(Int(round(cadenceDiff))) SPM" : ""
-                directiveContext = "CRITICAL_FATIGUE: Acute cumulative overload detected (\(heavyCount) hard sessions\(dropText)). PRIORITY: Advise a full rest day or very short gentle recovery walk. Safety and adaptation override race goals."
+                directiveContext = "CRITICAL_FATIGUE: Acute cumulative overload detected (\(heavyCount) hard sessions\(dropText)). PRIORITY: Tell the runner to take a full rest day or very gentle walk next, focusing on bringing fatigue down and resting their legs before their next run toward their \(trainingGoal) goal."
                 fatigueContext = "\(heavyCount) hard sessions; verified turnover decay under high acute density. Full rest recommended."
             } else if isModerateFatigue {
                 let turnoverNote = cadenceDropped
                     ? "Turnover shows mild decay (-3 to -4 SPM) after intense work."
                     : "Cadence turnover remains stable, but acute training density is high."
-                directiveContext = "MODERATE_FATIGUE: Productive training fatigue from recent quality work. \(turnoverNote) PRIORITY: Advise an easy Zone 2 recovery jog or light cross-training to consolidate fitness without overreaching."
+                directiveContext = "MODERATE_FATIGUE: Productive training fatigue from recent quality work. \(turnoverNote) PRIORITY: Tell the runner to do an easy recovery jog or light cross-training next, focusing on keeping their heart rate low and relaxed to consolidate fitness toward their \(trainingGoal) goal."
                 fatigueContext = "Moderate training strain from recent quality sessions. Recommend easy aerobic recovery in Zone 2."
             } else {
-                directiveContext = "HIGH_READINESS: Balanced training load, consistent turnover, and minimal cardiac drift. Athlete is primed for normal quality training."
+                directiveContext = "HIGH_READINESS: Balanced load, fresh legs, and consistent turnover. Athlete is primed for their next key workout. Recommend what kind of run to do next (such as a tempo run, intervals, or steady aerobic run) and what to focus on improving (like quickening cadence turnover, maintaining a steady pace, or building stamina) toward their \(trainingGoal) goal."
                 fatigueContext = "Readiness optimal. No acute cardiac or turnover fatigue."
             }
             efficiencyContext = ""
             verticalOscillationContext = ""
         } else {
-            // 30-DAY VIEW: Strategic Analyst (Adaptation & Efficiency)
-            // Acute fatigue is strictly excluded.
+            // 30-DAY VIEW: Goal Readiness & Trajectory Analyst
             let validRuns = timeRangeRuns.filter { $0.workingAvgPace > 0 && $0.workingAvgHeartRate > 0 }
             let midDate = Calendar.current.date(byAdding: .day, value: -15, to: Date()) ?? Date()
 
@@ -472,13 +472,16 @@ struct DashboardView: View {
             let olderHR = olderRuns.map(\.workingAvgHeartRate).reduce(0, +) / Double(max(1, olderRuns.count))
             let hrDelta = (recentHR > 0 && olderHR > 0) ? (recentHR - olderHR) : 0.0
 
-            if efDelta > 0.02 || hrDelta < -2.0 || oscDelta < -0.2 || vrDelta < -0.3 {
+            if (efDelta <= -0.02 && olderEF.count >= 2) || (hrDelta >= 3.0 && olderHR > 0) {
+                directiveContext = "TRAJECTORY_EASE_UP: Over the past 30 days, training data indicates cumulative overworking and declining efficiency (aerobic cost is climbing). For their stated goal of \(trainingGoal), tell the runner clearly that they are overworking and need to ease up on volume or intensity so their body can absorb the training and avoid declining instead of improving."
+                efficiencyContext = "Efficiency Factor declined over the past month. Cardiac drift and physiological strain accumulating."
+            } else if efDelta > 0.02 || hrDelta < -2.0 || oscDelta < -0.2 || vrDelta < -0.3 {
                 let hrDeltaText = hrDelta < 0 ? "\(Int(abs(hrDelta))) BPM lower" : "stable"
                 let vrDeltaText = avgRecentVR > 0 ? ", Vertical Ratio: \(String(format: "%.1f", avgRecentVR))%" : ""
-                directiveContext = "STRUCTURAL_ADAPTATION: Over 4 weeks, aerobic base has expanded significantly. Efficiency Factor increased by \(String(format: "%.2f", efDelta)), heart rate at \(paceContext) is \(hrDeltaText), and vertical oscillation shifted by \(String(format: "%+.1f", oscDelta)) cm\(vrDeltaText). Highlight structural economy and rising lactate threshold. Do NOT mention acute fatigue."
+                directiveContext = "TRAJECTORY_ON_TRACK: Over the past 30 days, aerobic efficiency, cardiac response, and running economy have clearly improved (Efficiency Factor increased by \(String(format: "%.2f", efDelta)), heart rate at \(paceContext) is \(hrDeltaText)\(vrDeltaText)). Tell the runner clearly that they are solidly on track for their \(trainingGoal) goal and their consistency is paying off."
                 efficiencyContext = "Efficiency Factor rose by +\(String(format: "%.2f", efDelta)) m/beat. Aerobic capacity expanding."
             } else {
-                directiveContext = "STEADY_AEROBIC_BASE: Consistent volume and steady aerobic efficiency over 30 days. Pacing stability and cadence turnover remain well calibrated. Highlight solid physiological foundation. Do NOT mention acute fatigue."
+                directiveContext = "TRAJECTORY_STEP_IT_UP: Over the past 30 days, baseline fitness is steady and well-calibrated, but performance has plateaued. Tell the runner their performances show their body has adapted and they have more to give, encouraging them to step up their training slightly in pace, volume, or quality to chase their \(trainingGoal) goal."
                 efficiencyContext = "Efficiency Factor stable at \(String(format: "%.2f", max(1.2, avgRecentEF))) m/beat."
             }
             if avgRecentVR > 0 {
@@ -1121,8 +1124,6 @@ struct DashboardView: View {
                             aiInsightCard
 
                             proactiveCoachCard
-
-                            ProgressionChartView(allRuns: runRecords, defaultHorizon: .thirtyDays)
                         }
                     } else { // 7 Days
                         fitnessBaselineCard
