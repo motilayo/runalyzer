@@ -169,7 +169,7 @@ struct BiomechanicsForceDiagramView: View {
                             }
                             Spacer()
                             HStack(spacing: 4) {
-                                Image(systemName: "spring")
+                                Image(systemName: "shield.fill")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.teal)
                                 Text("Bent-Knee Shock Dampening")
