@@ -283,7 +283,10 @@ private struct KinematicPointRow: View {
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -300,7 +303,7 @@ struct KinematicComparisonMatrixView: View {
                     .foregroundColor(.primary)
             }
 
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
                 ComparisonRowItem(
                     variable: "Landing Point",
                     good: "Under pelvis (<10cm)",
@@ -375,6 +378,7 @@ private struct ComparisonRowItem: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -396,7 +400,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
                 }
             }
 
-            VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 TelemetryComparisonRow(
                     metricName: "Vertical Oscillation",
                     goodRange: "6.0 – 9.0 cm",
@@ -475,6 +479,7 @@ private struct TelemetryComparisonRow: View {
                 .foregroundColor(.secondary)
                 .lineSpacing(1.5)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -491,7 +496,7 @@ struct CorrectiveCuesCardView: View {
                     .foregroundColor(.primary)
             }
 
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 CueItemRow(
                     cue: "“Get feet off the ground quickly”",
                     focus: "Focus on pulling your foot up off the tarmac rather than pushing down. Naturally quickens cadence."
@@ -521,11 +526,11 @@ private struct CueItemRow: View {
     let focus: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             Circle()
-                .fill(Color.accentColor.opacity(0.8))
+                .fill(Color.accentColor)
                 .frame(width: 6, height: 6)
-                .padding(.top, 6)
+                .padding(.top, 5)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(cue)
@@ -534,8 +539,12 @@ private struct CueItemRow: View {
                 Text(focus)
                     .font(.caption2)
                     .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
