@@ -9,8 +9,186 @@ enum BiomechanicsDiagramMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// A native SwiftUI free-body diagram showing Center of Mass (COM) alignment,
+/// landing distance, and ground reaction force vectors.
+struct BiomechanicsForceDiagramView: View {
+    let isOverstride: Bool
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Kinematic Vector Canvas
+            ZStack(alignment: .topLeading) {
+                // Background surface
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(UIColor.tertiarySystemFill).opacity(0.6))
+
+                VStack(spacing: 0) {
+                    // Top: Center of Mass & Body Lean Indicator
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                                Text("Center of Mass (COM)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.primary)
+                            }
+                            Text(isOverstride ? "Upright Torso (0° Lean)" : "Forward Lean (6°–8° from ankles)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text(isOverstride ? "Overstride (>30cm ahead)" : "Neutral Strike (<10cm)")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background((isOverstride ? Color.red : Color.teal).opacity(0.15))
+                            .foregroundColor(isOverstride ? .red : .teal)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+
+                    Spacer(minLength: 16)
+
+                    // Middle: Free-body alignment diagram
+                    GeometryReader { geo in
+                        let w = geo.size.width
+                        let h = geo.size.height
+                        let comX = w * 0.40
+                        let groundY = h - 22.0
+                        let strikeX = isOverstride ? (w * 0.82) : (w * 0.45)
+
+                        ZStack {
+                            // Ground Plane Line
+                            Path { path in
+                                path.move(to: CGPoint(x: 10, y: groundY))
+                                path.addLine(to: CGPoint(x: w - 10, y: groundY))
+                            }
+                            .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
+
+                            // COM Dotted Plumb Line (vertical gravity axis)
+                            Path { path in
+                                path.move(to: CGPoint(x: comX, y: 12))
+                                path.addLine(to: CGPoint(x: comX, y: groundY))
+                            }
+                            .stroke(
+                                Color.green.opacity(0.8),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                            )
+
+                            // COM Pivot Indicator (Pelvis / Core)
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 14, height: 14)
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                                .position(x: comX, y: 12)
+
+                            // Leg Angle Guideline (COM to Foot Strike)
+                            Path { path in
+                                path.move(to: CGPoint(x: comX, y: 12))
+                                if isOverstride {
+                                    // Straight, stiff leg
+                                    path.addLine(to: CGPoint(x: strikeX, y: groundY))
+                                } else {
+                                    // Flexed knee spring joint
+                                    let kneeX = (comX + strikeX) / 2 + 10
+                                    let kneeY = (12 + groundY) / 2
+                                    path.addLine(to: CGPoint(x: kneeX, y: kneeY))
+                                    path.addLine(to: CGPoint(x: strikeX, y: groundY))
+                                }
+                            }
+                            .stroke(
+                                (isOverstride ? Color.red : Color.teal).opacity(0.7),
+                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                            )
+
+                            // Knee Joint Marker
+                            if !isOverstride {
+                                let kneeX = (comX + strikeX) / 2 + 10
+                                let kneeY = (12 + groundY) / 2
+                                Circle()
+                                    .fill(Color.teal)
+                                    .frame(width: 8, height: 8)
+                                    .position(x: kneeX, y: kneeY)
+                            }
+
+                            // Horizontal Offset Bracket (between COM and Foot Strike)
+                            if isOverstride {
+                                Path { path in
+                                    let bracketY = groundY + 10
+                                    path.move(to: CGPoint(x: comX, y: bracketY - 3))
+                                    path.addLine(to: CGPoint(x: comX, y: bracketY))
+                                    path.addLine(to: CGPoint(x: strikeX, y: bracketY))
+                                    path.addLine(to: CGPoint(x: strikeX, y: bracketY - 3))
+                                }
+                                .stroke(Color.red, lineWidth: 1.2)
+                            }
+
+                            // Foot Strike Point Marker
+                            Circle()
+                                .fill(isOverstride ? Color.red : Color.teal)
+                                .frame(width: 10, height: 10)
+                                .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                                .position(x: strikeX, y: groundY)
+                        }
+                    }
+                    .frame(height: 75)
+
+                    // Bottom: Force Vector Legend
+                    HStack(spacing: 12) {
+                        if isOverstride {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.left")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.red)
+                                Text("Braking Vector (Deceleration)")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.red)
+                            }
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.orange)
+                                Text("High Vertical Shock")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.orange)
+                            }
+                        } else {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.teal)
+                                Text("Forward Propulsion (Elastic Recoil)")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.teal)
+                            }
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Image(systemName: "spring")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.teal)
+                                Text("Bent-Knee Shock Dampening")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.teal)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+                }
+            }
+            .frame(height: 145)
+        }
+    }
+}
+
 /// A clean illustration card representing either Good Stride or Overstriding
-/// using authentic sports-science biomechanical graphics.
+/// using pure native SwiftUI vector graphics and kinematic checklists.
 struct BiomechanicalCardView: View {
     let isOverstride: Bool
 
@@ -36,17 +214,8 @@ struct BiomechanicalCardView: View {
                     .clipShape(Capsule())
             }
 
-            // Authentic Sports-Science Illustration
-            Image(isOverstride ? "OverstrideIllustration" : "GoodStrideIllustration")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke((isOverstride ? Color.red : Color.teal).opacity(0.25), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 6, y: 2)
+            // Native SwiftUI Biomechanical Free-Body Diagram
+            BiomechanicsForceDiagramView(isOverstride: isOverstride)
 
             // Kinematic Point Checklist
             VStack(alignment: .leading, spacing: 6) {
@@ -113,6 +282,97 @@ private struct KinematicPointRow: View {
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// Comparative Matrix comparing mechanical variables side-by-side
+struct KinematicComparisonMatrixView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.left.and.right.square.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.subheadline)
+                Text("Kinematic Comparison Matrix")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+            }
+
+            VStack(spacing: 8) {
+                ComparisonRowItem(
+                    variable: "Landing Point",
+                    good: "Under pelvis (<10cm)",
+                    overstride: "Cast ahead (>30cm)"
+                )
+                Divider()
+                ComparisonRowItem(
+                    variable: "Knee Angle",
+                    good: "Flexed (~25° bend)",
+                    overstride: "Locked / Stiff (<10°)"
+                )
+                Divider()
+                ComparisonRowItem(
+                    variable: "Body Lean",
+                    good: "Slight forward (6°–8°)",
+                    overstride: "Upright / Backward"
+                )
+                Divider()
+                ComparisonRowItem(
+                    variable: "Primary Force",
+                    good: "Horizontal Propulsion",
+                    overstride: "Braking & Vertical Bounce"
+                )
+                Divider()
+                ComparisonRowItem(
+                    variable: "Joint Load",
+                    good: "Muscular absorption",
+                    overstride: "Joint & shin impact"
+                )
+            }
+            .padding(12)
+            .background(Color(UIColor.tertiarySystemFill))
+            .cornerRadius(14)
+        }
+        .padding(14)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(18)
+    }
+}
+
+private struct ComparisonRowItem: View {
+    let variable: String
+    let good: String
+    let overstride: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(variable)
+                .font(.caption2.bold())
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.teal)
+                        .font(.system(size: 10))
+                    Text(good)
+                        .font(.caption.bold())
+                        .foregroundColor(.teal)
+                }
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 10))
+                    Text(overstride)
+                        .font(.caption.bold())
+                        .foregroundColor(.red)
+                }
             }
         }
     }
@@ -302,21 +562,9 @@ struct OverstrideBiomechanicsSheet: View {
                     switch mode {
                     case .compare:
                         VStack(spacing: 14) {
-                            Image("StrideComparisonIllustration")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                                )
-                                .shadow(color: Color.black.opacity(0.08), radius: 6, y: 2)
-
-                            VStack(spacing: 12) {
-                                BiomechanicalCardView(isOverstride: false)
-                                BiomechanicalCardView(isOverstride: true)
-                            }
+                            KinematicComparisonMatrixView()
+                            BiomechanicalCardView(isOverstride: false)
+                            BiomechanicalCardView(isOverstride: true)
                         }
                         .padding(.horizontal)
 
