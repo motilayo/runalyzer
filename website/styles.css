@@ -878,7 +878,7 @@ body {
 
 .token-kw { color: #8a3b14; font-weight: 700; }
 .token-str { color: #1b6d3e; }
-.token-num { color: #8e44ad; }
+.token-num { color: #9a4c14; }
 .token-comment { color: var(--text-subtle); font-style: italic; }
 
 .eng-desc-sm {
@@ -886,6 +886,221 @@ body {
   color: var(--text-muted);
   line-height: 1.55;
   margin: 0;
+}
+
+/* ==========================================================================
+   BIOMECHANICAL TRIAGE (Why We Focus on Those Metrics)
+   ========================================================================== */
+.biomechanics-callout-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 40px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 32px;
+}
+
+.biomechanics-header {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 32px auto;
+}
+
+.biomechanics-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  margin-top: 14px;
+  margin-bottom: 12px;
+}
+
+.biomechanics-subtitle {
+  font-size: 15px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Formula Box */
+.biomechanics-formula-display {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 24px 20px;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.formula-caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pastel-coral-text);
+  margin-bottom: 14px;
+}
+
+.formula-math-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow-x: auto;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.8;
+  padding: 6px 4px;
+}
+
+.formula-group {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  gap: 0;
+}
+
+.formula-term {
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  color: var(--text-heading);
+}
+
+.formula-term.formula-target {
+  background: var(--pastel-coral-bg);
+  color: var(--pastel-coral-text);
+  border-color: var(--pastel-coral-border);
+  font-weight: 800;
+}
+
+.formula-term.formula-part {
+  background: var(--pastel-sand-bg);
+  color: var(--pastel-sand-text);
+  border-color: var(--pastel-sand-border);
+}
+
+.formula-symbol {
+  font-weight: 800;
+  color: var(--text-heading);
+  font-size: 18px;
+  padding: 0 4px;
+}
+
+.formula-bracket {
+  color: var(--text-subtle);
+  font-weight: 700;
+}
+
+/* 3 Pillars Grid */
+.biomechanics-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 900px) {
+  .biomechanics-pillars-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bio-pillar-card {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bio-pillar-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--pastel-sand-text);
+  background: var(--pastel-sand-bg);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.bio-pillar-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-heading);
+  margin-bottom: 10px;
+}
+
+.bio-pillar-body {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.bio-pillar-metric {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.metric-label {
+  color: var(--text-subtle);
+  font-weight: 500;
+}
+
+.metric-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+/* Action Box */
+.biomechanics-action-box {
+  background: var(--pastel-sage-bg);
+  border: 1px solid var(--pastel-sage-border);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.action-box-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.action-box-text {
+  font-size: 14px;
+  color: var(--pastel-sage-text);
+  line-height: 1.6;
+}
+
+.action-box-text strong {
+  color: #16462c;
+}
+
+.action-box-text em {
+  font-weight: 700;
+  font-style: normal;
 }
 
 /* Comparison Ribbon */
