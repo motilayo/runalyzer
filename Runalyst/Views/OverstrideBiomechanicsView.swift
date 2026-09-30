@@ -10,25 +10,23 @@ enum BiomechanicsDiagramMode: String, CaseIterable, Identifiable {
 }
 
 /// A native SwiftUI free-body diagram showing Center of Mass (COM) alignment,
-/// landing distance, and ground reaction force vectors.
+/// athletic running stick figure kinematics, and ground reaction force vectors.
 struct BiomechanicsForceDiagramView: View {
     let isOverstride: Bool
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Kinematic Vector Canvas
+        VStack(spacing: 10) {
             ZStack(alignment: .topLeading) {
-                // Background surface
                 RoundedRectangle(cornerRadius: 14)
                     .fill(Color(UIColor.tertiarySystemFill).opacity(0.6))
 
-                VStack(spacing: 0) {
-                    // Top: Center of Mass & Body Lean Indicator
+                VStack(spacing: 4) {
+                    // Header Bar
                     HStack {
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 5) {
                                 Circle()
-                                    .fill(Color.green)
+                                    .fill(isOverstride ? Color.red : Color.teal)
                                     .frame(width: 8, height: 8)
                                 Text("Center of Mass (COM)")
                                     .font(.system(size: 11, weight: .bold))
@@ -52,100 +50,18 @@ struct BiomechanicsForceDiagramView: View {
                     .padding(.horizontal, 12)
                     .padding(.top, 10)
 
-                    Spacer(minLength: 16)
+                    // Athletic Running Stick Figure Canvas
+                    RunningStickFigureCanvas(isOverstride: isOverstride)
+                        .padding(.horizontal, 8)
 
-                    // Middle: Free-body alignment diagram
-                    GeometryReader { geo in
-                        let w = geo.size.width
-                        let h = geo.size.height
-                        let comX = w * 0.40
-                        let groundY = h - 22.0
-                        let strikeX = isOverstride ? (w * 0.82) : (w * 0.45)
-
-                        ZStack {
-                            // Ground Plane Line
-                            Path { path in
-                                path.move(to: CGPoint(x: 10, y: groundY))
-                                path.addLine(to: CGPoint(x: w - 10, y: groundY))
-                            }
-                            .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
-
-                            // COM Dotted Plumb Line (vertical gravity axis)
-                            Path { path in
-                                path.move(to: CGPoint(x: comX, y: 12))
-                                path.addLine(to: CGPoint(x: comX, y: groundY))
-                            }
-                            .stroke(
-                                Color.green.opacity(0.8),
-                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
-                            )
-
-                            // COM Pivot Indicator (Pelvis / Core)
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 14, height: 14)
-                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                                .position(x: comX, y: 12)
-
-                            // Leg Angle Guideline (COM to Foot Strike)
-                            Path { path in
-                                path.move(to: CGPoint(x: comX, y: 12))
-                                if isOverstride {
-                                    // Straight, stiff leg
-                                    path.addLine(to: CGPoint(x: strikeX, y: groundY))
-                                } else {
-                                    // Flexed knee spring joint
-                                    let kneeX = (comX + strikeX) / 2 + 10
-                                    let kneeY = (12 + groundY) / 2
-                                    path.addLine(to: CGPoint(x: kneeX, y: kneeY))
-                                    path.addLine(to: CGPoint(x: strikeX, y: groundY))
-                                }
-                            }
-                            .stroke(
-                                (isOverstride ? Color.red : Color.teal).opacity(0.7),
-                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
-                            )
-
-                            // Knee Joint Marker
-                            if !isOverstride {
-                                let kneeX = (comX + strikeX) / 2 + 10
-                                let kneeY = (12 + groundY) / 2
-                                Circle()
-                                    .fill(Color.teal)
-                                    .frame(width: 8, height: 8)
-                                    .position(x: kneeX, y: kneeY)
-                            }
-
-                            // Horizontal Offset Bracket (between COM and Foot Strike)
-                            if isOverstride {
-                                Path { path in
-                                    let bracketY = groundY + 10
-                                    path.move(to: CGPoint(x: comX, y: bracketY - 3))
-                                    path.addLine(to: CGPoint(x: comX, y: bracketY))
-                                    path.addLine(to: CGPoint(x: strikeX, y: bracketY))
-                                    path.addLine(to: CGPoint(x: strikeX, y: bracketY - 3))
-                                }
-                                .stroke(Color.red, lineWidth: 1.2)
-                            }
-
-                            // Foot Strike Point Marker
-                            Circle()
-                                .fill(isOverstride ? Color.red : Color.teal)
-                                .frame(width: 10, height: 10)
-                                .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
-                                .position(x: strikeX, y: groundY)
-                        }
-                    }
-                    .frame(height: 75)
-
-                    // Bottom: Force Vector Legend
+                    // Force Vector Legend
                     HStack(spacing: 12) {
                         if isOverstride {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.left")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.red)
-                                Text("Braking Vector (Deceleration)")
+                                Text("Braking Force")
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(.red)
                             }
@@ -154,7 +70,7 @@ struct BiomechanicsForceDiagramView: View {
                                 Image(systemName: "arrow.up")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.orange)
-                                Text("High Vertical Shock")
+                                Text("Vertical Shock Impact")
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(.orange)
                             }
@@ -163,7 +79,7 @@ struct BiomechanicsForceDiagramView: View {
                                 Image(systemName: "arrow.right")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.teal)
-                                Text("Forward Propulsion (Elastic Recoil)")
+                                Text("Forward Propulsion")
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(.teal)
                             }
@@ -182,8 +98,294 @@ struct BiomechanicsForceDiagramView: View {
                     .padding(.bottom, 10)
                 }
             }
-            .frame(height: 145)
         }
+    }
+}
+
+/// Canvas rendering an athletic running stick figure with realistic joint angles
+private struct RunningStickFigureCanvas: View {
+    let isOverstride: Bool
+
+    var body: some View {
+        Canvas { context, size in
+            let w = size.width
+            let groundY: CGFloat = 115.0
+
+            // Baseline Ground Plane
+            var ground = Path()
+            ground.move(to: CGPoint(x: 10, y: groundY))
+            ground.addLine(to: CGPoint(x: w - 10, y: groundY))
+            context.stroke(
+                ground,
+                with: .color(Color.secondary.opacity(0.35)),
+                style: StrokeStyle(lineWidth: 1.8, lineCap: .round)
+            )
+
+            if isOverstride {
+                drawOverstrideRunner(context: context, size: size, groundY: groundY)
+            } else {
+                drawGoodStrideRunner(context: context, size: size, groundY: groundY)
+            }
+        }
+        .frame(height: 135)
+    }
+
+    private func drawGoodStrideRunner(context: GraphicsContext, size: CGSize, groundY: CGFloat) {
+        let comX = size.width * 0.46
+        let pelvisY: CGFloat = 58.0
+        let shoulderX = comX + 10.0
+        let shoulderY = pelvisY - 32.0
+
+        // 1. Center of Mass Vertical Plumb Line
+        var plumbLine = Path()
+        plumbLine.move(to: CGPoint(x: comX, y: pelvisY))
+        plumbLine.addLine(to: CGPoint(x: comX, y: groundY))
+        context.stroke(
+            plumbLine,
+            with: .color(Color.teal.opacity(0.65)),
+            style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+        )
+
+        // 2. Trailing Arm (Driving backward)
+        var backArm = Path()
+        backArm.move(to: CGPoint(x: shoulderX, y: shoulderY))
+        backArm.addLine(to: CGPoint(x: shoulderX - 14, y: shoulderY + 12))
+        backArm.addLine(to: CGPoint(x: shoulderX - 24, y: shoulderY + 22))
+        context.stroke(
+            backArm,
+            with: .color(Color.secondary.opacity(0.7)),
+            style: StrokeStyle(lineWidth: 3.0, lineCap: .round, lineJoin: .round)
+        )
+
+        // 3. Trailing Leg (Full hip extension & glute push-off behind)
+        var backLeg = Path()
+        backLeg.move(to: CGPoint(x: comX, y: pelvisY))
+        backLeg.addLine(to: CGPoint(x: comX - 22, y: pelvisY + 20))
+        backLeg.addLine(to: CGPoint(x: comX - 44, y: pelvisY + 40))
+        backLeg.addLine(to: CGPoint(x: comX - 52, y: pelvisY + 46))
+        context.stroke(
+            backLeg,
+            with: .color(Color.secondary.opacity(0.75)),
+            style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round)
+        )
+
+        // 4. Torso with Athletic Forward Lean (6°–8°)
+        var torso = Path()
+        torso.move(to: CGPoint(x: comX, y: pelvisY))
+        torso.addLine(to: CGPoint(x: shoulderX, y: shoulderY))
+        context.stroke(
+            torso,
+            with: .color(Color.white),
+            style: StrokeStyle(lineWidth: 4.5, lineCap: .round)
+        )
+
+        // 5. Head
+        let headCenter = CGPoint(x: shoulderX + 4, y: shoulderY - 12)
+        let headRect = CGRect(x: headCenter.x - 8, y: headCenter.y - 8, width: 16, height: 16)
+        context.fill(Path(ellipseIn: headRect), with: .color(Color.white))
+
+        // 6. Lead Arm (Bent ~90° swinging forward)
+        var frontArm = Path()
+        frontArm.move(to: CGPoint(x: shoulderX, y: shoulderY))
+        frontArm.addLine(to: CGPoint(x: shoulderX + 16, y: shoulderY + 14))
+        frontArm.addLine(to: CGPoint(x: shoulderX + 24, y: shoulderY + 4))
+        context.stroke(
+            frontArm,
+            with: .color(Color.white),
+            style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round)
+        )
+
+        // 7. Lead Leg (Bent Knee Spring, Foot landing beneath COM)
+        let leadKneeX = comX + 16.0
+        let leadKneeY = pelvisY + 28.0
+        let leadAnkleX = comX + 6.0 // Landing right under COM plumb line!
+        let leadAnkleY = groundY - 2.0
+
+        var leadLeg = Path()
+        leadLeg.move(to: CGPoint(x: comX, y: pelvisY))
+        leadLeg.addLine(to: CGPoint(x: leadKneeX, y: leadKneeY)) // flexed knee
+        leadLeg.addLine(to: CGPoint(x: leadAnkleX, y: leadAnkleY)) // vertical lower leg
+        leadLeg.addLine(to: CGPoint(x: leadAnkleX + 14, y: groundY)) // flat midfoot
+        context.stroke(
+            leadLeg,
+            with: .color(Color.teal),
+            style: StrokeStyle(lineWidth: 4.0, lineCap: .round, lineJoin: .round)
+        )
+
+        // Knee joint indicator dot
+        let kneeRect = CGRect(x: leadKneeX - 3.5, y: leadKneeY - 3.5, width: 7, height: 7)
+        context.fill(Path(ellipseIn: kneeRect), with: .color(Color.teal))
+
+        // 8. Pelvis / COM Marker
+        let comRect = CGRect(x: comX - 5.5, y: pelvisY - 5.5, width: 11, height: 11)
+        context.fill(Path(ellipseIn: comRect), with: .color(Color.teal))
+        context.stroke(
+            Path(ellipseIn: comRect),
+            with: .color(Color.white),
+            style: StrokeStyle(lineWidth: 1.8)
+        )
+
+        // 9. Forward Propulsion Vector Arrow at foot
+        var arrow = Path()
+        let arrowStartX = leadAnkleX + 18
+        let arrowEndX = arrowStartX + 24
+        arrow.move(to: CGPoint(x: arrowStartX, y: groundY))
+        arrow.addLine(to: CGPoint(x: arrowEndX, y: groundY))
+        arrow.move(to: CGPoint(x: arrowEndX - 5, y: groundY - 3.5))
+        arrow.addLine(to: CGPoint(x: arrowEndX, y: groundY))
+        arrow.addLine(to: CGPoint(x: arrowEndX - 5, y: groundY + 3.5))
+        context.stroke(
+            arrow,
+            with: .color(Color.teal),
+            style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round)
+        )
+    }
+
+    private func drawOverstrideRunner(context: GraphicsContext, size: CGSize, groundY: CGFloat) {
+        let comX = size.width * 0.36
+        let pelvisY: CGFloat = 58.0
+        let shoulderX = comX // Upright torso
+        let shoulderY = pelvisY - 32.0
+
+        // 1. Center of Mass Vertical Plumb Line
+        var plumbLine = Path()
+        plumbLine.move(to: CGPoint(x: comX, y: pelvisY))
+        plumbLine.addLine(to: CGPoint(x: comX, y: groundY))
+        context.stroke(
+            plumbLine,
+            with: .color(Color.red.opacity(0.65)),
+            style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+        )
+
+        // 2. Trailing Leg (Dragging close to body, poor push-off)
+        var backLeg = Path()
+        backLeg.move(to: CGPoint(x: comX, y: pelvisY))
+        backLeg.addLine(to: CGPoint(x: comX - 14, y: pelvisY + 26))
+        backLeg.addLine(to: CGPoint(x: comX - 20, y: groundY - 2))
+        backLeg.addLine(to: CGPoint(x: comX - 12, y: groundY))
+        context.stroke(
+            backLeg,
+            with: .color(Color.secondary.opacity(0.6)),
+            style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round)
+        )
+
+        // 3. Trailing Arm (Stiff)
+        var backArm = Path()
+        backArm.move(to: CGPoint(x: shoulderX, y: shoulderY))
+        backArm.addLine(to: CGPoint(x: shoulderX - 14, y: shoulderY + 12))
+        backArm.addLine(to: CGPoint(x: shoulderX - 20, y: shoulderY + 22))
+        context.stroke(
+            backArm,
+            with: .color(Color.secondary.opacity(0.6)),
+            style: StrokeStyle(lineWidth: 3.0, lineCap: .round, lineJoin: .round)
+        )
+
+        // 4. Torso - Strictly Upright (0° Lean)
+        var torso = Path()
+        torso.move(to: CGPoint(x: comX, y: pelvisY))
+        torso.addLine(to: CGPoint(x: shoulderX, y: shoulderY))
+        context.stroke(
+            torso,
+            with: .color(Color.white),
+            style: StrokeStyle(lineWidth: 4.5, lineCap: .round)
+        )
+
+        // 5. Head
+        let headCenter = CGPoint(x: shoulderX, y: shoulderY - 12)
+        let headRect = CGRect(x: headCenter.x - 8, y: headCenter.y - 8, width: 16, height: 16)
+        context.fill(Path(ellipseIn: headRect), with: .color(Color.white))
+
+        // 6. Lead Arm
+        var frontArm = Path()
+        frontArm.move(to: CGPoint(x: shoulderX, y: shoulderY))
+        frontArm.addLine(to: CGPoint(x: shoulderX + 14, y: shoulderY + 12))
+        frontArm.addLine(to: CGPoint(x: shoulderX + 24, y: shoulderY + 6))
+        context.stroke(
+            frontArm,
+            with: .color(Color.white),
+            style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round)
+        )
+
+        // 7. Lead Leg - REACHING AHEAD, LOCKED KNEE
+        let strikeX = comX + 62.0 // Planted far ahead of COM!
+        let kneeX = (comX + strikeX) / 2.0
+        let kneeY = (pelvisY + groundY) / 2.0
+
+        var leadLeg = Path()
+        leadLeg.move(to: CGPoint(x: comX, y: pelvisY))
+        leadLeg.addLine(to: CGPoint(x: kneeX, y: kneeY)) // locked straight knee
+        leadLeg.addLine(to: CGPoint(x: strikeX, y: groundY - 2))
+        context.stroke(
+            leadLeg,
+            with: .color(Color.red),
+            style: StrokeStyle(lineWidth: 4.0, lineCap: .round, lineJoin: .round)
+        )
+
+        // Dorsiflexed Heel Strike Foot (heel down, toes pulled up in air)
+        var foot = Path()
+        foot.move(to: CGPoint(x: strikeX, y: groundY))
+        foot.addLine(to: CGPoint(x: strikeX + 15, y: groundY - 9))
+        context.stroke(
+            foot,
+            with: .color(Color.red),
+            style: StrokeStyle(lineWidth: 4.0, lineCap: .round)
+        )
+
+        // Locked Knee joint marker
+        let kneeRect = CGRect(x: kneeX - 3.5, y: kneeY - 3.5, width: 7, height: 7)
+        context.fill(Path(ellipseIn: kneeRect), with: .color(Color.red))
+
+        // 8. Pelvis / COM Marker
+        let comRect = CGRect(x: comX - 5.5, y: pelvisY - 5.5, width: 11, height: 11)
+        context.fill(Path(ellipseIn: comRect), with: .color(Color.red))
+        context.stroke(
+            Path(ellipseIn: comRect),
+            with: .color(Color.white),
+            style: StrokeStyle(lineWidth: 1.8)
+        )
+
+        // 9. Ground Offset Distance Bracket (>30cm ahead)
+        var bracket = Path()
+        let bracketY = groundY + 8.0
+        bracket.move(to: CGPoint(x: comX, y: bracketY - 3))
+        bracket.addLine(to: CGPoint(x: comX, y: bracketY))
+        bracket.addLine(to: CGPoint(x: strikeX, y: bracketY))
+        bracket.addLine(to: CGPoint(x: strikeX, y: bracketY - 3))
+        context.stroke(
+            bracket,
+            with: .color(Color.red),
+            style: StrokeStyle(lineWidth: 1.2)
+        )
+
+        // 10. Braking Force Vector (Reverse arrow at heel)
+        var brakeArrow = Path()
+        let brakeStartX = strikeX - 4
+        let brakeEndX = brakeStartX - 24
+        brakeArrow.move(to: CGPoint(x: brakeStartX, y: groundY))
+        brakeArrow.addLine(to: CGPoint(x: brakeEndX, y: groundY))
+        brakeArrow.move(to: CGPoint(x: brakeEndX + 5, y: groundY - 3.5))
+        brakeArrow.addLine(to: CGPoint(x: brakeEndX, y: groundY))
+        brakeArrow.addLine(to: CGPoint(x: brakeEndX + 5, y: groundY + 3.5))
+        context.stroke(
+            brakeArrow,
+            with: .color(Color.red),
+            style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round)
+        )
+
+        // 11. Vertical Impact Shock Vector (Upward arrow at heel)
+        var impactArrow = Path()
+        let impactY = groundY - 4
+        let impactTopY = impactY - 22
+        impactArrow.move(to: CGPoint(x: strikeX + 2, y: impactY))
+        impactArrow.addLine(to: CGPoint(x: strikeX + 2, y: impactTopY))
+        impactArrow.move(to: CGPoint(x: strikeX - 2, y: impactTopY + 4))
+        impactArrow.addLine(to: CGPoint(x: strikeX + 2, y: impactTopY))
+        impactArrow.addLine(to: CGPoint(x: strikeX + 6, y: impactTopY + 4))
+        context.stroke(
+            impactArrow,
+            with: .color(Color.orange),
+            style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round)
+        )
     }
 }
 
