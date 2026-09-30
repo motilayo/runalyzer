@@ -38,13 +38,13 @@ struct BiomechanicalCardView: View {
 
             // Core Explainer Concept
             VStack(alignment: .leading, spacing: 6) {
-                Text("Where Should Your Foot Land When Running?")
+                Text("Where Should Your Foot Land?")
                     .font(.subheadline.bold())
                     .foregroundColor(.primary)
-                Text("Your foot should land underneath your body, not out in front of it.")
+                Text("Ideally, your foot should land beneath your center of mass rather than reaching out ahead of your body.")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("Ultimately, the goal is to run comfortably and consistently without issues. There is no universally \"best\" foot strike.")
+                Text("While there is no single \"best\" foot strike, landing closer to your hips reduces braking forces so you can run comfortably, efficiently, and injury-free.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
