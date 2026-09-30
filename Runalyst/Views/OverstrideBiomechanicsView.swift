@@ -36,18 +36,23 @@ struct BiomechanicalCardView: View {
                     .clipShape(Capsule())
             }
 
-            // High-Resolution Sports-Science Biomechanical Illustration
-            Image(isOverstride ? "OverstrideIllustration" : "GoodStrideIllustration")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .background(Color(UIColor.tertiarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke((isOverstride ? Color.red : Color.teal).opacity(0.25), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.12), radius: 6, y: 2)
+            // Core Explainer Concept
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Where Should Your Foot Land When Running?")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+                Text("Your foot should land underneath your body, not out in front of it.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("Ultimately, the goal is to run comfortably and consistently without issues. There is no universally \"best\" foot strike.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color(UIColor.tertiarySystemGroupedBackground))
+            .cornerRadius(12)
+            .padding(.vertical, 4)
 
             // Kinematic Point Checklist
             VStack(alignment: .leading, spacing: 6) {

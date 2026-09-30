@@ -403,11 +403,11 @@ struct MetricExplainerSheet: View {
                     .cornerRadius(10)
                 }
 
-                // Biomechanical Kinematic Diagram (Overstride vs Good Stride)
+                // Biomechanical Kinematic Guide (Overstride vs Good Stride)
                 if isBiomechanicsMetric {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("Kinematic Form Diagram")
+                            Text("Running Form Guide")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
