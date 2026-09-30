@@ -41,6 +41,7 @@ struct BiomechanicalCardView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity)
+                .background(Color(UIColor.tertiarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
