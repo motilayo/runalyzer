@@ -44,6 +44,7 @@
 		Z2X3C4V5B6N7M8L9K0J1H2G3 /* Runalyst/Views/RunDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyst/Views/RunDetailView.swift */; };
 		71A1B2C3D4E5F60718293A41 /* Runalyst/Views/ProgressionChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72A1B2C3D4E5F60718293A42 /* Runalyst/Views/ProgressionChartView.swift */; };
 		73A1B2C3D4E5F60718293A43 /* Runalyst/Views/LifetimeMilestonesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A1B2C3D4E5F60718293A44 /* Runalyst/Views/LifetimeMilestonesCard.swift */; };
+		89A1B2C3D4E5F60718293A81 /* Runalyst/Views/OverstrideBiomechanicsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A1B2C3D4E5F60718293A82 /* Runalyst/Views/OverstrideBiomechanicsView.swift */; };
 		23F276CDB5B630A042AFD6A6 /* MockHealthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFBFC7678A5632D5492EAD9 /* MockHealthStore.swift */; };
 		19251A19596B5C46911A31D7 /* WorkoutPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DBD50C2872490EFC601C63C /* WorkoutPlanTests.swift */; };
 		695AB71B15A216F6DE67C683 /* HealthKitManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A819A236B82055B19BD745F /* HealthKitManagerTests.swift */; };
@@ -117,6 +118,7 @@
 		Q1W2E3R4T5Y6U7I8O9P0A1S2 /* Runalyst/Views/RunDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/RunDetailView.swift; sourceTree = SOURCE_ROOT; };
 		72A1B2C3D4E5F60718293A42 /* Runalyst/Views/ProgressionChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/ProgressionChartView.swift; sourceTree = SOURCE_ROOT; };
 		74A1B2C3D4E5F60718293A44 /* Runalyst/Views/LifetimeMilestonesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/LifetimeMilestonesCard.swift; sourceTree = SOURCE_ROOT; };
+		89A1B2C3D4E5F60718293A82 /* Runalyst/Views/OverstrideBiomechanicsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/Views/OverstrideBiomechanicsView.swift; sourceTree = SOURCE_ROOT; };
 		Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runalyst/CoachingEngine/CoachingEngine.swift; sourceTree = SOURCE_ROOT; };
 		AAFBFC7678A5632D5492EAD9 /* MockHealthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockHealthStore.swift; sourceTree = "<group>"; };
 		5DBD50C2872490EFC601C63C /* WorkoutPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPlanTests.swift; sourceTree = "<group>"; };
@@ -314,6 +316,7 @@
 				AABBCCDDEEFF001122334455 /* Runalyst/Views/AnimatedLoadingView.swift */,
 				72A1B2C3D4E5F60718293A42 /* Runalyst/Views/ProgressionChartView.swift */,
 				74A1B2C3D4E5F60718293A44 /* Runalyst/Views/LifetimeMilestonesCard.swift */,
+				89A1B2C3D4E5F60718293A82 /* Runalyst/Views/OverstrideBiomechanicsView.swift */,
 				Z1X2C3V4B5N6M7L8K9J0H1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift */,
 				B1N2M3L4K5J6H7G8F9D0S1A2 /* Runalyst/Assets.xcassets */,
 				10AA26382422973E1F322C8D /* RunalystTests */,
@@ -436,6 +439,7 @@
 				554433221100FFEEDDCCBBAA /* Runalyst/Views/AnimatedLoadingView.swift in Sources */,
 				71A1B2C3D4E5F60718293A41 /* Runalyst/Views/ProgressionChartView.swift in Sources */,
 				73A1B2C3D4E5F60718293A43 /* Runalyst/Views/LifetimeMilestonesCard.swift in Sources */,
+				89A1B2C3D4E5F60718293A81 /* Runalyst/Views/OverstrideBiomechanicsView.swift in Sources */,
 				M1N2B3V4C5X6Z7A8S9D0F1G2 /* Runalyst/CoachingEngine/CoachingEngine.swift in Sources */,
 				438FD31B3051C867003DEDA5 /* LiveCoachDTOs.swift in Sources */,
 				438FD31C3051C867003DEDA5 /* LiveCoachEngine.swift in Sources */,

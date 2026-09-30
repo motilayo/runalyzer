@@ -66,8 +66,8 @@ struct MetricDetailExplainer {
                 modeContext: isWorkoutStats
                     ? "Workout Stats: Averages bounce across your whole session from start to finish, including walking pauses."
                     : "Working Stats: Measures bounce only while you are actively running, filtering out pauses and walking to show your true form.",
-                whyItMatters: "Efficiency: Running is about moving forward. Energy spent bouncing up and down is wasted and puts extra shock on your legs.",
-                targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Increases impact on your joints and tires your legs out faster.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
+                whyItMatters: "Efficiency: Running is about moving forward. When you overstride with a locked knee and large tibial angle, your foot acts as a mechanical brake ahead of your Center of Mass, redirecting forward momentum upward into wasted bounce and joint shock.",
+                targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Characteristic of overstriding, increasing braking shock on joints.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
             )
         case "avg pace", "pace":
             return MetricDetailExplainer(
@@ -301,6 +301,13 @@ struct MetricExplainerSheet: View {
     var whyItMatters: String?
     var targetRange: String?
     @Environment(\.dismiss) private var dismiss
+    @State private var showingBiomechanicsModal = false
+    @State private var inlineBiomechanicsOverstride = true
+
+    private var isBiomechanicsMetric: Bool {
+        let lower = title.lowercased()
+        return lower.contains("osc") || lower.contains("vertical") || lower.contains("stride")
+    }
 
     init(title: String, definition: String) {
         self.title = title
@@ -396,6 +403,49 @@ struct MetricExplainerSheet: View {
                     .cornerRadius(10)
                 }
 
+                // Biomechanical Kinematic Diagram (Overstride vs Good Stride)
+                if isBiomechanicsMetric {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Kinematic Form Diagram")
+                                .font(.caption.bold())
+                                .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+
+                            Spacer()
+
+                            Picker("Form", selection: $inlineBiomechanicsOverstride) {
+                                Text("Good Stride").tag(false)
+                                Text("Overstride").tag(true)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 190)
+                        }
+
+                        BiomechanicalCardView(isOverstride: inlineBiomechanicsOverstride)
+
+                        Button(action: { showingBiomechanicsModal = true }) {
+                            HStack {
+                                Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
+                                    .font(.caption.bold())
+                                Text("Explore Full Biomechanics Guide & Cues")
+                                    .font(.caption.bold())
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2.bold())
+                            }
+                            .foregroundColor(.accentColor)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color.accentColor.opacity(0.1))
+                            .cornerRadius(10)
+                        }
+                    }
+                    .sheet(isPresented: $showingBiomechanicsModal) {
+                        OverstrideBiomechanicsSheet()
+                    }
+                }
+
                 // Why It Matters
                 if let why = whyItMatters, !why.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -426,7 +476,7 @@ struct MetricExplainerSheet: View {
             }
             .padding(20)
         }
-        .presentationDetents([.fraction(0.52), .medium, .large])
+        .presentationDetents(isBiomechanicsMetric ? [.fraction(0.85), .large] : [.fraction(0.52), .medium, .large])
         .presentationDragIndicator(.visible)
     }
 }
