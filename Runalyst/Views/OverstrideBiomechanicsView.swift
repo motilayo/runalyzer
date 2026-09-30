@@ -59,33 +59,33 @@ struct BiomechanicalCardView: View {
                 if isOverstride {
                     KinematicPointRow(
                         title: "Foot Strike Ahead of COM (>30cm)",
-                        subtitle: "Foot lands with large forward tibial angle, producing heavy braking forces.",
+                        subtitle: "Your foot lands with a large forward tibial angle, producing heavy braking forces.",
                         isPositive: false
                     )
                     KinematicPointRow(
                         title: "Reduced Knee Flexion",
-                        subtitle: "Straightened knee cannot act as a spring, sending vertical impact up into joints.",
+                        subtitle: "A straightened knee cannot act as a spring, sending vertical impact up into your joints.",
                         isPositive: false
                     )
                     KinematicPointRow(
                         title: "High Braking & Vertical Impact",
-                        subtitle: "Braking force redirects horizontal speed into high vertical bounce (>10 cm).",
+                        subtitle: "The braking force redirects your horizontal speed into a high vertical bounce (>10 cm).",
                         isPositive: false
                     )
                 } else {
                     KinematicPointRow(
                         title: "Foot Strike Close to COM",
-                        subtitle: "Foot lands under pelvis with forward body lean, directing force horizontally.",
+                        subtitle: "Your foot lands under your pelvis with a slight forward body lean, directing force horizontally.",
                         isPositive: true
                     )
                     KinematicPointRow(
                         title: "Good Knee Flexion",
-                        subtitle: "Flexed knee absorbs landing load naturally through the quadriceps and elastic recoil.",
+                        subtitle: "A flexed knee absorbs the landing load naturally through your quadriceps and elastic recoil.",
                         isPositive: true
                     )
                     KinematicPointRow(
                         title: "Small Tibial Angle & Push-Off",
-                        subtitle: "Nearly vertical shin on landing unlocks rearward glute push-off.",
+                        subtitle: "A nearly vertical shin on landing unlocks a powerful rearward glute push-off.",
                         isPositive: true
                     )
                 }
@@ -242,7 +242,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
                     metricName: "Vertical Oscillation",
                     goodRange: "6.0 – 9.0 cm",
                     overstrideRange: "> 10.0 cm",
-                    explanation: "Landing stiff-legged sends kinetic impact straight up, creating high bounce instead of forward speed."
+                    explanation: "Landing stiff-legged sends the kinetic impact straight up, creating a high bounce instead of forward speed."
                 )
 
                 Divider()
@@ -260,7 +260,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
                     metricName: "Cadence Turnover",
                     goodRange: "165 – 180 SPM",
                     overstrideRange: "< 155 SPM",
-                    explanation: "Slow turnover gives the lead leg time to cast forward; quick steps force feet to land under the hips."
+                    explanation: "Slow turnover gives your lead leg time to cast forward; quick steps force your feet to land under your hips."
                 )
 
                 Divider()
@@ -269,7 +269,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
                     metricName: "Vertical Ratio",
                     goodRange: "< 8.0 %",
                     overstrideRange: "> 9.5 %",
-                    explanation: "Ratio of vertical bounce to stride length. Lower means energy propels forward rather than upward."
+                    explanation: "This is the ratio of vertical bounce to stride length. A lower value means your energy propels you forward rather than upward."
                 )
             }
             .padding(12)
@@ -336,19 +336,19 @@ struct CorrectiveCuesCardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 CueItemRow(
                     cue: "“Get feet off the ground quickly”",
-                    focus: "Focus on pulling your foot up off the tarmac rather than pushing down. Naturally quickens cadence."
+                    focus: "Focus on pulling your foot up off the tarmac rather than pushing down. This naturally quickens your cadence."
                 )
                 CueItemRow(
                     cue: "“Run on ice”",
-                    focus: "Promotes delicate, quiet footfalls with bent knees to dampen impact shock."
+                    focus: "This promotes delicate, quiet footfalls with bent knees to dampen the impact shock."
                 )
                 CueItemRow(
                     cue: "“High knees and low ankles”",
-                    focus: "Keeps your lower leg tucked under the knee, preventing the foot from reaching forward."
+                    focus: "This keeps your lower leg tucked under the knee, preventing the foot from reaching forward."
                 )
                 CueItemRow(
                     cue: "“Push through your glutes behind you”",
-                    focus: "Lengthens your stride behind your body with full hip extension without reaching ahead."
+                    focus: "This lengthens your stride behind your body with full hip extension without reaching ahead."
                 )
             }
         }

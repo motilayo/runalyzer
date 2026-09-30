@@ -428,7 +428,7 @@ struct MetricExplainerSheet: View {
                             HStack {
                                 Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
                                     .font(.caption.bold())
-                                Text("Explore Full Biomechanics Guide & Cues")
+                                Text("Tap here to explore the full biomechanics guide and coaching cues.")
                                     .font(.caption.bold())
                                 Spacer()
                                 Image(systemName: "chevron.right")
