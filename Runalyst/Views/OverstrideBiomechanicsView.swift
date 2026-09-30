@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Mode selector for the biomechanics vector diagram
+/// Mode selector for the biomechanics guide
 enum BiomechanicsDiagramMode: String, CaseIterable, Identifiable {
     case compare = "Compare"
     case goodStride = "Good Stride"
@@ -9,8 +9,7 @@ enum BiomechanicsDiagramMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// A clean illustration card representing either Good Stride or Overstriding
-/// using high-resolution sports-science biomechanical graphics.
+/// A biomechanical summary card representing either Good Stride or Overstriding.
 struct BiomechanicalCardView: View {
     let isOverstride: Bool
 
@@ -58,34 +57,34 @@ struct BiomechanicalCardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 if isOverstride {
                     KinematicPointRow(
-                        title: "Foot Strike Ahead of COM (>30cm)",
-                        subtitle: "Your foot lands with a large forward tibial angle, producing heavy braking forces.",
+                        title: "Landing Ahead of Center of Mass (> 30 cm)",
+                        subtitle: "Your foot reaches forward with an angled shin, producing heavy braking forces against the ground.",
                         isPositive: false
                     )
                     KinematicPointRow(
-                        title: "Reduced Knee Flexion",
-                        subtitle: "A straightened knee cannot act as a spring, sending vertical impact up into your joints.",
+                        title: "Locked Knee on Landing",
+                        subtitle: "A rigid, straightened knee cannot absorb shock like a spring, sending impact directly into your joints.",
                         isPositive: false
                     )
                     KinematicPointRow(
-                        title: "High Braking & Vertical Impact",
-                        subtitle: "The braking force redirects your horizontal speed into a high vertical bounce (>10 cm).",
+                        title: "High Braking & Vertical Bounce",
+                        subtitle: "Each braking step halts forward momentum, redirecting your energy into a high vertical bounce (> 10 cm).",
                         isPositive: false
                     )
                 } else {
                     KinematicPointRow(
-                        title: "Foot Strike Close to COM",
-                        subtitle: "Your foot lands under your pelvis with a slight forward body lean, directing force horizontally.",
+                        title: "Landing Close to Center of Mass",
+                        subtitle: "Your foot lands underneath your hips with a slight forward lean from the ankles, directing force horizontally.",
                         isPositive: true
                     )
                     KinematicPointRow(
-                        title: "Good Knee Flexion",
-                        subtitle: "A flexed knee absorbs the landing load naturally through your quadriceps and elastic recoil.",
+                        title: "Soft, Flexed Knee",
+                        subtitle: "A bent knee cushions the landing naturally through muscle engagement and elastic recoil.",
                         isPositive: true
                     )
                     KinematicPointRow(
-                        title: "Small Tibial Angle & Push-Off",
-                        subtitle: "A nearly vertical shin on landing unlocks a powerful rearward glute push-off.",
+                        title: "Near-Vertical Shin & Push-Off",
+                        subtitle: "Landing with a nearly vertical shin lets you roll smoothly into a powerful push-off behind you.",
                         isPositive: true
                     )
                 }
@@ -143,31 +142,31 @@ struct KinematicComparisonMatrixView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ComparisonRowItem(
                     variable: "Landing Point",
-                    good: "Under pelvis (<10cm)",
-                    overstride: "Cast ahead (>30cm)"
+                    good: "Under hips (< 10 cm)",
+                    overstride: "Cast forward (> 30 cm)"
                 )
                 Divider()
                 ComparisonRowItem(
                     variable: "Knee Angle",
                     good: "Flexed (~25° bend)",
-                    overstride: "Locked / Stiff (<10°)"
+                    overstride: "Locked / Stiff (< 10°)"
                 )
                 Divider()
                 ComparisonRowItem(
                     variable: "Body Lean",
                     good: "Slight forward (6°–8°)",
-                    overstride: "Upright / Backward"
+                    overstride: "Upright or leaning back"
                 )
                 Divider()
                 ComparisonRowItem(
                     variable: "Primary Force",
-                    good: "Horizontal Propulsion",
-                    overstride: "Braking & Vertical Bounce"
+                    good: "Horizontal propulsion",
+                    overstride: "Braking & upward bounce"
                 )
                 Divider()
                 ComparisonRowItem(
-                    variable: "Joint Load",
-                    good: "Muscular absorption",
+                    variable: "Impact Absorption",
+                    good: "Muscular spring recoil",
                     overstride: "Joint & shin impact"
                 )
             }
@@ -242,7 +241,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
                     metricName: "Vertical Oscillation",
                     goodRange: "6.0 – 9.0 cm",
                     overstrideRange: "> 10.0 cm",
-                    explanation: "Landing stiff-legged sends the kinetic impact straight up, creating a high bounce instead of forward speed."
+                    explanation: "Landing on a stiff leg sends impact straight up, creating excess vertical bounce instead of forward speed."
                 )
 
                 Divider()
@@ -251,25 +250,25 @@ struct AppleWatchBiomechanicsBridgeView: View {
                     metricName: "Ground Contact Time",
                     goodRange: "200 – 240 ms",
                     overstrideRange: "> 260 ms",
-                    explanation: "A braking foot must stay glued to the asphalt while your center of mass slowly rolls over the ankle."
+                    explanation: "When your foot lands too far ahead, it stays on the ground longer as your body slowly rolls over the ankle before pushing off."
                 )
 
                 Divider()
 
                 TelemetryComparisonRow(
-                    metricName: "Cadence Turnover",
+                    metricName: "Cadence",
                     goodRange: "165 – 180 SPM",
                     overstrideRange: "< 155 SPM",
-                    explanation: "Slow turnover gives your lead leg time to cast forward; quick steps force your feet to land under your hips."
+                    explanation: "A slower cadence gives your lead leg time to reach too far forward. Quicker steps naturally encourage your feet to land beneath your hips."
                 )
 
                 Divider()
 
                 TelemetryComparisonRow(
                     metricName: "Vertical Ratio",
-                    goodRange: "< 8.0 %",
-                    overstrideRange: "> 9.5 %",
-                    explanation: "This is the ratio of vertical bounce to stride length. A lower value means your energy propels you forward rather than upward."
+                    goodRange: "< 8.0%",
+                    overstrideRange: "> 9.5%",
+                    explanation: "This measures vertical bounce as a percentage of stride length. Lower percentages mean more of your energy propels you forward rather than upward."
                 )
             }
             .padding(12)
@@ -335,20 +334,20 @@ struct CorrectiveCuesCardView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 CueItemRow(
-                    cue: "“Get feet off the ground quickly”",
-                    focus: "Focus on pulling your foot up off the tarmac rather than pushing down. This naturally quickens your cadence."
+                    cue: "“Quick off the ground”",
+                    focus: "Focus on lifting your foot off the ground rather than stomping down. This naturally quickens your cadence and shortens ground contact."
                 )
                 CueItemRow(
                     cue: "“Run on ice”",
-                    focus: "This promotes delicate, quiet footfalls with bent knees to dampen the impact shock."
+                    focus: "Encourages soft, quiet landings with bent knees to absorb impact smoothly and stay light on your feet."
                 )
                 CueItemRow(
-                    cue: "“High knees and low ankles”",
-                    focus: "This keeps your lower leg tucked under the knee, preventing the foot from reaching forward."
+                    cue: "“High knees, low ankles”",
+                    focus: "Keeps your lower leg tucked comfortably beneath the knee, preventing your foot from casting out ahead."
                 )
                 CueItemRow(
-                    cue: "“Push through your glutes behind you”",
-                    focus: "This lengthens your stride behind your body with full hip extension without reaching ahead."
+                    cue: "“Drive through your glutes”",
+                    focus: "Lengthens your stride behind you through full hip extension rather than overreaching out in front."
                 )
             }
         }

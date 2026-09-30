@@ -66,7 +66,7 @@ struct MetricDetailExplainer {
                 modeContext: isWorkoutStats
                     ? "Workout Stats: Averages bounce across your whole session from start to finish, including walking pauses."
                     : "Working Stats: Measures bounce only while you are actively running, filtering out pauses and walking to show your true form.",
-                whyItMatters: "Efficiency: Running is about moving forward. When you overstride with a locked knee and large tibial angle, your foot acts as a mechanical brake ahead of your Center of Mass, redirecting forward momentum upward into wasted bounce and joint shock.",
+                whyItMatters: "Efficiency: Running is about moving forward. Overstriding with an extended knee causes your foot to brake in front of your center of mass, redirecting forward momentum upward into wasted bounce and joint impact.",
                 targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Characteristic of overstriding, increasing braking shock on joints.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
             )
         case "avg pace", "pace":
@@ -428,7 +428,7 @@ struct MetricExplainerSheet: View {
                             HStack {
                                 Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
                                     .font(.caption.bold())
-                                Text("Tap here to explore the full biomechanics guide and coaching cues.")
+                                Text("Explore full biomechanics guide & coaching cues")
                                     .font(.caption.bold())
                                 Spacer()
                                 Image(systemName: "chevron.right")
