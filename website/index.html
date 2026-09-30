@@ -31,7 +31,7 @@
   <meta name="theme-color" content="#fafaf8">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="assets/images/app_icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1.1">
 </head>
 <body>
 
@@ -380,6 +380,80 @@
                 <strong>Adversarial Noise Injection:</strong> Validated with <code class="eng-code">TelemetryNoiseInjector</code> injecting &plusmn;1.2 SPM cadence, &plusmn;1.5 BPM HR, and &plusmn;3.0 s/km pace jitter to guarantee zero-threshold fragility.
               </li>
             </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           WHY WE FOCUS ON THOSE METRICS (Biomechanical Overstride Formulation)
+           ==================================================================== -->
+      <div class="biomechanics-callout-card fade-in-section">
+        <div class="biomechanics-header">
+          <span class="eng-tag pastel-coral">BIOMECHANICAL TRIAGE &bull; INJURY PREVENTATIVE ARCHITECTURE</span>
+          <h3 class="biomechanics-title">Why We Focus on Those Metrics</h3>
+          <p class="biomechanics-subtitle">
+            Most fitness trackers report cadence, stride length, and ground contact time as isolated, disconnected scalars. Runalyst evaluates them through a deterministic physical law: <strong>overstride is not a single number—it is a physical conjunction of three variables.</strong>
+          </p>
+        </div>
+
+        <!-- Formula Display Card -->
+        <div class="biomechanics-formula-display">
+          <div class="formula-caption">THE OVERSTRIDE RISK FORMULATION</div>
+          <div class="formula-math-row">
+            <span class="formula-group"><span class="formula-term formula-target">Overstride Risk</span></span>
+            <span class="formula-symbol">=</span>
+            <span class="formula-group"><span class="formula-bracket">(</span><span class="formula-term formula-part">Low Cadence</span><span class="formula-bracket">)</span></span>
+            <span class="formula-symbol">&and;</span>
+            <span class="formula-group"><span class="formula-bracket">(</span><span class="formula-term formula-part">High Stride Length relative to Speed</span><span class="formula-bracket">)</span></span>
+            <span class="formula-symbol">&and;</span>
+            <span class="formula-group"><span class="formula-bracket">(</span><span class="formula-term formula-part">Elevated GCT</span><span class="formula-bracket">)</span></span>
+          </div>
+        </div>
+
+        <!-- 3 Pillars Grid -->
+        <div class="biomechanics-pillars-grid">
+          <div class="bio-pillar-card">
+            <div class="bio-pillar-num">01</div>
+            <h4 class="bio-pillar-title">Low Cadence (&Delta; &lt; Baseline)</h4>
+            <p class="bio-pillar-body">
+              When turnover drops below your personal 30-day baseline, each stride requires higher vertical flight time to sustain pace. This allows the swinging foot to drift and strike significantly ahead of your center of mass.
+            </p>
+            <div class="bio-pillar-metric">
+              <span class="metric-label">Biometric Signal</span>
+              <span class="metric-val">Cadence &lt; 30-Day Mean</span>
+            </div>
+          </div>
+
+          <div class="bio-pillar-card">
+            <div class="bio-pillar-num">02</div>
+            <h4 class="bio-pillar-title">High Stride Length / Speed</h4>
+            <p class="bio-pillar-body">
+              A long stride is only efficient when driven by powerful rear hip extension at race speeds. Artificially reaching forward with a straight knee during aerobic paces generates sharp deceleration shockwaves through the tibia and knee.
+            </p>
+            <div class="bio-pillar-metric">
+              <span class="metric-label">Biometric Signal</span>
+              <span class="metric-val">Stride Length / Velocity Ratio &uarr;</span>
+            </div>
+          </div>
+
+          <div class="bio-pillar-card">
+            <div class="bio-pillar-num">03</div>
+            <h4 class="bio-pillar-title">Elevated Ground Contact Time</h4>
+            <p class="bio-pillar-body">
+              Spring-like running relies on rapid Achilles tendon elastic recoil (&lt;230 ms). Landing in front of the center of mass spikes GCT (&gt;260 ms) as the body stalls in a braking phase rather than immediately rolling forward.
+            </p>
+            <div class="bio-pillar-metric">
+              <span class="metric-label">Biometric Signal</span>
+              <span class="metric-val">GCT &gt; 250–270 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actionable Outcome Box -->
+        <div class="biomechanics-action-box">
+          <div class="action-box-icon">🎯</div>
+          <div class="action-box-text">
+            <strong>The Deterministic Action:</strong> No single variable is penalized in isolation—downhill coasting or sprint acceleration will not trigger a false alert. Only when all three conditions concur does Swift intervene, instructing Apple FoundationModels to prescribe targeted <em>Cadence Pyramids</em> or <em>Rhythm Intervals</em> to guide foot strikes back underneath the pelvis.
           </div>
         </div>
       </div>

@@ -24,6 +24,16 @@ Currently, Runalyst captures and analyzes pace, cadence, heart rate, and vertica
    This created false positives for tall runners with naturally long, efficient strides, as well as easy recovery runs where cadence is lower without braking forces. Conversely, it failed to detect true braking overstriding at cadences between 150–165 SPM.
 3. **Missing Running Economy Benchmark (Vertical Ratio)**: Apple Watch captures both vertical oscillation (VO) and stride length. The ratio of the two—**Vertical Ratio** ($\frac{\text{Vertical Oscillation}}{\text{Stride Length}} \times 100\%$)—is the gold-standard metric for running economy, describing the percentage of energy directed upward (wasted bounce) versus forward. Runalyst previously could not compute this metric.
 
+### Translating Laboratory Biomechanics into HealthKit Telemetry
+
+While sports science labs require high-speed optical motion capture to measure tibial inclination angles, knee flexion, and distance from the center of mass (COM), Runalyst detects and treats this exact mechanical failure using wrist-based Apple HealthKit telemetry.
+
+Because the Apple Watch is worn on the wrist, it cannot directly measure whether a foot strike is $> 30\text{ cm}$ ahead of the COM. However, it captures the three downstream kinematic consequences of that mechanical braking force:
+
+* **Cadence vs. Stride Length Disparity**: Overstriding occurs when a runner reaches forward with their lead leg rather than driving backward with their glutes. In the data pipeline, this manifests as an inflated `runningStrideLength` paired with a sluggish cadence (e.g., $< 155\text{ SPM}$).
+* **Spike in Ground Contact Time (GCT)**: When the foot lands with a locked knee and large forward tibial angle, it acts as a mechanical brake. The foot must remain planted on the ground while the runner's COM slowly travels forward over the ankle. That braking phase directly inflates `runningGroundContactTime` (often $> 260\text{ ms}$).
+* **Excessive Vertical Oscillation**: Landing stiff-legged sends high vertical impact forces straight up the kinetic chain. The energy that should have propelled the runner forward bounces upward instead, resulting in elevated `runningVerticalOscillation` (e.g., $> 10.0\text{ cm}$, like the $10.6\text{ cm}$ reading flagged in test fixtures).
+
 ## Decision Drivers
 
 * **Biomechanical Fidelity**: Distinguish between cadence-driven vs. stride-driven pace adaptations, and detect actual braking overstriding rather than using an arbitrary cadence threshold.
