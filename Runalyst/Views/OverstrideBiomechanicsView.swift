@@ -1,14 +1,5 @@
 import SwiftUI
 
-/// Mode selector for the biomechanics guide
-enum BiomechanicsDiagramMode: String, CaseIterable, Identifiable {
-    case compare = "Compare"
-    case goodStride = "Good Stride"
-    case overstride = "Overstriding"
-
-    var id: String { rawValue }
-}
-
 /// A biomechanical summary card representing either Good Stride or Overstriding.
 struct BiomechanicalCardView: View {
     let isOverstride: Bool
@@ -121,98 +112,6 @@ private struct KinematicPointRow: View {
             }
 
             Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// Comparative Matrix comparing mechanical variables side-by-side
-struct KinematicComparisonMatrixView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.left.and.right.square.fill")
-                    .foregroundColor(.accentColor)
-                    .font(.subheadline)
-                Text("Kinematic Comparison Matrix")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.primary)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                ComparisonRowItem(
-                    variable: "Landing Point",
-                    good: "Under hips (< 10 cm)",
-                    overstride: "Cast forward (> 30 cm)"
-                )
-                Divider()
-                ComparisonRowItem(
-                    variable: "Knee Angle",
-                    good: "Flexed (~25° bend)",
-                    overstride: "Locked / Stiff (< 10°)"
-                )
-                Divider()
-                ComparisonRowItem(
-                    variable: "Body Lean",
-                    good: "Slight forward (6°–8°)",
-                    overstride: "Upright or leaning back"
-                )
-                Divider()
-                ComparisonRowItem(
-                    variable: "Primary Force",
-                    good: "Horizontal propulsion",
-                    overstride: "Braking & upward bounce"
-                )
-                Divider()
-                ComparisonRowItem(
-                    variable: "Impact Absorption",
-                    good: "Muscular spring recoil",
-                    overstride: "Joint & shin impact"
-                )
-            }
-            .padding(12)
-            .background(Color(UIColor.tertiarySystemFill))
-            .cornerRadius(14)
-        }
-        .padding(14)
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(18)
-    }
-}
-
-private struct ComparisonRowItem: View {
-    let variable: String
-    let good: String
-    let overstride: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(variable)
-                .font(.caption2.bold())
-                .foregroundColor(.secondary)
-                .textCase(.uppercase)
-
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.teal)
-                        .font(.system(size: 10))
-                    Text(good)
-                        .font(.caption.bold())
-                        .foregroundColor(.teal)
-                }
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
-                        .font(.system(size: 10))
-                    Text(overstride)
-                        .font(.caption.bold())
-                        .foregroundColor(.red)
-                }
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -384,49 +283,33 @@ private struct CueItemRow: View {
     }
 }
 
-/// Complete standalone bottom-sheet modal or embeddable screen detailing overstriding biomechanics
+/// Complete standalone bottom-sheet modal detailing overstriding biomechanics across 3 focused sections
 struct OverstrideBiomechanicsSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var mode: BiomechanicsDiagramMode = .compare
+    @State private var isOverstride = true
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Segmented Mode Selector
-                    Picker("Biomechanics View", selection: $mode) {
-                        ForEach(BiomechanicsDiagramMode.allCases) { m in
-                            Text(m.rawValue).tag(m)
+                    // 1. Form Mode Toggle & Biomechanical Concept Card
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("Form", selection: $isOverstride) {
+                            Text("Good Stride").tag(false)
+                            Text("Overstride").tag(true)
                         }
+                        .pickerStyle(.segmented)
+
+                        BiomechanicalCardView(isOverstride: isOverstride)
                     }
-                    .pickerStyle(.segmented)
                     .padding(.horizontal)
                     .padding(.top, 4)
 
-                    // Diagram Content
-                    switch mode {
-                    case .compare:
-                        VStack(spacing: 14) {
-                            KinematicComparisonMatrixView()
-                            BiomechanicalCardView(isOverstride: false)
-                            BiomechanicalCardView(isOverstride: true)
-                        }
-                        .padding(.horizontal)
-
-                    case .goodStride:
-                        BiomechanicalCardView(isOverstride: false)
-                            .padding(.horizontal)
-
-                    case .overstride:
-                        BiomechanicalCardView(isOverstride: true)
-                            .padding(.horizontal)
-                    }
-
-                    // Apple Watch Sensor Connection
+                    // 2. Apple Watch Sensor Telemetry
                     AppleWatchBiomechanicsBridgeView()
                         .padding(.horizontal)
 
-                    // Mental Cues
+                    // 3. Actionable Coaching Cues
                     CorrectiveCuesCardView()
                         .padding(.horizontal)
 

@@ -302,7 +302,6 @@ struct MetricExplainerSheet: View {
     var targetRange: String?
     @Environment(\.dismiss) private var dismiss
     @State private var showingBiomechanicsModal = false
-    @State private var inlineBiomechanicsOverstride = true
 
     private var isBiomechanicsMetric: Bool {
         let lower = title.lowercased()
@@ -403,44 +402,37 @@ struct MetricExplainerSheet: View {
                     .cornerRadius(10)
                 }
 
-                // Biomechanical Kinematic Guide (Overstride vs Good Stride)
+                // Running Form & Biomechanics Guide (Progressive Disclosure)
                 if isBiomechanicsMetric {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Running Form Guide")
-                                .font(.caption.bold())
-                                .foregroundColor(.secondary)
-                                .textCase(.uppercase)
+                    Button(action: { showingBiomechanicsModal = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "figure.run")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.accentColor)
+                                .frame(width: 32, height: 32)
+                                .background(Color.accentColor.opacity(0.12))
+                                .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Running Form & Overstriding Guide")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.primary)
+                                Text("See how foot landing affects bounce, cadence, and efficiency.")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
 
                             Spacer()
 
-                            Picker("Form", selection: $inlineBiomechanicsOverstride) {
-                                Text("Good Stride").tag(false)
-                                Text("Overstride").tag(true)
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(maxWidth: 190)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.bold())
+                                .foregroundColor(.secondary)
                         }
-
-                        BiomechanicalCardView(isOverstride: inlineBiomechanicsOverstride)
-
-                        Button(action: { showingBiomechanicsModal = true }) {
-                            HStack {
-                                Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
-                                    .font(.caption.bold())
-                                Text("Explore full biomechanics guide & coaching cues")
-                                    .font(.caption.bold())
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption2.bold())
-                            }
-                            .foregroundColor(.accentColor)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .background(Color.accentColor.opacity(0.1))
-                            .cornerRadius(10)
-                        }
+                        .padding(12)
+                        .background(Color(UIColor.secondarySystemFill))
+                        .cornerRadius(12)
                     }
+                    .buttonStyle(.plain)
                     .sheet(isPresented: $showingBiomechanicsModal) {
                         OverstrideBiomechanicsSheet()
                     }
@@ -476,7 +468,7 @@ struct MetricExplainerSheet: View {
             }
             .padding(20)
         }
-        .presentationDetents(isBiomechanicsMetric ? [.fraction(0.85), .large] : [.fraction(0.52), .medium, .large])
+        .presentationDetents(isBiomechanicsMetric ? [.fraction(0.58), .medium, .large] : [.fraction(0.52), .medium, .large])
         .presentationDragIndicator(.visible)
     }
 }
