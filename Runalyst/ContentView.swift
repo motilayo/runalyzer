@@ -407,7 +407,7 @@ struct AppStoreTourView: View {
     }
 
     private var runFirstWithMetrics: RunRecord? {
-        existingRuns.first { ($0.workingAvgCadence ?? 0) > 0 } ?? existingRuns.first
+        existingRuns.first { $0.workingAvgCadence > 0 } ?? existingRuns.first
     }
 }
 

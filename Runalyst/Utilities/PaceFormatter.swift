@@ -66,8 +66,8 @@ struct MetricDetailExplainer {
                 modeContext: isWorkoutStats
                     ? "Workout Stats: Averages bounce across your whole session from start to finish, including walking pauses."
                     : "Working Stats: Measures bounce only while you are actively running, filtering out pauses and walking to show your true form.",
-                whyItMatters: "Efficiency: Running is about moving forward. Energy spent bouncing up and down is wasted and puts extra shock on your legs.",
-                targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Increases impact on your joints and tires your legs out faster.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
+                whyItMatters: "Efficiency: Running is about moving forward. Overstriding with an extended knee causes your foot to brake in front of your center of mass, redirecting forward momentum upward into wasted bounce and joint impact.",
+                targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Characteristic of overstriding, increasing braking shock on joints.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
             )
         case "avg pace", "pace":
             return MetricDetailExplainer(
@@ -301,6 +301,12 @@ struct MetricExplainerSheet: View {
     var whyItMatters: String?
     var targetRange: String?
     @Environment(\.dismiss) private var dismiss
+    @State private var showingBiomechanicsModal = false
+
+    private var isBiomechanicsMetric: Bool {
+        let lower = title.lowercased()
+        return lower.contains("osc") || lower.contains("vertical") || lower.contains("stride")
+    }
 
     init(title: String, definition: String) {
         self.title = title
@@ -396,6 +402,42 @@ struct MetricExplainerSheet: View {
                     .cornerRadius(10)
                 }
 
+                // Running Form & Biomechanics Guide (Progressive Disclosure)
+                if isBiomechanicsMetric {
+                    Button(action: { showingBiomechanicsModal = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "figure.run")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.accentColor)
+                                .frame(width: 32, height: 32)
+                                .background(Color.accentColor.opacity(0.12))
+                                .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Running Form & Overstriding Guide")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.primary)
+                                Text("See how foot landing affects bounce, cadence, and efficiency.")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.bold())
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(12)
+                        .background(Color(UIColor.secondarySystemFill))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showingBiomechanicsModal) {
+                        OverstrideBiomechanicsSheet()
+                    }
+                }
+
                 // Why It Matters
                 if let why = whyItMatters, !why.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -426,7 +468,7 @@ struct MetricExplainerSheet: View {
             }
             .padding(20)
         }
-        .presentationDetents([.fraction(0.52), .medium, .large])
+        .presentationDetents(isBiomechanicsMetric ? [.fraction(0.58), .medium, .large] : [.fraction(0.52), .medium, .large])
         .presentationDragIndicator(.visible)
     }
 }
