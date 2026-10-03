@@ -45,12 +45,12 @@ function initScreenshotShowcase() {
     },
     drills: {
       src: 'assets/images/03_Targeted_Drills.png',
-      badge: '03 / PRE-RUN DRILL PRESCRIPTION',
-      title: 'Targeted Form Drills',
-      desc: 'Never guess what warm-up to run. When low cadence or fatigue is detected, Runalyst prescribes specific drills like Cadence Pyramids, Rhythm Intervals, or Strides with distinct work, effort, and rest instructions.',
-      b1: 'Structured 4-field drill prescriptions: Purpose, Work, Effort, Recovery',
-      b2: 'Interactive completion tracking with state saved permanently to SwiftData',
-      b3: 'Dynamic cadence targets tailored to nudge turnover by +5 SPM'
+      badge: '03 / PRE-RUN DRILL PRESCRIPTION & TIMELINES',
+      title: 'Targeted Form Drills & Workout Timelines',
+      desc: 'Never guess what warm-up to run. When low cadence or fatigue is detected, Runalyst prescribes targeted drills with proportional phase timelines and an interstitial mental preparation readout before syncing to Apple Watch.',
+      b1: 'Structured 5-point mental readout: Target Cues, Biomechanical Focus, Phase Breakdown, Strategy, Effort',
+      b2: 'Proportional horizontal geometry blocks visualizing warmups, surges, and recovery intervals',
+      b3: 'Dynamic duration scaling (5m, 10m, 15m) with one-tap export to Apple Watch WorkoutKit'
     },
     progression: {
       src: 'assets/images/04_Longitudinal_Progression.png',

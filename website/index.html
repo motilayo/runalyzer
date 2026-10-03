@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Runalyst — Your running form, decoded.</title>
-  <meta name="description" content="Turn raw Apple Watch running telemetry into personalized coaching. Live cadence deltas, 30-day relative baselines, and targeted form drills on iPhone.">
+  <meta name="description" content="Turn raw Apple Watch running telemetry into personalized coaching. 11-profile taxonomic classification, workout phase timelines, live cadence deltas, 30-day baselines, and targeted form drills on iPhone.">
   <meta name="keywords" content="running coach, Apple Watch running app, running biometrics, cadence, vertical oscillation, ground contact time, SwiftData, on-device AI, runalyst.ca">
   
   <!-- SEO & Canonical -->
@@ -31,7 +31,7 @@
   <meta name="theme-color" content="#fafaf8">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="assets/images/app_icon.png">
-  <link rel="stylesheet" href="styles.css?v=1.1">
+  <link rel="stylesheet" href="styles.css?v=2.3.0">
 </head>
 <body>
 
@@ -94,7 +94,8 @@
          ==================================================================== -->
     <section class="hero-section" id="hero">
       <div class="hero-tag">
-        <span>⚡ On-Device Running Intelligence</span>
+        <span class="hero-version-pill">v2.3.0</span>
+        <span>⚡ 11-Profile Classification &amp; Workout Timelines</span>
       </div>
 
       <h1 class="hero-title">
@@ -102,7 +103,7 @@
       </h1>
 
       <p class="hero-subtitle">
-        Turn raw Apple Watch telemetry into personalized, actionable coaching. Live cadence deltas, 30-day relative baselines, and targeted form drills—100% on your device.
+        Turn raw Apple Watch telemetry into personalized, actionable coaching. 11-profile taxonomic classification, workout phase timelines, live cadence deltas, 30-day baselines, and targeted form drills—100% on your device.
       </p>
 
       <div class="hero-cta-row">
@@ -156,13 +157,13 @@
       </div>
 
       <div class="ribbon-box ribbon-sand">
-        <span class="ribbon-num">100%</span>
-        <span class="ribbon-caption">On-device Apple FoundationModels. Zero cloud latency or external calls.</span>
+        <span class="ribbon-num">11 Profiles</span>
+        <span class="ribbon-caption">Topological classification from pyramid intervals to urban hill repeats.</span>
       </div>
 
       <div class="ribbon-box ribbon-peach">
-        <span class="ribbon-num">4-Field</span>
-        <span class="ribbon-caption">Targeted pre-run drills: Purpose, Active Work, Effort, and Rest.</span>
+        <span class="ribbon-num">100%</span>
+        <span class="ribbon-caption">On-device Apple FoundationModels. Zero cloud latency or external calls.</span>
       </div>
 
       <div class="ribbon-box ribbon-mint">
@@ -191,18 +192,26 @@
         </div>
 
         <div class="clean-card">
-          <div class="card-icon" style="background: var(--pastel-peach-bg); color: var(--pastel-peach-text);">🧠</div>
+          <div class="card-icon" style="background: var(--pastel-peach-bg); color: var(--pastel-peach-text);">🧬</div>
           <div>
-            <h3>Apple FoundationModels</h3>
-            <p>Runs local LLM inference directly on Apple Silicon. Swift applies deterministic physiological math before prompting for guaranteed safety.</p>
+            <h3>11-Profile Taxonomic Classifier</h3>
+            <p>Extracts 15-dimensional sliding-window feature vectors (ADR-0008). 98.26% accuracy discriminating Pyramids, Hill Repeats, and Urban Traffic.</p>
           </div>
         </div>
 
         <div class="clean-card">
-          <div class="card-icon" style="background: var(--pastel-sand-bg); color: var(--pastel-sand-text);">🎯</div>
+          <div class="card-icon" style="background: var(--pastel-sand-bg); color: var(--pastel-sand-text);">⏱️</div>
           <div>
-            <h3>Targeted Form Drills</h3>
-            <p>Structured 4-field prescriptions: Purpose, Active Work, Effort, and Rest. Prescribes Cadence Pyramids, Rhythm Intervals, and Strides.</p>
+            <h3>Workout Phase Timelines &amp; Readout</h3>
+            <p>Proportional horizontal geometry blocks for warmups, surges, recoveries, and cooldowns. Mental preparation readout modal with Apple Watch handoff.</p>
+          </div>
+        </div>
+
+        <div class="clean-card">
+          <div class="card-icon" style="background: var(--pastel-mint-bg); color: var(--pastel-mint-text);">🧠</div>
+          <div>
+            <h3>Apple FoundationModels</h3>
+            <p>Runs local LLM inference directly on Apple Silicon. Swift applies deterministic physiological math before prompting for guaranteed safety.</p>
           </div>
         </div>
       </div>
@@ -221,7 +230,7 @@
         <div class="showcase-tab-bar" role="tablist">
           <button class="tab-pill active" data-tab="biometrics" role="tab" id="tab-biometrics">01. Biometrics</button>
           <button class="tab-pill" data-tab="coaching" role="tab" id="tab-coaching">02. AI Coaching</button>
-          <button class="tab-pill" data-tab="drills" role="tab" id="tab-drills">03. Targeted Drills</button>
+          <button class="tab-pill" data-tab="drills" role="tab" id="tab-drills">03. Drills &amp; Timelines</button>
           <button class="tab-pill" data-tab="progression" role="tab" id="tab-progression">04. Progression</button>
           <button class="tab-pill" data-tab="privacy" role="tab" id="tab-privacy">05. Privacy</button>
         </div>
@@ -268,43 +277,65 @@
       </div>
 
       <div class="eng-grid fade-in-section">
-        <!-- Card 1: Topological Time-Series Classification -->
+        <!-- Card 1: 11-Profile Taxonomic Feature Vector Classification -->
         <div class="eng-card">
           <div class="eng-card-top">
-            <span class="eng-tag pastel-sage">FramboiseEngine &bull; ADR-0003</span>
+            <span class="eng-tag pastel-sage">FramboiseEngine &bull; ADR-0008</span>
             <span class="eng-step-num">01</span>
           </div>
-          <h3 class="eng-title">Topological Time-Series Classification</h3>
+          <h3 class="eng-title">11-Profile Taxonomic Feature Vector Classification</h3>
           <p class="eng-summary">
-            Standard running apps use scalar Coefficient of Variation (<code class="eng-code">CV = &sigma;/&mu;</code>) to classify runs. But scalar compression destroys temporal sequence: a continuous steady run with a natural warmup and late-run fade produces the exact same CV as an intentional 6-interval track session.
+            Standard running apps compress continuous workouts into flat scalar averages, collapsing intervals and tempo runs into generic buckets. Runalyst extracts a 15-dimensional sliding-window topological feature vector to accurately categorize complex running structures.
           </p>
 
           <div class="eng-callout">
-            <div class="eng-callout-title">The 3-Layer Classification Pipeline</div>
+            <div class="eng-callout-title">The 15-Dimensional Feature Pipeline</div>
             <ul class="eng-bullet-list">
               <li>
-                <strong>1. Zero-Crossing Oscillation Gate:</strong> Cadence time-series is smoothed with a 2-bucket (30-second) sliding window. We count transitions across the session mean to detect genuine surge-and-recovery alternations.
+                <strong>Multi-Resolution Feature Extraction:</strong> Analyzes acceleration gradients, peak cadence clusters, elevation correlation, and stop-to-run transition dynamics.
               </li>
               <li>
-                <strong>2. Multi-Signal Corroboration:</strong> A cycle is only validated if at least 2 of 3 physiological signals corroborate it:
-                <div class="eng-pills-row">
-                  <span class="eng-mini-pill">&Delta; Cadence &ge; +8 SPM</span>
-                  <span class="eng-mini-pill">&Delta; Pace &ge; 15 s/km</span>
-                  <span class="eng-mini-pill">&Delta; HR &ge; +5 BPM (~15s lag comp)</span>
-                </div>
+                <strong>11 Distinct Archetypes:</strong> Discriminating <em>Pyramid Workouts</em>, <em>Hill Repeats</em>, <em>Urban Traffic Runs</em>, <em>Intervals</em>, <em>Tempo Surges</em>, <em>Strides</em>, <em>Steady Effort</em>, <em>Long Run</em>, <em>Recovery Run</em>, <em>Progression Run</em>, and <em>Fartlek</em>.
               </li>
               <li>
-                <strong>3. Duration Guards &amp; Regularity:</strong> Requires &ge;15s surge and &ge;20s recovery phases. If valid cycles &ge; 3, cycle variance separates structured <em>Intervals</em> from irregular <em>Fartlek</em>. If continuous, monotonic quintile acceleration (<code class="eng-code">CV &lt; 0.09</code>) detects true <em>Progression</em> runs.
+                <strong>98.26% CoreML Accuracy:</strong> Validated on authentic multi-runner continuous telemetry fixtures with strict topological guardrails preventing classification conflicts.
               </li>
             </ul>
           </div>
         </div>
 
-        <!-- Card 2: Deterministic Safety Guardrails -->
+        <!-- Card 2: Proportional Workout Phase Timelines -->
+        <div class="eng-card">
+          <div class="eng-card-top">
+            <span class="eng-tag pastel-peach">WorkoutKit &bull; Phase Geometry</span>
+            <span class="eng-step-num">02</span>
+          </div>
+          <h3 class="eng-title">Proportional Workout Phase Timelines &amp; Readout</h3>
+          <p class="eng-summary">
+            Executing complex interval drills requires mental preparation and clear pacing geometry before stepping onto the track or road.
+          </p>
+
+          <div class="eng-callout">
+            <div class="eng-callout-title">Pre-Run Mental Readiness &amp; Geometry</div>
+            <ul class="eng-bullet-list">
+              <li>
+                <strong>Proportional Horizontal Geometry:</strong> Warmup, surge reps, recovery blocks, and cooldown segments are rendered with exact mathematical duration weights.
+              </li>
+              <li>
+                <strong>5-Point Mental Preparation Modal:</strong> Presents Target Cues, Biomechanical Focus, Phase Breakdown, Strategy, and Effort bands before initiating.
+              </li>
+              <li>
+                <strong>Dynamic Duration Scaling:</strong> Instantly scales active work and recovery intervals across 5m, 10m, and 15m presets, ready for one-tap export to Apple Watch WorkoutKit.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Card 3: Deterministic Safety Guardrails -->
         <div class="eng-card">
           <div class="eng-card-top">
             <span class="eng-tag pastel-peach">CoachingEngine &bull; Safety Invariants</span>
-            <span class="eng-step-num">02</span>
+            <span class="eng-step-num">03</span>
           </div>
           <h3 class="eng-title">Deterministic Guardrails over LLM Hallucinations</h3>
           <p class="eng-summary">
@@ -329,11 +360,11 @@
           </div>
         </div>
 
-        <!-- Card 3: 30-Day Rolling Relative Baselines -->
+        <!-- Card 4: 30-Day Rolling Relative Baselines -->
         <div class="eng-card">
           <div class="eng-card-top">
             <span class="eng-tag pastel-sand">SwiftData &bull; Relative Biometrics</span>
-            <span class="eng-step-num">03</span>
+            <span class="eng-step-num">04</span>
           </div>
           <h3 class="eng-title">30-Day Time-Locked Longitudinal Baselines</h3>
           <p class="eng-summary">
@@ -356,11 +387,11 @@
           </div>
         </div>
 
-        <!-- Card 4: Working Stats & Test Veracity -->
-        <div class="eng-card">
+        <!-- Card 5: Working Stats & Test Veracity -->
+        <div class="eng-card span-2">
           <div class="eng-card-top">
             <span class="eng-tag pastel-coral">Telemetry Veracity &bull; ADR-0007</span>
-            <span class="eng-step-num">04</span>
+            <span class="eng-step-num">05</span>
           </div>
           <h3 class="eng-title">Dead-Stop Trimming &amp; Golden Fixtures</h3>
           <p class="eng-summary">
@@ -377,7 +408,7 @@
                 <strong>Authentic Golden Telemetry:</strong> Tested against authentic continuous recordings (<code class="eng-code">authenticIntervals31Min</code>, <code class="eng-code">hillySteadyAerobicRun</code>, <code class="eng-code">fadingCadenceFatigueRun</code>).
               </li>
               <li>
-                <strong>Adversarial Noise Injection:</strong> Validated with <code class="eng-code">TelemetryNoiseInjector</code> injecting &plusmn;1.2 SPM cadence, &plusmn;1.5 BPM HR, and &plusmn;3.0 s/km pace jitter to guarantee zero-threshold fragility.
+                <strong>Adversarial Noise Injection:</strong> Validated with <code class="eng-code">TelemetryNoiseInjector</code> injecting &plusmn;1.2 SPM cadence, &plusmn;1.5 BPM HR, and &plusmn;3.0 s/km pace jitter across 137 automated tests to guarantee zero-threshold fragility.
               </li>
             </ul>
           </div>
@@ -449,6 +480,84 @@
           </div>
         </div>
 
+        <!-- Kinematic Sports-Science Illustration Comparison -->
+        <div class="illustration-comparison-grid">
+          <!-- Good Stride Card -->
+          <div class="illustration-card">
+            <div class="illustration-card-header">
+              <span class="illustration-card-title">Good Stride Kinematics</span>
+              <span class="illustration-badge good">Spring Elasticity</span>
+            </div>
+            <div class="illustration-img-wrap">
+              <img src="assets/images/good_stride_illustration.png" alt="Optimal Running Stride Kinematics" class="illustration-img">
+            </div>
+            <ul class="illustration-points">
+              <li>
+                <span class="point-icon good">✓</span>
+                <div><strong>Landing Beneath Pelvis:</strong> Foot strikes close to center of mass with slight forward ankle lean, directing ground reaction force horizontally.</div>
+              </li>
+              <li>
+                <span class="point-icon good">✓</span>
+                <div><strong>Soft, Flexed Knee:</strong> Bent knee cushions landing naturally through muscle engagement and Achilles tendon elastic recoil (&lt;230 ms).</div>
+              </li>
+              <li>
+                <span class="point-icon good">✓</span>
+                <div><strong>Near-Vertical Shin:</strong> Smoothly rolls into rearward hip extension and glute push-off without braking momentum.</div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Overstride Card -->
+          <div class="illustration-card">
+            <div class="illustration-card-header">
+              <span class="illustration-card-title">Overstriding Kinematics</span>
+              <span class="illustration-badge overstride">Braking Shockwave</span>
+            </div>
+            <div class="illustration-img-wrap">
+              <img src="assets/images/overstride_illustration.png" alt="Overstride Braking Kinematics" class="illustration-img">
+            </div>
+            <ul class="illustration-points">
+              <li>
+                <span class="point-icon bad">✗</span>
+                <div><strong>Landing Ahead of Center of Mass (&gt;30 cm):</strong> Foot casts outward with an angled shin, generating heavy deceleration shockwaves.</div>
+              </li>
+              <li>
+                <span class="point-icon bad">✗</span>
+                <div><strong>Locked Knee on Impact:</strong> Rigid, straightened leg cannot compress like a spring, transmitting kinetic collision directly into knee and hip joints.</div>
+              </li>
+              <li>
+                <span class="point-icon bad">✗</span>
+                <div><strong>High Braking &amp; Vertical Bounce:</strong> Energy stalls in prolonged ground contact (&gt;260 ms) and deflects upward into excessive vertical oscillation (&gt;10 cm).</div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Corrective Mental Coaching Cues Banner -->
+        <div class="cues-banner">
+          <div class="cues-title">
+            <span>🧠 Corrective Mental Cues from On-Device AI Coach</span>
+          </div>
+          <div class="cues-grid">
+            <div class="cue-card">
+              <div class="cue-quote">“Quick off the ground”</div>
+              <div class="cue-body">Focus on lifting off rather than stomping down. Naturally quickens cadence and minimizes ground contact time.</div>
+            </div>
+            <div class="cue-card">
+              <div class="cue-quote">“Run on ice”</div>
+              <div class="cue-body">Encourages light, quiet landings with soft knees to absorb impact smoothly and protect joint cartilage.</div>
+            </div>
+            <div class="cue-card">
+              <div class="cue-quote">“High knees, low ankles”</div>
+              <div class="cue-body">Keeps lower leg tucked under the knee, preventing the foot from reaching or casting forward.</div>
+            </div>
+            <div class="cue-card">
+              <div class="cue-quote">“Drive through your glutes”</div>
+              <div class="cue-body">Lengthens stride behind through full rear hip extension rather than overreaching out in front.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Actionable Outcome Box -->
         <div class="biomechanics-action-box">
           <div class="action-box-icon">🎯</div>
@@ -476,7 +585,7 @@
               <tr>
                 <td><strong>Run Classification</strong></td>
                 <td>Scalar averages &amp; Pace CV (collapses temporal sequence)</td>
-                <td><span class="table-highlight">3-Layer Topological Zero-Crossing</span> with multi-signal corroboration (&ge;2/3 signals)</td>
+                <td><span class="table-highlight">11-Profile Taxonomic Classifier</span> (ADR-0008) &bull; 15D Feature Vectors &bull; Proportional Phase Timelines</td>
               </tr>
               <tr>
                 <td><strong>AI Coaching Logic</strong></td>
