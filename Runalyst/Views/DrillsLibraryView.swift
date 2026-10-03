@@ -227,6 +227,8 @@ struct DrillsLibraryView: View {
                     }
                 }
             )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
         .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in

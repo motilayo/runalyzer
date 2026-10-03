@@ -176,7 +176,7 @@ struct DrillInterstitialReadoutView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
     }
 

@@ -782,6 +782,8 @@ struct DashboardView: View {
                     }
                 }
             )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
         .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
