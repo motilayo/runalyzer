@@ -888,6 +888,30 @@ body {
   overflow-x: auto;
 }
 
+.eng-safety-highlight {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-left: 4px solid #14b8a6;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.eng-safety-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.eng-safety-text {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.55;
+}
+
 .token-kw { color: #8a3b14; font-weight: 700; }
 .token-str { color: #1b6d3e; }
 .token-num { color: #9a4c14; }
