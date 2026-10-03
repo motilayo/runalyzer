@@ -1468,13 +1468,13 @@ body {
 }
 
 .kinematic-summary-box.good {
-  background: rgba(34, 197, 94, 0.04);
-  border-color: rgba(34, 197, 94, 0.18);
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.24);
 }
 
 .kinematic-summary-box.overstride {
-  background: rgba(239, 68, 68, 0.04);
-  border-color: rgba(239, 68, 68, 0.18);
+  background: rgba(244, 63, 94, 0.06);
+  border-color: rgba(244, 63, 94, 0.24);
 }
 
 .summary-stat-row {
