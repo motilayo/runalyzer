@@ -195,7 +195,7 @@
           <div class="card-icon" style="background: var(--pastel-peach-bg); color: var(--pastel-peach-text);">🧬</div>
           <div>
             <h3>11-Profile Taxonomic Classifier</h3>
-            <p>Extracts 15-dimensional sliding-window feature vectors (ADR-0008). 98.26% accuracy discriminating Pyramids, Hill Repeats, and Urban Traffic.</p>
+            <p>Extracts 15-dimensional sliding-window feature vectors to automatically classify workouts with 98.26% accuracy across Pyramids, Hill Repeats, and Urban Runs.</p>
           </div>
         </div>
 
@@ -277,40 +277,40 @@
       </div>
 
       <div class="eng-grid fade-in-section">
-        <!-- Card 1: 11-Profile Taxonomic Feature Vector Classification -->
+        <!-- Card 1: Automatic 11-Type Workout Classification -->
         <div class="eng-card">
           <div class="eng-card-top">
-            <span class="eng-tag pastel-sage">FramboiseEngine &bull; ADR-0008</span>
+            <span class="eng-tag pastel-sage">INTELLIGENT RUN DETECTION</span>
             <span class="eng-step-num">01</span>
           </div>
-          <h3 class="eng-title">11-Profile Taxonomic Feature Vector Classification</h3>
+          <h3 class="eng-title">Automatic 11-Type Workout Classification</h3>
           <p class="eng-summary">
-            Standard running apps compress continuous workouts into flat scalar averages, collapsing intervals and tempo runs into generic buckets. Runalyst extracts a 15-dimensional sliding-window topological feature vector to accurately categorize complex running structures.
+            Standard running apps compress continuous workouts into flat scalar averages, collapsing intervals and tempo runs into generic buckets. Runalyst analyzes acceleration patterns, cadence clusters, and terrain dynamics to automatically categorize complex workout structures.
           </p>
 
           <div class="eng-callout">
-            <div class="eng-callout-title">The 15-Dimensional Feature Pipeline</div>
+            <div class="eng-callout-title">Intelligent Workout Recognition</div>
             <ul class="eng-bullet-list">
               <li>
-                <strong>Multi-Resolution Feature Extraction:</strong> Analyzes acceleration gradients, peak cadence clusters, elevation correlation, and stop-to-run transition dynamics.
+                <strong>Multi-Resolution Signal Analysis:</strong> Evaluates acceleration gradients, peak cadence clusters, elevation correlation, and stop-to-run transition dynamics.
               </li>
               <li>
-                <strong>11 Distinct Archetypes:</strong> Discriminating <em>Pyramid Workouts</em>, <em>Hill Repeats</em>, <em>Urban Traffic Runs</em>, <em>Intervals</em>, <em>Tempo Surges</em>, <em>Strides</em>, <em>Steady Effort</em>, <em>Long Run</em>, <em>Recovery Run</em>, <em>Progression Run</em>, and <em>Fartlek</em>.
+                <strong>11 Distinct Archetypes:</strong> Accurately identifies <em>Pyramid Workouts</em>, <em>Hill Repeats</em>, <em>Urban Traffic Runs</em>, <em>Track Intervals</em>, <em>Tempo Surges</em>, <em>Strides</em>, <em>Steady Effort</em>, <em>Long Run</em>, <em>Recovery Run</em>, <em>Progression Run</em>, and <em>Fartlek</em>.
               </li>
               <li>
-                <strong>98.26% CoreML Accuracy:</strong> Validated on authentic multi-runner continuous telemetry fixtures with strict topological guardrails preventing classification conflicts.
+                <strong>98.26% Machine Learning Accuracy:</strong> Validated on authentic outdoor continuous telemetry with strict safeguards preventing classification conflicts.
               </li>
             </ul>
           </div>
         </div>
 
-        <!-- Card 2: Proportional Workout Phase Timelines -->
+        <!-- Card 2: Visual Workout Phases & Apple Watch Export -->
         <div class="eng-card">
           <div class="eng-card-top">
-            <span class="eng-tag pastel-peach">WorkoutKit &bull; Phase Geometry</span>
+            <span class="eng-tag pastel-peach">WORKOUT READINESS</span>
             <span class="eng-step-num">02</span>
           </div>
-          <h3 class="eng-title">Proportional Workout Phase Timelines &amp; Readout</h3>
+          <h3 class="eng-title">Visual Workout Phases &amp; Apple Watch Export</h3>
           <p class="eng-summary">
             Executing complex interval drills requires mental preparation and clear pacing geometry before stepping onto the track or road.
           </p>
@@ -319,7 +319,7 @@
             <div class="eng-callout-title">Pre-Run Mental Readiness &amp; Geometry</div>
             <ul class="eng-bullet-list">
               <li>
-                <strong>Proportional Horizontal Geometry:</strong> Warmup, surge reps, recovery blocks, and cooldown segments are rendered with exact mathematical duration weights.
+                <strong>Proportional Phase Timelines:</strong> Warmup, surge reps, recovery blocks, and cooldown segments are rendered with exact duration weights.
               </li>
               <li>
                 <strong>5-Point Mental Preparation Modal:</strong> Presents Target Cues, Biomechanical Focus, Phase Breakdown, Strategy, and Effort bands before initiating.
@@ -334,18 +334,18 @@
         <!-- Card 3: Deterministic Safety Guardrails -->
         <div class="eng-card">
           <div class="eng-card-top">
-            <span class="eng-tag pastel-peach">CoachingEngine &bull; Safety Invariants</span>
+            <span class="eng-tag pastel-peach">PHYSIOLOGICAL SAFETY</span>
             <span class="eng-step-num">03</span>
           </div>
-          <h3 class="eng-title">Deterministic Guardrails over LLM Hallucinations</h3>
+          <h3 class="eng-title">Cardiovascular Guardrails Prevent Overtraining</h3>
           <p class="eng-summary">
-            On-device generative models should never compute raw biomechanical arithmetic or balance competing physiological priorities. Small models hallucinate math and fail safety boundaries under prompt conflicts.
+            Generative AI should never guess physiological math or compromise runner safety. Runalyst computes all baseline statistics, fatigue markers, and aerobic thresholds locally before AI coaching generates guidance.
           </p>
 
           <div class="eng-callout">
-            <div class="eng-callout-title">Deterministic Conflict Resolution in Swift</div>
+            <div class="eng-callout-title">Deterministic Safety Invariants</div>
             <p class="eng-desc-sm">
-              All baseline statistics, deltas, and fatigue states are computed locally in <code class="eng-code">RunAnalyzerActor</code> before Apple FoundationModels is ever invoked.
+              When elevated cardiac drift or acute fatigue is detected, safety rules automatically override training goals to protect joint and heart health:
             </p>
             <div class="eng-code-block">
 <span class="token-kw">if</span> paceDelta &lt; <span class="token-num">0</span> &amp;&amp; hrDelta &gt; <span class="token-num">0</span> {
@@ -355,7 +355,7 @@
 }
             </div>
             <p class="eng-desc-sm" style="margin-top: 8px;">
-              The LLM receives one unambiguous physiological directive. The model provides human empathy and conversational tone, but the prescriptive drill selection is 100% mathematically deterministic.
+              The AI coach provides empathetic tone and actionable cues, but the underlying safety decisions and drill targets are 100% mathematically deterministic.
             </p>
           </div>
         </div>
@@ -363,7 +363,7 @@
         <!-- Card 4: 30-Day Rolling Relative Baselines -->
         <div class="eng-card">
           <div class="eng-card-top">
-            <span class="eng-tag pastel-sand">SwiftData &bull; Relative Biometrics</span>
+            <span class="eng-tag pastel-sand">PERSONALIZED BASELINES</span>
             <span class="eng-step-num">04</span>
           </div>
           <h3 class="eng-title">30-Day Time-Locked Longitudinal Baselines</h3>
@@ -375,10 +375,10 @@
             <div class="eng-callout-title">Eliminating Hindsight &amp; Universal Bias</div>
             <ul class="eng-bullet-list">
               <li>
-                <strong>Strict Rolling Window:</strong> Every biometric split is benchmarked against the runner's personal rolling 30-day baseline time-locked to that workout (<code class="eng-code">$0.date &lt; targetDate</code>).
+                <strong>Strict Rolling Window:</strong> Every biometric split is benchmarked against your personal rolling 30-day baseline on the day you ran.
               </li>
               <li>
-                <strong>No Hindsight Leakage:</strong> Historical runs are evaluated strictly against what your baseline was on the day you ran—never retroactively biased by runs that happened weeks later.
+                <strong>No Hindsight Leakage:</strong> Historical workouts are evaluated strictly against what your baseline was on that day—never retroactively biased by runs that happened weeks later.
               </li>
               <li>
                 <strong>Coupled Form Diagnostics:</strong> Vertical oscillation (&gt;10 cm) is mathematically linked to cadence to detect forward bounding vs. compact turnover.
@@ -390,25 +390,25 @@
         <!-- Card 5: Working Stats & Test Veracity -->
         <div class="eng-card span-2">
           <div class="eng-card-top">
-            <span class="eng-tag pastel-coral">Telemetry Veracity &bull; ADR-0007</span>
+            <span class="eng-tag pastel-coral">REAL-WORLD ACCURACY</span>
             <span class="eng-step-num">05</span>
           </div>
-          <h3 class="eng-title">Dead-Stop Trimming &amp; Golden Fixtures</h3>
+          <h3 class="eng-title">Smart Traffic Pause Trimming &amp; Field Calibration</h3>
           <p class="eng-summary">
-            Waiting at traffic lights and street crossings corrupts pace and biomechanical averages with resting zeros. Synthetic metronomic unit tests mask real-world sensor noise.
+            Waiting at traffic lights and street crossings corrupts pace and biomechanical averages with resting zeros. Runalyst filters out stationary stops to report your true Working Stats while running.
           </p>
 
           <div class="eng-callout">
             <div class="eng-callout-title">Authentic Biomechanical Precision</div>
             <ul class="eng-bullet-list">
               <li>
-                <strong>Dead-Stop Bucket Trimming:</strong> <code class="eng-code">FramboiseEngine</code> detects and trims stationary pauses to calculate true Working Stats. When no stops occur, it strictly inherits raw HealthKit double-precision values to prevent floating-point drift.
+                <strong>Smart Pause Detection:</strong> Intelligently detects and trims stationary pauses at red lights to calculate true Working Stats. When running continuously without stops, it preserves pure Apple HealthKit data without distortion.
               </li>
               <li>
-                <strong>Authentic Golden Telemetry:</strong> Tested against authentic continuous recordings (<code class="eng-code">authenticIntervals31Min</code>, <code class="eng-code">hillySteadyAerobicRun</code>, <code class="eng-code">fadingCadenceFatigueRun</code>).
+                <strong>Tested on Authentic Outdoor Roads:</strong> Calibrated and validated across real-world outdoor road workouts with steep hills, traffic pauses, and variable weather—not sterile synthetic simulations.
               </li>
               <li>
-                <strong>Adversarial Noise Injection:</strong> Validated with <code class="eng-code">TelemetryNoiseInjector</code> injecting &plusmn;1.2 SPM cadence, &plusmn;1.5 BPM HR, and &plusmn;3.0 s/km pace jitter across 137 automated tests to guarantee zero-threshold fragility.
+                <strong>Sensor Noise Resilience:</strong> Rigorously stress-tested against real-world GPS jitter, cadence anomalies, and heart rate monitor lag across 137 automated test suites to guarantee zero false alerts.
               </li>
             </ul>
           </div>
@@ -585,22 +585,22 @@
               <tr>
                 <td><strong>Run Classification</strong></td>
                 <td>Scalar averages &amp; Pace CV (collapses temporal sequence)</td>
-                <td><span class="table-highlight">11-Profile Taxonomic Classifier</span> (ADR-0008) &bull; 15D Feature Vectors &bull; Proportional Phase Timelines</td>
+                <td><span class="table-highlight">11-Profile Automatic Classifier</span> &bull; 15D Feature Vectors &bull; Proportional Phase Timelines</td>
               </tr>
               <tr>
                 <td><strong>AI Coaching Logic</strong></td>
                 <td>Prompting cloud LLMs to estimate physiological math</td>
-                <td><span class="table-highlight">Local Deterministic Swift Guardrails</span> &bull; On-device FoundationModels</td>
+                <td><span class="table-highlight">Local Deterministic Guardrails</span> &bull; On-device FoundationModels</td>
               </tr>
               <tr>
                 <td><strong>Baseline Standards</strong></td>
                 <td>Static universal charts (e.g. 180 SPM for all body types)</td>
-                <td><span class="table-highlight">Time-Locked 30-Day Moving Window</span> (<code class="eng-code">$0.date &lt; targetDate</code>)</td>
+                <td><span class="table-highlight">Personalized 30-Day Moving Window</span> (time-locked to run date)</td>
               </tr>
               <tr>
                 <td><strong>Sensor Noise &amp; Pauses</strong></td>
                 <td>Traffic stops dilute stride length and cadence</td>
-                <td><span class="table-highlight">FramboiseEngine Dead-Stop Trimming</span> with raw double inheritance</td>
+                <td><span class="table-highlight">Smart Dead-Stop Trimming</span> with precision HealthKit sync</td>
               </tr>
               <tr>
                 <td><strong>Privacy &amp; Data Pipeline</strong></td>
