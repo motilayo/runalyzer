@@ -104,6 +104,18 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Default canonical duration for this drill when prescribed or activated
+    public var defaultDuration: DrillDuration {
+        switch self {
+        case .zone2Run:
+            return .fiveMinutes
+        case .strides, .recoveryJog:
+            return .fifteenMinutes
+        case .tempoSurges, .cadencePyramids, .rhythmIntervals, .neuromuscularPrimer, .hillBounds, .aerobicFlush, .fartlekPrimer:
+            return .tenMinutes
+        }
+    }
+
     /// The standard run classification this drill belongs to.
     var correspondingClassification: String {
         switch self {

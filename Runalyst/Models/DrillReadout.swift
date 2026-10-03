@@ -138,7 +138,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .rhythmIntervals:
             let resolvedTitle = customTitle ?? "Rhythm Intervals"
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
             let targetStr = targetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" } ?? "162 SPM"
 
             let drill = PreRunDrill(
@@ -149,12 +149,23 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let overviewText: String
+            let breakdownText: String
+
+            if duration == .fifteenMinutes {
+                overviewText = "In this drill, you will complete a 15-minute rhythmic tempo tune-up to establish a consistent, economical cadence."
+                breakdownText = "You’ll start with a 3-minute easy warm-up jog. This is followed by 5 sets of rhythm intervals for 45 seconds, paired with 75 seconds of relaxed recovery jog."
+            } else {
+                overviewText = "In this drill, you will complete a 10-minute rhythmic tempo tune-up to establish a consistent, economical cadence."
+                breakdownText = "You’ll start with a 2-minute easy warm-up jog. This is followed by 4 sets of rhythm intervals for 30 seconds, paired with 45 seconds of relaxed recovery jog."
+            }
+
             return DrillReadout(
                 drillId: .rhythmIntervals,
                 title: resolvedTitle,
                 subtitle: "Cadence & Rhythm Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute rhythmic tempo tune-up to establish a consistent, economical cadence.",
-                breakdown: "You’ll start with a 2-minute easy warm-up jog. This is followed by 4 sets of rhythm intervals for 30 seconds, paired with 45 seconds of relaxed recovery jog.",
+                overview: overviewText,
+                breakdown: breakdownText,
                 coachingTip: "Relax your shoulders and bend your elbows at 90 degrees. Let the cadence of your arms dictate the turnover of your feet.",
                 phases: phases,
                 durationMinutes: duration.rawValue,

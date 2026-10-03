@@ -123,13 +123,13 @@ struct PreRunDrill: Sendable {
         id: PreRunDrillId,
         previousCadence: Int? = nil,
         targetCadence: String? = nil,
-        duration: DrillDuration = .fifteenMinutes,
+        duration: DrillDuration? = nil,
         hapticMode: HapticFeedbackMode = .on
     ) {
         self.id = id
         self.previousCadence = previousCadence
         self.targetCadence = targetCadence
-        self.duration = duration
+        self.duration = duration ?? id.defaultDuration
         self.hapticMode = hapticMode
     }
 
