@@ -887,6 +887,14 @@ private struct DrillCardView: View {
         let recovery = (drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery
         let effort = (drill.drillEffort?.isEmpty == false ? drill.drillEffort : nil) ?? template.defaultEffort
         let purpose = (drill.drillPurpose?.isEmpty == false ? drill.drillPurpose : nil) ?? template.defaultPurpose
+        let cue: String? = {
+            if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
+                return cueText
+            }
+            let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+            let generated = template.generateInstructionalCue(targetInt)
+            return generated.isEmpty ? nil : generated
+        }()
 
         VStack(alignment: .leading, spacing: 12) {
             if totalDrills > 1 {
@@ -973,15 +981,6 @@ private struct DrillCardView: View {
                 }
             }
 
-            let cue: String? = {
-                if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
-                    return cueText
-                }
-                let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
-                let generated = template.generateInstructionalCue(targetInt)
-                return generated.isEmpty ? nil : generated
-            }()
-
             if let cue = cue, !cue.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "lightbulb.fill")
@@ -1051,7 +1050,7 @@ private struct DrillCardView: View {
 
             HStack(spacing: 12) {
                 Button(action: {
-                    openDrillReadout(displayTitle: displayTitle)
+                    openDrillReadout(displayTitle: displayTitle, coachingCue: cue)
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")
@@ -1086,7 +1085,7 @@ private struct DrillCardView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            openDrillReadout(displayTitle: displayTitle)
+            openDrillReadout(displayTitle: displayTitle, coachingCue: cue)
         }
         .frame(maxWidth: .infinity, minHeight: 1)
         .padding()
@@ -1117,7 +1116,7 @@ private struct DrillCardView: View {
         }
     }
 
-    private func openDrillReadout(displayTitle: String) {
+    private func openDrillReadout(displayTitle: String, coachingCue: String?) {
         let currentPreRunId = resolvedPreRunId
         let currentTargetCadence = targetCadenceString
         let currentDrill = preRunDrill
@@ -1135,7 +1134,8 @@ private struct DrillCardView: View {
             customTitle: displayTitle,
             targetCadence: currentTargetCadence,
             previousCadence: drill.previousCadence,
-            customDuration: currentDrill.duration
+            customDuration: currentDrill.duration,
+            customCoachingTip: coachingCue
         )
         activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
     }

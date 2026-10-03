@@ -317,26 +317,20 @@ struct PreRunDrill: Sendable {
         var phases: [WorkoutPhase] = []
 
         let warmUpDurationMinutes: Double
-        let coolDownDurationMinutes: Double
 
         if id == .zone2Run {
             warmUpDurationMinutes = duration == .fiveMinutes ? 5.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0))
-            coolDownDurationMinutes = duration == .fiveMinutes ? 0.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0))
         } else if id == .tempoSurges && duration == .tenMinutes {
             warmUpDurationMinutes = 2.5
-            coolDownDurationMinutes = 0.0
         } else if id == .strides && duration == .fifteenMinutes {
             warmUpDurationMinutes = 5.0
-            coolDownDurationMinutes = 2.0
         } else if id == .aerobicFlush || id == .recoveryJog {
             warmUpDurationMinutes = 0.0
-            coolDownDurationMinutes = 0.0
         } else {
             warmUpDurationMinutes = duration == .fiveMinutes ? 1.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 4.0 : 3.0))
-            coolDownDurationMinutes = duration == .fiveMinutes ? 0.5 : (duration == .tenMinutes ? 1.0 : (duration == .thirtyMinutes ? 2.0 : 2.0))
         }
 
-        if warmUpDurationMinutes > 0 && id != .zone2Run {
+        if warmUpDurationMinutes > 0 && !(id == .zone2Run && duration == .fiveMinutes) {
             phases.append(
                 WorkoutPhase(
                     id: "warmup",
@@ -404,7 +398,8 @@ struct PreRunDrill: Sendable {
                 if duration == .fiveMinutes {
                     return (1, 300, nil, false)
                 } else {
-                    let steadySeconds = Int((Double(duration.rawValue) - warmUpDurationMinutes - coolDownDurationMinutes) * 60)
+                    let zone2CoolDown = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
+                    let steadySeconds = Int((Double(duration.rawValue) - warmUpDurationMinutes - zone2CoolDown) * 60)
                     return (1, max(60, steadySeconds), nil, false)
                 }
             }
@@ -438,6 +433,18 @@ struct PreRunDrill: Sendable {
                     kind: duration == .fiveMinutes && id == .zone2Run ? .warmup : .steady
                 )
             )
+        }
+
+        let coolDownDurationMinutes: Double
+        if id == .aerobicFlush || id == .recoveryJog {
+            coolDownDurationMinutes = 0.0
+        } else if id == .zone2Run {
+            coolDownDurationMinutes = duration == .fiveMinutes ? 0.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0))
+        } else {
+            let intervalSeconds = iterations * (workSeconds + (recoverySeconds ?? 0))
+            let targetTotalSeconds = duration.rawValue * 60
+            let remainingSeconds = targetTotalSeconds - Int(warmUpDurationMinutes * 60) - intervalSeconds
+            coolDownDurationMinutes = max(0.0, Double(remainingSeconds) / 60.0)
         }
 
         if coolDownDurationMinutes > 0 {

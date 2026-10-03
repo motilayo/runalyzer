@@ -128,4 +128,66 @@ final class DrillReadoutTests: XCTestCase {
             XCTAssertGreaterThan(readout.durationMinutes, 0)
         }
     }
+
+    func testCoachingTipsMatchBetweenTemplateAndReadout() {
+        for drillId in PreRunDrillId.allCases {
+            let template = DrillTemplate.template(for: drillId)
+            let templateCue = template.generateInstructionalCue("165 SPM")
+            let readout = DrillReadout.readout(for: drillId, targetCadence: "165 SPM")
+            XCTAssertEqual(
+                readout.coachingTip,
+                templateCue,
+                "Coaching tip must exactly match template for \(drillId)"
+            )
+        }
+    }
+
+    func testRhythmIntervalsScalesAcrossAllDurations() {
+        for duration in DrillDuration.allCases {
+            let readout = DrillReadout.readout(for: .rhythmIntervals, customDuration: duration)
+            XCTAssertTrue(
+                readout.overview.contains("\(duration.rawValue)-minute"),
+                "Overview should mention \(duration.rawValue)-minute"
+            )
+            XCTAssertEqual(readout.durationMinutes, duration.rawValue)
+            let totalSeconds = readout.phases.reduce(0) { $0 + $1.durationSeconds }
+            XCTAssertEqual(
+                totalSeconds,
+                duration.rawValue * 60,
+                "Total seconds for rhythmIntervals at \(duration) must equal \(duration.rawValue * 60)"
+            )
+        }
+    }
+
+    func testNeuromuscularPrimerScalesAcrossAllDurations() {
+        for duration in DrillDuration.allCases {
+            let readout = DrillReadout.readout(for: .neuromuscularPrimer, customDuration: duration)
+            XCTAssertTrue(
+                readout.overview.contains("\(duration.rawValue)-minute"),
+                "Overview should mention \(duration.rawValue)-minute"
+            )
+            XCTAssertEqual(readout.durationMinutes, duration.rawValue)
+            let totalSeconds = readout.phases.reduce(0) { $0 + $1.durationSeconds }
+            XCTAssertEqual(
+                totalSeconds,
+                duration.rawValue * 60,
+                "Total seconds for neuromuscularPrimer at \(duration) must equal \(duration.rawValue * 60)"
+            )
+        }
+    }
+
+    func testAllDrillPhasesSumToExactSelectedDuration() {
+        for drillId in PreRunDrillId.allCases {
+            for duration in DrillDuration.allCases {
+                let drill = PreRunDrill(id: drillId, duration: duration)
+                let phases = drill.generatePhases()
+                let totalSeconds = phases.reduce(0) { $0 + $1.durationSeconds }
+                XCTAssertEqual(
+                    totalSeconds,
+                    duration.rawValue * 60,
+                    "Total phase duration for \(drillId) at \(duration) must be exactly \(duration.rawValue * 60)s"
+                )
+            }
+        }
+    }
 }

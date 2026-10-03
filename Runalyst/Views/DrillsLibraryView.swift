@@ -330,9 +330,26 @@ struct DrillPrimerCardView: View {
     let baselineCadence: Int?
     var onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
-    @State private var selectedDuration: DrillDuration = .fifteenMinutes
+    @State private var selectedDuration: DrillDuration
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
     @State private var showingTargetExplainer = false
+
+    init(
+        drillId: PreRunDrillId,
+        customTitle: String? = nil,
+        customPurpose: String? = nil,
+        customTarget: String? = nil,
+        baselineCadence: Int? = nil,
+        onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)? = nil
+    ) {
+        self.drillId = drillId
+        self.customTitle = customTitle
+        self.customPurpose = customPurpose
+        self.customTarget = customTarget
+        self.baselineCadence = baselineCadence
+        self.onStart = onStart
+        self._selectedDuration = State(initialValue: drillId.defaultDuration)
+    }
 
     private var selectedHapticMode: HapticFeedbackMode {
         get { HapticFeedbackMode(rawValue: selectedHapticModeRaw) ?? .on }

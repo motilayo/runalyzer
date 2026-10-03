@@ -175,7 +175,7 @@ struct DrillTemplate: Sendable {
                     return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
-                    "Pump your arms forward and up, driving through your knees and glutes with tall, powerful posture."
+                    "Pump your arms forward and drive through your hips. Maintain tall posture without collapsing your chest into the incline."
                 }
             )
         case .recoveryJog:
@@ -207,7 +207,7 @@ struct DrillTemplate: Sendable {
                     return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
-                    "Focus on calm nasal breathing and a conversational pace, keeping your heart rate steadily locked in Zone 2."
+                    "Keep your breathing entirely through your nose. If you feel the need to open your mouth to breathe, you are pushing too hard and leaving Zone 2."
                 }
             )
         }
