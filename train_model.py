@@ -6,8 +6,8 @@ import coremltools as ct
 def train_and_export():
     # Load data
     print("Loading data...")
-    train_df = pd.read_csv("CoreML_Training_Data_v5.csv")
-    test_df = pd.read_csv("CoreML_Testing_Data_v5.csv")
+    train_df = pd.read_csv("CoreML_Training_Data_v6.csv")
+    test_df = pd.read_csv("CoreML_Testing_Data_v6.csv")
 
     features = [
         "paceDelta", "hrDelta", "percentZone4", "cadenceDelta", 
@@ -22,29 +22,44 @@ def train_and_export():
     y_test = test_df[target]
 
     print("Training RandomForestClassifier...")
-    model = RandomForestClassifier(n_estimators=150, max_depth=12, random_state=42)
+    model = RandomForestClassifier(n_estimators=150, max_depth=14, random_state=42)
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     print(f"Model Accuracy on Test Set: {acc * 100:.2f}%")
 
-    # Test suite covering crucial real-world cases:
+    # Test suite covering crucial real-world cases across all 11 taxonomic classes:
     test_cases = [
         ("Progressive Intervals (should be Intervals, not Progression)", {
             "paceDelta": -50.0, "hrDelta": 25.0, "percentZone4": 0.55,
             "cadenceDelta": 12.0, "verticalOscillation": 9.0, "cv": 0.13,
             "paceSlope": -0.30, "runnerStage": 1, "durationMinutes": 30.0, "cadenceCV": 0.048
         }, "Intervals"),
-        ("Rhythm Intervals Drill", {
-            "paceDelta": -60.0, "hrDelta": 25.0, "percentZone4": 0.8,
-            "cadenceDelta": 10.0, "verticalOscillation": 9.5, "cv": 0.12,
-            "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 15.0, "cadenceCV": 0.045
-        }, "Intervals"),
+        ("Cadence Pyramids Ladder", {
+            "paceDelta": -40.0, "hrDelta": 20.0, "percentZone4": 0.55,
+            "cadenceDelta": 15.0, "verticalOscillation": 9.2, "cv": 0.08,
+            "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 18.0, "cadenceCV": 0.052
+        }, "Pyramids"),
+        ("Hill Repeats", {
+            "paceDelta": -10.0, "hrDelta": 26.0, "percentZone4": 0.65,
+            "cadenceDelta": 4.0, "verticalOscillation": 11.5, "cv": 0.085,
+            "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 22.0, "cadenceCV": 0.035
+        }, "Hill Repeats"),
+        ("Long Run (Duration >= 90 min)", {
+            "paceDelta": 15.0, "hrDelta": -5.0, "percentZone4": 0.10,
+            "cadenceDelta": -1.0, "verticalOscillation": 8.8, "cv": 0.04,
+            "paceSlope": 0.02, "runnerStage": 1, "durationMinutes": 105.0, "cadenceCV": 0.014
+        }, "Long Run"),
+        ("Urban Traffic (Chaotic Crosswalk Stops)", {
+            "paceDelta": 10.0, "hrDelta": 0.0, "percentZone4": 0.05,
+            "cadenceDelta": -5.0, "verticalOscillation": 8.6, "cv": 0.16,
+            "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 35.0, "cadenceCV": 0.065
+        }, "Urban Traffic"),
         ("Steady Effort with High HR / Cardiac Drift", {
-            "paceDelta": 0.0, "hrDelta": 20.0, "percentZone4": 0.80,
-            "cadenceDelta": 1.0, "verticalOscillation": 9.9, "cv": 0.08,
-            "paceSlope": -0.05, "runnerStage": 1, "durationMinutes": 27.0, "cadenceCV": 0.012
+            "paceDelta": 0.0, "hrDelta": 18.0, "percentZone4": 0.60,
+            "cadenceDelta": 1.0, "verticalOscillation": 9.9, "cv": 0.045,
+            "paceSlope": -0.02, "runnerStage": 1, "durationMinutes": 40.0, "cadenceCV": 0.013
         }, "Steady Effort"),
         ("True Fartlek (Cadence & Pace Surges)", {
             "paceDelta": -20.0, "hrDelta": 18.0, "percentZone4": 0.45,
@@ -57,9 +72,9 @@ def train_and_export():
             "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 45.0, "cadenceCV": 0.014
         }, "Tempo Run"),
         ("Easy Recovery Run", {
-            "paceDelta": 45.0, "hrDelta": -20.0, "percentZone4": 0.01,
-            "cadenceDelta": -4.0, "verticalOscillation": 10.2, "cv": 0.02,
-            "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 25.0, "cadenceCV": 0.011
+            "paceDelta": 60.0, "hrDelta": -25.0, "percentZone4": 0.01,
+            "cadenceDelta": -5.0, "verticalOscillation": 10.2, "cv": 0.015,
+            "paceSlope": 0.0, "runnerStage": 1, "durationMinutes": 30.0, "cadenceCV": 0.010
         }, "Recovery Run"),
     ]
 

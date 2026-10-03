@@ -206,4 +206,98 @@ enum GoldenTelemetryFixtures {
             samples: samples
         )
     }
+
+    /// Authentic structured Pyramids interval ladder (1-2-3-2-1 minutes).
+    /// Features:
+    /// - 5 work reps scaling symmetrically: 60s -> 120s -> 180s -> 120s -> 60s.
+    /// - Uniform 60s recovery jogs.
+    /// - Monotonic climb and descent with bell-curve duration symmetry >= 0.70.
+    static var authenticPyramidsLadder: WorkoutTelemetryFixture {
+        var samples: [BucketTelemetrySample] = []
+
+        // Warmup: 3 min (6 windows of 30s) at 150 SPM, 460 s/km, 134 HR
+        for _ in 0..<6 {
+            samples.append(.make(paceSecPerKm: 460, cadence: 150, hr: 134, verticalOscillation: 8.3, strideLength: 0.88))
+        }
+
+        let ladderSurges = [2, 4, 6, 4, 2] // 60s, 120s, 180s, 120s, 60s (in 30s windows)
+        for surgeWindows in ladderSurges {
+            // Work surge
+            for _ in 0..<surgeWindows {
+                samples.append(.make(paceSecPerKm: 320, cadence: 176, hr: 166, verticalOscillation: 9.1, strideLength: 1.15))
+            }
+            // Recovery
+            for _ in 0..<2 {
+                samples.append(.make(paceSecPerKm: 510, cadence: 135, hr: 144, verticalOscillation: 8.2, strideLength: 0.84))
+            }
+        }
+
+        return WorkoutTelemetryFixture(
+            id: "golden-pyramids-ladder",
+            name: "Structured 1-2-3-2-1 Pyramids Ladder",
+            expectedClassification: "Pyramids",
+            physiologicalNotes: "Symmetrical expanding and contracting interval ladder with workBlockSymmetry >= 0.70.",
+            durationMinutes: 17.0,
+            samples: samples
+        )
+    }
+
+    /// Continuous run punctuated by chaotic urban street stops (crosswalks, stoplights).
+    /// Features:
+    /// - Continuous steady running at 158 SPM punctuated by 4 abrupt 15s dead-stops (< 70 SPM, pace > 600 s/km).
+    /// - Lacks structured interval symmetry or purposeful recovery floors.
+    static var urbanTrafficCrosswalkRun: WorkoutTelemetryFixture {
+        var samples: [BucketTelemetrySample] = []
+
+        for i in 0..<80 {
+            // 4 street stoplights with irregular city block intervals (buckets 10, 28, 42, 65)
+            if i == 10 || i == 28 || i == 42 || i == 65 {
+                samples.append(.make(durationSeconds: 15, paceSecPerKm: 800, cadence: 0, hr: 125, verticalOscillation: 0, strideLength: 0))
+            } else {
+                samples.append(.make(durationSeconds: 15, paceSecPerKm: 380, cadence: 158, hr: 146, verticalOscillation: 8.6, strideLength: 1.0))
+            }
+        }
+
+        return WorkoutTelemetryFixture(
+            id: "golden-urban-traffic-crosswalk",
+            name: "Urban Run with Crosswalk Stops",
+            expectedClassification: "Urban Traffic",
+            physiologicalNotes: "Chaotic 15s dead-stops without interval periodicity triggering urbanTraffic entropy.",
+            durationMinutes: 20.0,
+            samples: samples
+        )
+    }
+
+    /// Authentic hill repeats workout with repeated elevation gain sawtooths.
+    /// Features:
+    /// - 4 steep hill climb reps (+10m gain each) correlated with HR spikes to 170+ BPM, followed by descending recoveries.
+    static var authenticHillRepeatsSawtooth: WorkoutTelemetryFixture {
+        var samples: [BucketTelemetrySample] = []
+
+        // Warmup: 3 min (6 windows of 30s)
+        for _ in 0..<6 {
+            samples.append(.make(paceSecPerKm: 450, cadence: 152, hr: 135, verticalOscillation: 8.4, strideLength: 0.90, elevationGainMeters: 0.0))
+        }
+
+        // 4 climb and descent reps
+        for _ in 0..<4 {
+            // Climb: 60s (2 windows of 30s) with +5.5m gain per window (+11m total), elevated HR
+            for _ in 0..<2 {
+                samples.append(.make(paceSecPerKm: 410, cadence: 162, hr: 172, verticalOscillation: 9.3, strideLength: 0.98, elevationGainMeters: 5.5))
+            }
+            // Recovery descent: 60s (2 windows of 30s) with 0m gain, lower HR
+            for _ in 0..<2 {
+                samples.append(.make(paceSecPerKm: 420, cadence: 150, hr: 140, verticalOscillation: 8.3, strideLength: 0.92, elevationGainMeters: 0.0))
+            }
+        }
+
+        return WorkoutTelemetryFixture(
+            id: "golden-hill-repeats-sawtooth",
+            name: "Authentic 4x Hill Repeats with Sawtooth Elevation",
+            expectedClassification: "Hill Repeats",
+            physiologicalNotes: "Repeated elevation climb surges correlated with cardiac spikes followed by descending recovery.",
+            durationMinutes: 11.0,
+            samples: samples
+        )
+    }
 }

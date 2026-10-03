@@ -13,6 +13,7 @@ This directory documents key architectural decisions made in the Runalyst projec
 | [0005](0005-dual-scope-refresh-and-healthkit-sync-lifecycle.md) | [Dual-Scope Refresh and HealthKit Synchronization Lifecycle](0005-dual-scope-refresh-and-healthkit-sync-lifecycle.md) | Accepted | 2026-09-24 |
 | [0006](0006-multi-signal-topological-interval-segmentation-and-progression-guardrails.md) | [Multi-Signal Topological Interval Segmentation and Progression Guardrails](0006-multi-signal-topological-interval-segmentation-and-progression-guardrails.md) | Accepted | 2026-09-28 |
 | [0007](0007-golden-telemetry-fixtures-and-biomechanical-test-veracity.md) | [Golden Telemetry Fixtures and Biomechanical Test Veracity](0007-golden-telemetry-fixtures-and-biomechanical-test-veracity.md) | Accepted | 2026-09-28 |
+| [0008](0008-feature-vector-extraction-and-taxonomic-classification-engine.md) | [Feature Vector Extraction and Taxonomic Run Classification Engine](0008-feature-vector-extraction-and-taxonomic-classification-engine.md) | Proposed | 2026-10-02 |
 
 ---
 

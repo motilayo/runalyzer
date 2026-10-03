@@ -119,7 +119,86 @@ final class WorkoutTelemetryVeracityTests: XCTestCase {
         XCTAssertEqual(classification, fixture.expectedClassification)
     }
 
-    // MARK: - 2. Noise Resilience Under Sensor Jitter
+    func testGoldenFixtures_PyramidsLadderRun() async {
+        let fixture = GoldenTelemetryFixtures.authenticPyramidsLadder
+        let buckets = fixture.toBucketData()
+
+        let cycles = await engine.extractOscillationCycles(buckets: buckets)
+        XCTAssertGreaterThanOrEqual(cycles.count, 3, "Pyramids ladder must detect >= 3 oscillation cycles")
+
+        let symmetry = await engine.calculateWorkBlockSymmetry(cycles: cycles)
+        XCTAssertGreaterThanOrEqual(symmetry, 0.70, "Pyramids ladder must exhibit workBlockSymmetry >= 0.70, got \(symmetry)")
+
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.14,
+            slope: 0.0,
+            zone4: 0.45,
+            durationMinutes: fixture.durationMinutes,
+            cadenceCV: 0.045,
+            averageHR: 156.0
+        )
+        XCTAssertEqual(classification, fixture.expectedClassification)
+    }
+
+    func testGoldenFixtures_UrbanTrafficCrosswalkRun() async {
+        let fixture = GoldenTelemetryFixtures.urbanTrafficCrosswalkRun
+        let buckets = fixture.toBucketData()
+
+        let entropy = await engine.detectUrbanTrafficEntropy(buckets: buckets)
+        XCTAssertGreaterThanOrEqual(entropy, 0.04, "Chaotic crosswalk pauses must produce urban traffic entropy")
+
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.14,
+            slope: 0.0,
+            zone4: 0.10,
+            durationMinutes: fixture.durationMinutes,
+            cadenceCV: 0.035,
+            averageHR: 145.0,
+            deadStopsCount: 4
+        )
+        XCTAssertEqual(classification, fixture.expectedClassification)
+    }
+
+    func testGoldenFixtures_HillRepeatsSawtooth() async {
+        let fixture = GoldenTelemetryFixtures.authenticHillRepeatsSawtooth
+        let buckets = fixture.toBucketData()
+
+        let isHills = await engine.detectHillRepeats(buckets: buckets)
+        XCTAssertTrue(isHills, "Authentic sawtooth climb episodes must be recognized as hill repeats")
+
+        let classification = await engine.classifyRun(
+            buckets: buckets,
+            cv: 0.08,
+            slope: 0.0,
+            zone4: 0.40,
+            durationMinutes: fixture.durationMinutes,
+            cadenceCV: 0.030,
+            averageHR: 155.0
+        )
+        XCTAssertEqual(classification, fixture.expectedClassification)
+    }
+
+    func testRecoveryFloor_WalkingRestIntervalsVsJoggingRecoveryFartlek() async {
+        // Construct 3 cycles with walking rest (cadence = 90 SPM during recovery)
+        let walkingCycles = [
+            SurgeRecoveryCycle(workDuration: 60, recoveryDuration: 60, workCadence: 175, recoveryCadence: 90, workPace: 300, recoveryPace: 550, workHR: 165, recoveryHR: 130, isCorroborated: true),
+            SurgeRecoveryCycle(workDuration: 60, recoveryDuration: 60, workCadence: 175, recoveryCadence: 90, workPace: 300, recoveryPace: 550, workHR: 165, recoveryHR: 130, isCorroborated: true),
+            SurgeRecoveryCycle(workDuration: 60, recoveryDuration: 60, workCadence: 175, recoveryCadence: 90, workPace: 300, recoveryPace: 550, workHR: 165, recoveryHR: 130, isCorroborated: true)
+        ]
+        let walkingFloor = await engine.calculateRecoveryCadenceFloor(buckets: [], cycles: walkingCycles)
+        XCTAssertLessThan(walkingFloor, 120.0, "Walking recovery floor must be < 120 SPM")
+
+        // Construct 3 cycles with active jogging recovery (cadence = 142 SPM during recovery)
+        let joggingCycles = [
+            SurgeRecoveryCycle(workDuration: 60, recoveryDuration: 60, workCadence: 175, recoveryCadence: 142, workPace: 300, recoveryPace: 480, workHR: 165, recoveryHR: 145, isCorroborated: true),
+            SurgeRecoveryCycle(workDuration: 60, recoveryDuration: 60, workCadence: 175, recoveryCadence: 142, workPace: 300, recoveryPace: 480, workHR: 165, recoveryHR: 145, isCorroborated: true),
+            SurgeRecoveryCycle(workDuration: 60, recoveryDuration: 60, workCadence: 175, recoveryCadence: 142, workPace: 300, recoveryPace: 480, workHR: 165, recoveryHR: 145, isCorroborated: true)
+        ]
+        let joggingFloor = await engine.calculateRecoveryCadenceFloor(buckets: [], cycles: joggingCycles)
+        XCTAssertGreaterThanOrEqual(joggingFloor, 135.0, "Jogging recovery floor must be >= 135 SPM")
+    }
 
     func testNoiseResilience_IntervalsUnderSensorJitter() async {
         let fixture = GoldenTelemetryFixtures.authenticIntervals31Min

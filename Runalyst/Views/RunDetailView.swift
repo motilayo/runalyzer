@@ -1025,9 +1025,11 @@ private struct DrillCardView: View {
 
             let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
 
+            let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
+            WorkoutPhaseTimelineView(phases: preRunDrill.generatePhases())
+
             HStack(spacing: 12) {
                 Button(action: {
-                    let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
                     activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
                     pendingWatchDrillDTO = DrillPrescriptionDTO(
                         title: displayTitle,

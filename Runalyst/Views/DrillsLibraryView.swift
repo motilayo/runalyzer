@@ -483,6 +483,16 @@ struct DrillPrimerCardView: View {
                     }
                 }
 
+            // Workout Phase Visual Timeline
+            let previewDrill = PreRunDrill(
+                id: drillId,
+                previousCadence: baselineCadence,
+                targetCadence: targetCadence,
+                duration: selectedDuration,
+                hapticMode: selectedHapticMode
+            )
+            WorkoutPhaseTimelineView(phases: previewDrill.generatePhases())
+
             // Single Action Button: Start Drill
             Button(action: {
                 startDrill(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
