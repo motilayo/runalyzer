@@ -80,6 +80,36 @@ extension PreRunDrill {
     }
 }
 
+/// Represents a discrete phase of a pre-run workout/drill for visual timeline mapping.
+struct WorkoutPhase: Identifiable, Sendable, Equatable {
+    let id: String
+    let name: String
+    let durationSeconds: Int
+    let kind: Kind
+
+    enum Kind: Sendable, Equatable {
+        case warmup
+        case work
+        case recovery(isWalk: Bool)
+        case cooldown
+        case steady
+    }
+
+    var formattedDuration: String {
+        if durationSeconds >= 60 {
+            let minutes = durationSeconds / 60
+            let seconds = durationSeconds % 60
+            if seconds == 0 {
+                return "\(minutes)m"
+            } else {
+                return "\(minutes)m \(seconds)s"
+            }
+        } else {
+            return "\(durationSeconds)s"
+        }
+    }
+}
+
 /// Represents an instantiated pre-run drill with user-specific cadence targets,
 /// duration, and native WorkoutKit plan compilation capabilities.
 struct PreRunDrill: Sendable {
@@ -266,6 +296,131 @@ struct PreRunDrill: Sendable {
         case .tempoSurges, .fartlekPrimer: return "Hard / Zone 4"
         case .strides, .neuromuscularPrimer, .hillBounds: return "Sprint / Zone 5"
         }
+    }
+
+    /// Generates structured workout phases for timeline visualization.
+    func generatePhases() -> [WorkoutPhase] {
+        var phases: [WorkoutPhase] = []
+
+        let warmUpDurationMinutes: Double
+        let coolDownDurationMinutes: Double
+
+        if id == .zone2Run {
+            warmUpDurationMinutes = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0)
+            coolDownDurationMinutes = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
+        } else if id == .aerobicFlush || id == .recoveryJog {
+            warmUpDurationMinutes = 0.0
+            coolDownDurationMinutes = 0.0
+        } else {
+            warmUpDurationMinutes = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 4.0 : 3.0)
+            coolDownDurationMinutes = duration == .tenMinutes ? 1.0 : (duration == .thirtyMinutes ? 3.0 : 2.0)
+        }
+
+        if warmUpDurationMinutes > 0 {
+            phases.append(
+                WorkoutPhase(
+                    id: "warmup",
+                    name: "Warm-up",
+                    durationSeconds: Int(warmUpDurationMinutes * 60),
+                    kind: .warmup
+                )
+            )
+        }
+
+        let (iterations, workSeconds, recoverySeconds, isWalk): (Int, Int, Int?, Bool) = {
+            switch id {
+            case .cadencePyramids:
+                switch duration {
+                case .tenMinutes: return (4, 30, 45, true)
+                case .fifteenMinutes: return (4, 60, 90, true)
+                case .thirtyMinutes: return (6, 90, 120, true)
+                }
+            case .rhythmIntervals:
+                switch duration {
+                case .tenMinutes: return (4, 30, 45, false)
+                case .fifteenMinutes: return (5, 45, 75, false)
+                case .thirtyMinutes: return (6, 90, 120, false)
+                }
+            case .tempoSurges:
+                switch duration {
+                case .tenMinutes: return (3, 60, 90, true)
+                case .fifteenMinutes: return (3, 120, 120, true)
+                case .thirtyMinutes: return (4, 180, 180, true)
+                }
+            case .strides:
+                switch duration {
+                case .tenMinutes: return (4, 15, 45, true)
+                case .fifteenMinutes: return (6, 20, 60, true)
+                case .thirtyMinutes: return (8, 30, 90, true)
+                }
+            case .neuromuscularPrimer:
+                switch duration {
+                case .tenMinutes: return (4, 20, 40, true)
+                case .fifteenMinutes: return (5, 30, 60, true)
+                case .thirtyMinutes: return (6, 45, 90, true)
+                }
+            case .fartlekPrimer:
+                switch duration {
+                case .tenMinutes: return (4, 45, 45, false)
+                case .fifteenMinutes: return (5, 60, 60, false)
+                case .thirtyMinutes: return (6, 120, 120, false)
+                }
+            case .hillBounds:
+                switch duration {
+                case .tenMinutes: return (4, 20, 40, true)
+                case .fifteenMinutes: return (5, 30, 60, true)
+                case .thirtyMinutes: return (6, 45, 90, true)
+                }
+            case .aerobicFlush, .recoveryJog:
+                return (1, duration.rawValue * 60, nil, false)
+            case .zone2Run:
+                let steadySeconds = Int((Double(duration.rawValue) - warmUpDurationMinutes - coolDownDurationMinutes) * 60)
+                return (1, max(60, steadySeconds), nil, false)
+            }
+        }()
+
+        if let recSec = recoverySeconds {
+            for idx in 0..<iterations {
+                phases.append(
+                    WorkoutPhase(
+                        id: "work-\(idx)",
+                        name: "Work",
+                        durationSeconds: workSeconds,
+                        kind: .work
+                    )
+                )
+                phases.append(
+                    WorkoutPhase(
+                        id: "rec-\(idx)",
+                        name: isWalk ? "Walk" : "Jog",
+                        durationSeconds: recSec,
+                        kind: .recovery(isWalk: isWalk)
+                    )
+                )
+            }
+        } else {
+            phases.append(
+                WorkoutPhase(
+                    id: "steady",
+                    name: id == .zone2Run ? "Zone 2 Steady" : "Steady",
+                    durationSeconds: workSeconds,
+                    kind: .steady
+                )
+            )
+        }
+
+        if coolDownDurationMinutes > 0 {
+            phases.append(
+                WorkoutPhase(
+                    id: "cooldown",
+                    name: "Cool-down",
+                    durationSeconds: Int(coolDownDurationMinutes * 60),
+                    kind: .cooldown
+                )
+            )
+        }
+
+        return phases
     }
 
     #if canImport(WorkoutKit)

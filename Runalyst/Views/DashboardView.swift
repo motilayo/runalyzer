@@ -724,9 +724,12 @@ struct DashboardView: View {
                 }
             }
 
+            let primerDrill = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget)
+            WorkoutPhaseTimelineView(phases: primerDrill.generatePhases())
+
             HStack(spacing: 12) {
                 Button(action: {
-                    activeWorkoutPlan = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget).buildWorkoutPlan()
+                    activeWorkoutPlan = primerDrill.buildWorkoutPlan()
                     pendingWatchDrillDTO = DrillPrescriptionDTO(
                         title: template.title,
                         preRunDrillId: primerId.rawValue,

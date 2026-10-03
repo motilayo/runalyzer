@@ -24,7 +24,8 @@ struct WorkoutTelemetryFixture: Codable, Sendable {
                 meanCadence: sample.meanCadence,
                 meanHR: sample.meanHR,
                 meanVerticalOscillation: sample.meanVerticalOscillation,
-                meanStrideLength: sample.meanStrideLength
+                meanStrideLength: sample.meanStrideLength,
+                elevationGainMeters: sample.elevationGainMeters
             )
             current = current.addingTimeInterval(sample.durationSeconds)
             return bucket
@@ -54,6 +55,7 @@ struct BucketTelemetrySample: Codable, Sendable {
     let meanHR: Double
     let meanVerticalOscillation: Double
     let meanStrideLength: Double
+    let elevationGainMeters: Double
 
     init(
         durationSeconds: Double = 30.0,
@@ -62,7 +64,8 @@ struct BucketTelemetrySample: Codable, Sendable {
         meanCadence: Double,
         meanHR: Double,
         meanVerticalOscillation: Double = 0.0,
-        meanStrideLength: Double = 0.0
+        meanStrideLength: Double = 0.0,
+        elevationGainMeters: Double = 0.0
     ) {
         self.durationSeconds = durationSeconds
         self.distanceMeters = distanceMeters
@@ -71,6 +74,7 @@ struct BucketTelemetrySample: Codable, Sendable {
         self.meanHR = meanHR
         self.meanVerticalOscillation = meanVerticalOscillation
         self.meanStrideLength = meanStrideLength
+        self.elevationGainMeters = elevationGainMeters
     }
 
     /// Convenience factory computing distance directly from duration and pace in sec/km.
@@ -80,7 +84,8 @@ struct BucketTelemetrySample: Codable, Sendable {
         cadence: Double,
         hr: Double,
         verticalOscillation: Double = 0.0,
-        strideLength: Double = 0.0
+        strideLength: Double = 0.0,
+        elevationGainMeters: Double = 0.0
     ) -> BucketTelemetrySample {
         let distance = paceSecPerKm > 0 ? (durationSeconds / paceSecPerKm) * 1000.0 : 0.0
         return BucketTelemetrySample(
@@ -90,7 +95,8 @@ struct BucketTelemetrySample: Codable, Sendable {
             meanCadence: cadence,
             meanHR: hr,
             meanVerticalOscillation: verticalOscillation,
-            meanStrideLength: strideLength
+            meanStrideLength: strideLength,
+            elevationGainMeters: elevationGainMeters
         )
     }
 }

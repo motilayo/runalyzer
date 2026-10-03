@@ -66,20 +66,21 @@ actor ModelManager {
                 // Topological Structural Guardrail:
                 // 1. Continuous Run Gate:
                 // If < 3 corroborated oscillation cycles, the run is continuous.
-                // CoreML CANNOT classify it as Fartlek or Intervals.
-                if (targetClass == "Fartlek" || targetClass == "Intervals") && cycles.count < 3 {
+                // CoreML CANNOT classify it as Fartlek, Intervals, or Pyramids.
+                if (targetClass == "Fartlek" || targetClass == "Intervals" || targetClass == "Pyramids") && cycles.count < 3 {
                     targetClass = weightedClass
                 }
 
                 // 2. Intermittent Gate:
-                // If >= 3 corroborated cycles, override continuous predictions with Intervals or Fartlek.
-                if targetClass != "Intervals" && targetClass != "Fartlek" && cycles.count >= 3 {
-                    let regularity = await framboise.calculateCycleRegularity(cycles: cycles)
-                    if regularity >= 0.65 {
-                        targetClass = "Intervals"
-                    } else {
-                        targetClass = "Fartlek"
-                    }
+                // If >= 3 corroborated cycles, delegate to weightedClass which accurately separates Pyramids, Intervals, and Fartlek.
+                if targetClass != "Intervals" && targetClass != "Fartlek" && targetClass != "Pyramids" && cycles.count >= 3 {
+                    targetClass = weightedClass
+                }
+
+                // 3. Environmental & Topographic Override:
+                // If deterministic telemetry validates Urban Traffic or Hill Repeats, override scalar tabular CoreML.
+                if weightedClass == "Urban Traffic" || weightedClass == "Hill Repeats" {
+                    targetClass = weightedClass
                 }
 
                 return targetClass

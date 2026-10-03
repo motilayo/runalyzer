@@ -11,6 +11,7 @@ struct BucketData: Sendable {
     let meanHR: Double
     let meanVerticalOscillation: Double
     let meanStrideLength: Double
+    let elevationGainMeters: Double
 
     init(
         startTime: Date,
@@ -20,7 +21,8 @@ struct BucketData: Sendable {
         meanCadence: Double,
         meanHR: Double,
         meanVerticalOscillation: Double = 0.0,
-        meanStrideLength: Double = 0.0
+        meanStrideLength: Double = 0.0,
+        elevationGainMeters: Double = 0.0
     ) {
         self.startTime = startTime
         self.distanceMeters = distanceMeters
@@ -30,6 +32,7 @@ struct BucketData: Sendable {
         self.meanHR = meanHR
         self.meanVerticalOscillation = meanVerticalOscillation
         self.meanStrideLength = meanStrideLength
+        self.elevationGainMeters = elevationGainMeters
     }
 }
 
@@ -439,6 +442,113 @@ actor FramboiseEngine {
         return fasterTransitions >= 3 && slowerTransitions == 0 && q5IsFastest
     }
 
+    // MARK: - Extended Taxonomic Classifiers (ADR-0008)
+
+    /// Calculates the mean cadence of the slowest 20% pace buckets or recovery phases, representing the recovery floor.
+    func calculateRecoveryCadenceFloor(buckets: [BucketData], cycles: [SurgeRecoveryCycle] = []) -> Double {
+        if !cycles.isEmpty {
+            return cycles.map(\.recoveryCadence).reduce(0, +) / Double(cycles.count)
+        }
+        guard !buckets.isEmpty else { return 0.0 }
+        let sortedByPace = buckets.sorted { $0.meanPaceSecPerKm > $1.meanPaceSecPerKm }
+        let sliceCount = max(1, Int(Double(sortedByPace.count) * 0.20))
+        let slowest = sortedByPace.prefix(sliceCount)
+        return slowest.map(\.meanCadence).reduce(0, +) / Double(sliceCount)
+    }
+
+    /// Evaluates the duration symmetry of intermittent work intervals to identify pyramid structures.
+    /// Returns 0.0 to 1.0 (higher = symmetric expanding and contracting ladder, e.g. 1-2-3-2-1 mins).
+    func calculateWorkBlockSymmetry(cycles: [SurgeRecoveryCycle]) -> Double {
+        guard cycles.count >= 3 else { return 0.0 }
+        let workDurations = cycles.map(\.workDuration)
+        guard let maxVal = workDurations.max(),
+              let maxIdx = workDurations.firstIndex(of: maxVal) else { return 0.0 }
+
+        // In a true pyramid, peak must be an interior rep (not start or finish)
+        guard maxIdx > 0 && maxIdx < workDurations.count - 1 else { return 0.0 }
+
+        // Monotonic climb up to peak: each step must be >= previous step (with 5s tolerance)
+        for i in 0..<maxIdx where workDurations[i + 1] < workDurations[i] - 5.0 {
+            return 0.0
+        }
+
+        // Monotonic descent down from peak: each step must be <= previous step (with 5s tolerance)
+        for i in maxIdx..<workDurations.count - 1 where workDurations[i + 1] > workDurations[i] + 5.0 {
+            return 0.0
+        }
+
+        // Peak must expand substantially above the base (at least 25% longer)
+        guard let firstWork = workDurations.first,
+              let lastWork = workDurations.last,
+              maxVal >= firstWork * 1.25 && maxVal >= lastWork * 1.25 else { return 0.0 }
+
+        let n = workDurations.count
+        var diffSum = 0.0
+        let comparisons = n / 2
+        for i in 0..<comparisons {
+            diffSum += abs(workDurations[i] - workDurations[n - 1 - i])
+        }
+        let totalWork = workDurations.reduce(0, +)
+        guard totalWork > 0 else { return 0.0 }
+
+        let symmetry = max(0.0, 1.0 - ((diffSum * 2.0) / totalWork))
+        return symmetry
+    }
+
+    /// Evaluates non-periodic cadence crashes (< 70 SPM) and pace dropouts characteristic of city running (stoplights, crosswalks).
+    /// Returns a ratio from 0.0 to 1.0 representing chaotic dead stops relative to total buckets.
+    func detectUrbanTrafficEntropy(buckets: [BucketData]) -> Double {
+        guard buckets.count >= 8 else { return 0.0 }
+        var stopDurations: [Double] = []
+        var currentStopDuration = 0.0
+        var totalStopDuration = 0.0
+
+        for b in buckets {
+            if b.meanCadence < 70.0 || b.meanPaceSecPerKm > 600.0 {
+                currentStopDuration += b.durationSeconds
+                totalStopDuration += b.durationSeconds
+            } else if currentStopDuration > 0 {
+                stopDurations.append(currentStopDuration)
+                currentStopDuration = 0.0
+            }
+        }
+        if currentStopDuration > 0 {
+            stopDurations.append(currentStopDuration)
+        }
+
+        guard stopDurations.count >= 3 else { return 0.0 }
+        let totalDuration = buckets.map(\.durationSeconds).reduce(0, +)
+        guard totalDuration > 0 else { return 0.0 }
+
+        // Check for brief, chaotic durations (predominantly 5s - 30s)
+        let meanStop = stopDurations.reduce(0, +) / Double(stopDurations.count)
+
+        if meanStop <= 30.0 {
+            return totalStopDuration / totalDuration
+        }
+        return 0.0
+    }
+
+    /// Detects repeated saw-tooth elevation climbs synchronized with cardiac surges.
+    func detectHillRepeats(buckets: [BucketData]) -> Bool {
+        guard buckets.count >= 6 else { return false }
+        let totalGain = buckets.map(\.elevationGainMeters).reduce(0, +)
+        guard totalGain >= 35.0 else { return false }
+
+        var climbEpisodes = 0
+        var inClimb = false
+        for b in buckets {
+            let isClimbing = b.elevationGainMeters >= 4.0
+            if isClimbing && !inClimb {
+                inClimb = true
+                climbEpisodes += 1
+            } else if !isClimbing && inClimb {
+                inClimb = false
+            }
+        }
+        return climbEpisodes >= 3
+    }
+
     /// Multi-delta weighted classification engine enforcing turnover stability,
     /// topological oscillation signatures, cardiac strain guardrails, and pacing trends.
     func classifyRun(
@@ -451,8 +561,14 @@ actor FramboiseEngine {
         averageHR: Double? = nil,
         paceDelta: Double? = nil,
         hrDelta: Double? = nil,
-        cycles: [SurgeRecoveryCycle]? = nil
+        cycles: [SurgeRecoveryCycle]? = nil,
+        deadStopsCount: Int = 0,
+        hoursSinceHeavyEffort: Double? = nil
     ) -> String {
+        // LAYER 0: Environmental Interruption (Urban Traffic)
+        let trafficEntropy = detectUrbanTrafficEntropy(buckets: buckets)
+        let isChaoticTraffic = (trafficEntropy >= 0.04 || (deadStopsCount >= 4 && cv > 0.10))
+
         // LAYER 1: Continuous Monotonic Progression (Strict low-variance progressive acceleration)
         let isProgression = durationMinutes >= 20.0 && cv < 0.09 && evaluateQuintileProgression(buckets: buckets)
         if isProgression {
@@ -464,12 +580,34 @@ actor FramboiseEngine {
         let isIntermittent = cycles.count >= 3
         let regularityScore = isIntermittent ? calculateCycleRegularity(cycles: cycles) : 0.0
 
-        // LAYER 3: Intermittent Sub-Classification (Intervals vs. Fartlek)
+        // If traffic was chaotic and it's not a structured threshold interval workout, classify as Urban Traffic
+        if isChaoticTraffic && (zone4 < 0.35 || regularityScore < 0.65) {
+            return "Urban Traffic"
+        }
+
+        // LAYER 2.5: Topographic Sawtooth Climbs (Hill Repeats)
+        if detectHillRepeats(buckets: buckets) {
+            return "Hill Repeats"
+        }
+
+        // LAYER 3: Intermittent Sub-Classification (Pyramids vs. Intervals vs. Fartlek)
         if isIntermittent {
-            if regularityScore >= 0.65 {
+            let symmetryScore = calculateWorkBlockSymmetry(cycles: cycles)
+            if symmetryScore >= 0.70 {
+                return "Pyramids"
+            }
+
+            let recoveryFloor = calculateRecoveryCadenceFloor(buckets: buckets, cycles: cycles)
+            if recoveryFloor < 120.0 {
                 return "Intervals"
+            } else if recoveryFloor >= 135.0 {
+                if regularityScore >= 0.65 {
+                    return "Intervals"
+                } else {
+                    return "Fartlek"
+                }
             } else {
-                return "Fartlek"
+                return regularityScore >= 0.65 ? "Intervals" : "Fartlek"
             }
         }
 
@@ -478,7 +616,7 @@ actor FramboiseEngine {
             return "Long Run"
         }
 
-        // LAYER 3c: Continuous Intensity Matrix (Zone 4 + HR Strain + Pace Delta)
+        // LAYER 5: Continuous Intensity Matrix (Zone 4 + HR Strain + Pace Delta)
         // Calculate normalized Intensity Score (0 to 100)
         let z4Score = min(100.0, zone4 * 125.0)
 
@@ -527,7 +665,7 @@ actor FramboiseEngine {
         // Weighted combination: 45% Zone 4, 35% HR Strain, 20% Pace Effort
         let totalIntensity = (0.45 * z4Score) + (0.35 * hrScore) + (0.20 * paceScore)
 
-        if totalIntensity < 22.0 && zone4 <= 0.03 && durationMinutes < 35.0 {
+        if totalIntensity < 22.0 && zone4 <= 0.03 && durationMinutes < 40.0 {
             return "Recovery Run"
         } else if totalIntensity < 48.0 && zone4 <= 0.20 {
             return "Easy Run"
