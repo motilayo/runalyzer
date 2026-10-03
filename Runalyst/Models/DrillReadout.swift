@@ -175,7 +175,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .neuromuscularPrimer:
             let resolvedTitle = customTitle ?? "Form Primer"
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
             let targetStr = targetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" } ?? "170 SPM"
 
             let drill = PreRunDrill(
@@ -186,13 +186,24 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let overviewText: String
+            let breakdownText: String
+
+            if duration == .fifteenMinutes {
+                overviewText = "In this drill, you will complete a 15-minute quick-step activation to sharpen muscle reaction time and prime your nervous system."
+                breakdownText = "You’ll start with a 3-minute easy warm-up jog. This is followed by 5 sets of 30-second fast-feet bursts, paired with 60 seconds of walk recovery."
+            } else {
+                overviewText = "In this drill, you will complete a 10-minute quick-step activation to sharpen muscle reaction time and prime your nervous system."
+                breakdownText = "You’ll start with a 2-minute easy warm-up jog. This is followed by 4 sets of 20-second fast-feet bursts, paired with 40 seconds of walk recovery."
+            }
+
             return DrillReadout(
                 drillId: .neuromuscularPrimer,
                 title: resolvedTitle,
                 subtitle: "Neuromuscular Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute quick-step activation to sharpen muscle reaction time and prime your nervous system.",
-                breakdown: "You’ll start with a 2-minute easy warm-up jog. This is followed by 4 sets of 20-second fast-feet bursts, paired with 40 seconds of walk recovery.",
-                coachingTip: "Shorten your stride and aim for high turnover. Focus on springy, quiet steps landed directly under your center of mass.",
+                overview: overviewText,
+                breakdown: breakdownText,
+                coachingTip: "Land softly underneath your hips rather than reaching forward. Focus on springy, quiet steps.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
                 targetCadence: targetStr,

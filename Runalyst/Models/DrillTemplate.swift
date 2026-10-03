@@ -62,7 +62,7 @@ struct DrillTemplate: Sendable {
                     return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
-                    "Toes wide, light footfalls, and quick ground contact. Let your feet kiss the ground and lift quickly."
+                    "Focus on landing lightly underneath your hips. Let your feet kiss the ground and lift quickly rather than reaching forward."
                 }
             )
         case .rhythmIntervals:
@@ -93,8 +93,9 @@ struct DrillTemplate: Sendable {
                     let target = min(185, max(155, Int(Double(baseline) * 1.08)))
                     return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
-                generateInstructionalCue: { _ in
-                    "Stay tall with a slight lean from your ankles. Keep hands relaxed and drive smoothly from your hips."
+                generateInstructionalCue: { target in
+                    let targetStr = target ?? "160 SPM"
+                    return "A taller posture reduces vertical bounce and saves energy. Drop your shoulders, keep your eyes up, and focus on quick, light steps to hit your \(targetStr) target without sprinting."
                 }
             )
         case .strides:
@@ -110,7 +111,7 @@ struct DrillTemplate: Sendable {
                     return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
-                    "Stand tall, gaze on the horizon, drive your elbows backward, and keep your hands relaxed."
+                    "Don't fight through fatigue. Use the full 60-second walk to recover so you can focus 100% on your form during the sprints. Drive your elbows backward and keep your hands relaxed."
                 }
             )
         case .neuromuscularPrimer:
