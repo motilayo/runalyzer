@@ -208,28 +208,10 @@ cards = [
         "output": "07_HealthKit_Privacy.png",
         "glow": (255, 80, 110, 95),
         "bg": ((24, 10, 18), (38, 14, 26))
-    },
-    # Backward-compatible 5-slot fallbacks
-    {
-        "title": "Longitudinal Progression",
-        "subtitle": "Track efficiency factor gains and cadence over time",
-        "tag": "Deep Analytics",
-        "screen": "Media/Screenshots/iPad_Raw/screen_progression.png",
-        "output": "04_Longitudinal_Progression.png",
-        "glow": (0, 210, 255, 110),
-        "bg": ((10, 18, 32), (16, 28, 50))
-    },
-    {
-        "title": "100% Private & HealthKit-Native",
-        "subtitle": "Zero cloud tracking. Seamless Apple Watch sync.",
-        "tag": "Privacy First",
-        "screen": "Media/Screenshots/iPad_Raw/screen_settings.png",
-        "output": "05_HealthKit_Privacy.png",
-        "glow": (255, 80, 110, 95),
-        "bg": ((24, 10, 18), (38, 14, 26))
     }
 ]
 
 for c in cards:
     render_ipad_card(c["title"], c["subtitle"], c["tag"], c["screen"], c["output"], c["glow"], c["bg"])
+
 

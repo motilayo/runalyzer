@@ -30,7 +30,7 @@ card_files = [
     "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore/01_Intelligent_Biometrics.png",
     "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore/02_AI_Coaching.png",
     "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore/03_Targeted_Drills.png",
-    "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore/04_Longitudinal_Progression.png",
+    "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore/06_Longitudinal_Progression.png",
 ]
 loaded_cards = [Image.open(f).convert("RGBA") for f in card_files]
 
