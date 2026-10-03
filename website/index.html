@@ -31,7 +31,7 @@
   <meta name="theme-color" content="#fafaf8">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="assets/images/app_icon.png">
-  <link rel="stylesheet" href="styles.css?v=2.3.0">
+  <link rel="stylesheet" href="styles.css?v=2.3.1">
 </head>
 <body>
 
@@ -488,110 +488,9 @@
               <span class="illustration-badge good">Spring Elasticity</span>
             </div>
             
-            <!-- Mathematical Vector Kinematic Diagram -->
-            <div class="kinematic-svg-container">
-              <svg class="kinematic-svg" viewBox="0 0 440 350" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="goodBoneGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="100%" stop-color="#059669"/>
-    </linearGradient>
-    <filter id="goodGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3.5" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-    </filter>
-  </defs>
-
-  <!-- Background Card -->
-  <rect width="440" height="350" rx="14" fill="#080e18"/>
-  <rect x="1" y="1" width="438" height="348" rx="13" fill="none" stroke="#1e293b" stroke-width="1.2"/>
-
-  <!-- Top Status Bar -->
-  <rect x="18" y="14" width="144" height="22" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
-  <circle cx="30" cy="25" r="3.5" fill="#10b981" filter="url(#goodGlow)"/>
-  <text x="40" y="28.5" fill="#94a3b8" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" letter-spacing="0.5">BIOMECHANICAL LAB</text>
-
-  <rect x="282" y="14" width="140" height="22" rx="4" fill="#064e3b" stroke="#059669" stroke-width="1"/>
-  <text x="352" y="28.5" fill="#34d399" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle" letter-spacing="0.3">SPRING ELASTICITY</text>
-
-  <!-- Ground Plane Datum -->
-  <line x1="20" y1="280" x2="420" y2="280" stroke="#334155" stroke-width="2"/>
-  <path d="M 30 288 L 38 280 M 70 288 L 78 280 M 110 288 L 118 280 M 150 288 L 158 280 M 190 288 L 198 280 M 230 288 L 238 280 M 270 288 L 278 280 M 310 288 L 318 280 M 350 288 L 358 280 M 390 288 L 398 280" stroke="#1e293b" stroke-width="1.5"/>
-
-  <!-- Plumb Line from Pelvis COM straight down to ground -->
-  <line x1="195" y1="135" x2="195" y2="280" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3" opacity="0.95"/>
-  <circle cx="195" cy="280" r="5" fill="#10b981" filter="url(#goodGlow)"/>
-  <circle cx="195" cy="280" r="2" fill="#ffffff"/>
-
-  <!-- ATHLETIC RUNNER SILHOUETTE -->
-  <g id="goodRunner">
-    <!-- Trailing Arm (Background) -->
-    <path d="M 202 78 L 172 98" stroke="#1e293b" stroke-width="9" stroke-linecap="round"/>
-    <path d="M 172 98 L 176 76" stroke="#1e293b" stroke-width="7" stroke-linecap="round"/>
-
-    <!-- Trailing Leg (Background Push-Off) -->
-    <path d="M 195 135 L 152 185" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
-    <path d="M 152 185 L 108 218" stroke="#1e293b" stroke-width="11" stroke-linecap="round"/>
-    <!-- Trailing Shoe -->
-    <path d="M 108 218 L 88 226 L 86 220 L 106 214 Z" fill="#334155"/>
-
-    <!-- Torso (Athletic contoured capsule, 8.5° forward lean) -->
-    <path d="M 195 135 L 205 78" stroke="#334155" stroke-width="22" stroke-linecap="round"/>
-    <!-- Chest / athletic profile accent -->
-    <path d="M 198 128 L 207 78" stroke="#475569" stroke-width="16" stroke-linecap="round"/>
-
-    <!-- Neck & Head (Natural athletic profile) -->
-    <path d="M 205 78 L 209 62" stroke="#e2e8f0" stroke-width="9" stroke-linecap="round"/>
-    <ellipse cx="213" cy="48" rx="10.5" ry="12.5" fill="#f8fafc" transform="rotate(8 213 48)"/>
-    <!-- Sleek Running Visor -->
-    <path d="M 208 44 Q 216 42 225 43 Q 230 45 224 48 Q 216 48 208 48 Z" fill="#38bdf8"/>
-
-    <!-- Lead Arm (Foreground - Athletic 90° Running Carriage) -->
-    <path d="M 206 78 L 230 106" stroke="#64748b" stroke-width="9.5" stroke-linecap="round"/>
-    <path d="M 230 106 L 250 86" stroke="#64748b" stroke-width="7.5" stroke-linecap="round"/>
-    <circle cx="250" cy="86" r="4.5" fill="#94a3b8"/>
-
-    <!-- Lead Stance Leg (Foreground - Active Spring Cushion) -->
-    <!-- Thigh (Hip to Knee, flexed forward ~20°) -->
-    <path d="M 195 135 L 218 198" stroke="url(#goodBoneGrad)" stroke-width="15" stroke-linecap="round" opacity="0.9"/>
-    <path d="M 195 135 L 218 198" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
-
-    <!-- Knee Joint Indicator Node -->
-    <circle cx="218" cy="198" r="8" fill="#10b981" stroke="#ffffff" stroke-width="2.5" filter="url(#goodGlow)"/>
-
-    <!-- Shank / Tibia (Near-Vertical drop directly beneath Pelvis) -->
-    <path d="M 218 198 L 198 266" stroke="url(#goodBoneGrad)" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
-    <path d="M 218 198 L 198 266" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
-
-    <!-- Running Shoe (Midfoot Landing Directly on Plumb Line x=195) -->
-    <path d="M 180 278 C 182 268 194 266 206 266 C 220 266 230 272 234 278 Z" fill="#10b981" stroke="#34d399" stroke-width="1.8"/>
-    <!-- Cushioned Outsole (Flat on ground) -->
-    <rect x="178" y="277" width="58" height="3.5" rx="1.5" fill="#ffffff"/>
-  </g>
-
-  <!-- HUD BIOMECHANICAL ANNOTATIONS -->
-
-  <!-- Center of Mass Pelvis Node & Pill -->
-  <circle cx="195" cy="135" r="7" fill="#10b981" stroke="#ffffff" stroke-width="2.5" filter="url(#goodGlow)"/>
-  <rect x="22" y="124" width="154" height="22" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.2"/>
-  <text x="99" y="138.5" fill="#a7f3d0" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">CENTER OF MASS (PELVIS)</text>
-  <line x1="176" y1="135" x2="188" y2="135" stroke="#10b981" stroke-width="1.5"/>
-
-  <!-- Forward Drive Vector Arrow (Connected stem to arrowhead) -->
-  <line x1="205" y1="135" x2="272" y2="135" stroke="#34d399" stroke-width="3.5" stroke-linecap="round"/>
-  <polygon points="284,135 270,129 270,141" fill="#34d399"/>
-  <rect x="290" y="124" width="134" height="22" rx="4" fill="#064e3b" stroke="#059669" stroke-width="1"/>
-  <text x="357" y="138.5" fill="#34d399" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle">FORWARD DRIVE</text>
-
-  <!-- Soft Knee Spring Recoil Callout -->
-  <path d="M 228 192 C 236 188 244 192 248 198 C 252 204 246 210 254 214" fill="none" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="2 2"/>
-  <rect x="260" y="187" width="168" height="22" rx="4" fill="#0f172a" stroke="#059669" stroke-width="1"/>
-  <text x="344" y="201.5" fill="#6ee7b7" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">SOFT KNEE SPRING (20° FLEX)</text>
-
-  <!-- Foot Strike Alignment Badge at Ground -->
-  <rect x="75" y="306" width="240" height="28" rx="6" fill="#064e3b" stroke="#059669" stroke-width="1.5"/>
-  <text x="195" y="324" fill="#34d399" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle">✓ FOOT LANDS DIRECTLY UNDER PELVIS</text>
-</svg>
+            <!-- Biomechanical Athletic Kinematic Illustration -->
+            <div class="illustration-img-wrap">
+              <img src="assets/images/good_stride_illustration.png" alt="Optimal Running Stride Kinematics — Foot lands beneath pelvis center of mass with flexed knee spring" class="illustration-img" width="1376" height="768" loading="lazy">
             </div>
 
             <div class="kinematic-summary-box good" style="display: flex; flex-direction: column; gap: 9px; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 12px; padding: 14px 18px; margin: 16px 0 20px 0;">
@@ -636,116 +535,9 @@
               <span class="illustration-badge overstride">Braking Shockwave</span>
             </div>
 
-            <!-- Mathematical Vector Kinematic Diagram -->
-            <div class="kinematic-svg-container">
-              <svg class="kinematic-svg" viewBox="0 0 440 350" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="badBoneGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#fb7185"/>
-      <stop offset="100%" stop-color="#e11d48"/>
-    </linearGradient>
-    <filter id="badGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3.5" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-    </filter>
-  </defs>
-
-  <!-- Background Card -->
-  <rect width="440" height="350" rx="14" fill="#080e18"/>
-  <rect x="1" y="1" width="438" height="348" rx="13" fill="none" stroke="#1e293b" stroke-width="1.2"/>
-
-  <!-- Top Status Bar -->
-  <rect x="18" y="14" width="144" height="22" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
-  <circle cx="30" cy="25" r="3.5" fill="#f43f5e" filter="url(#badGlow)"/>
-  <text x="40" y="28.5" fill="#94a3b8" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" letter-spacing="0.5">BIOMECHANICAL LAB</text>
-
-  <rect x="278" y="14" width="144" height="22" rx="4" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
-  <text x="350" y="28.5" fill="#fda4af" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle" letter-spacing="0.3">BRAKING SHOCKWAVE</text>
-
-  <!-- Ground Plane Datum -->
-  <line x1="20" y1="280" x2="420" y2="280" stroke="#334155" stroke-width="2"/>
-  <path d="M 30 288 L 38 280 M 70 288 L 78 280 M 110 288 L 118 280 M 150 288 L 158 280 M 190 288 L 198 280 M 230 288 L 238 280 M 270 288 L 278 280 M 310 288 L 318 280 M 350 288 L 358 280 M 390 288 L 398 280" stroke="#1e293b" stroke-width="1.5"/>
-
-  <!-- Plumb Line from Pelvis COM straight down to ground -->
-  <line x1="145" y1="140" x2="145" y2="280" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.6"/>
-  <circle cx="145" cy="280" r="4.5" fill="#94a3b8"/>
-
-  <!-- ATHLETIC RUNNER SILHOUETTE (Overstride Posture) -->
-  <g id="overstrideRunner">
-    <!-- Trailing Arm -->
-    <path d="M 145 82 L 118 102" stroke="#1e293b" stroke-width="9" stroke-linecap="round"/>
-    <path d="M 118 102 L 122 80" stroke="#1e293b" stroke-width="7" stroke-linecap="round"/>
-
-    <!-- Trailing Leg (Dragging low behind) -->
-    <path d="M 145 140 L 108 192" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
-    <path d="M 108 192 L 68 224" stroke="#1e293b" stroke-width="11" stroke-linecap="round"/>
-    <path d="M 68 224 L 48 230 L 46 224 L 66 220 Z" fill="#334155"/>
-
-    <!-- Torso (Upright, Zero Forward Momentum) -->
-    <path d="M 145 140 L 147 82" stroke="#334155" stroke-width="22" stroke-linecap="round"/>
-    <path d="M 146 132 L 148 82" stroke="#475569" stroke-width="16" stroke-linecap="round"/>
-
-    <!-- Neck & Head (Upright) -->
-    <path d="M 147 82 L 149 64" stroke="#e2e8f0" stroke-width="9" stroke-linecap="round"/>
-    <ellipse cx="151" cy="50" rx="10.5" ry="12.5" fill="#f8fafc"/>
-    <path d="M 146 46 Q 154 44 163 45 Q 168 47 162 50 Q 154 50 146 50 Z" fill="#fb7185"/>
-
-    <!-- Lead Arm -->
-    <path d="M 147 82 L 172 108" stroke="#64748b" stroke-width="9.5" stroke-linecap="round"/>
-    <path d="M 172 108 L 192 88" stroke="#64748b" stroke-width="7.5" stroke-linecap="round"/>
-    <circle cx="192" cy="88" r="4.5" fill="#94a3b8"/>
-
-    <!-- Lead Stance Leg (Foreground - Locked Straight Knee Casting Forward) -->
-    <!-- Thigh (Hip to Knee, locked straight) -->
-    <path d="M 145 140 L 185 208" stroke="url(#badBoneGrad)" stroke-width="15" stroke-linecap="round" opacity="0.9"/>
-    <path d="M 145 140 L 185 208" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
-
-    <!-- Locked Knee Node -->
-    <circle cx="185" cy="208" r="8" fill="#e11d48" stroke="#ffffff" stroke-width="2.5" filter="url(#badGlow)"/>
-
-    <!-- Shank / Tibia (Continuous straight line casting ahead) -->
-    <path d="M 185 208 L 222 270" stroke="url(#badBoneGrad)" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
-    <path d="M 185 208 L 222 270" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
-
-    <!-- Running Shoe (Heavy Heel Collision Strike, Dorsiflexed Toe) -->
-    <path d="M 218 280 L 225 264 L 258 250 C 262 254 260 258 254 262 L 230 280 Z" fill="#f43f5e" stroke="#fb7185" stroke-width="2"/>
-    <line x1="218" y1="280" x2="258" y2="252" stroke="#ffffff" stroke-width="2.5"/>
-
-    <!-- Ground Collision Impact Point -->
-    <circle cx="223" cy="280" r="5.5" fill="#e11d48" filter="url(#badGlow)"/>
-    <circle cx="223" cy="280" r="2" fill="#ffffff"/>
-  </g>
-
-  <!-- HUD BIOMECHANICAL ANNOTATIONS -->
-
-  <!-- Center of Mass Pelvis Node & Pill -->
-  <circle cx="145" cy="140" r="7" fill="#94a3b8" stroke="#ffffff" stroke-width="2.5"/>
-  <rect x="18" y="129" width="112" height="22" rx="4" fill="#0f172a" stroke="#475569" stroke-width="1.2"/>
-  <text x="74" y="143.5" fill="#cbd5e1" font-size="8" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">CENTER OF MASS</text>
-  <line x1="130" y1="140" x2="138" y2="140" stroke="#94a3b8" stroke-width="1.5"/>
-
-  <!-- Locked Knee Warning Callout -->
-  <rect x="246" y="197" width="186" height="22" rx="4" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
-  <text x="339" y="211.5" fill="#fecdd3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle">LOCKED KNEE (&lt;5° FLEXION)</text>
-  <line x1="193" y1="208" x2="246" y2="208" stroke="#f43f5e" stroke-width="1.5"/>
-
-  <!-- Severe Braking Collision Force Vector Arrow (Shooting back up into the leg) -->
-  <line x1="219" y1="274" x2="151" y2="226" stroke="#f43f5e" stroke-width="3.5" filter="url(#badGlow)"/>
-  <polygon points="143,220 156,230 150,219" fill="#f43f5e" filter="url(#badGlow)"/>
-  <rect x="42" y="215" width="128" height="22" rx="4" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
-  <text x="106" y="229.5" fill="#fb7185" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle">BRAKING COLLISION</text>
-
-  <!-- Overstride Gap Dimension Bracket (Under Ground Plane) -->
-  <line x1="145" y1="294" x2="223" y2="294" stroke="#f43f5e" stroke-width="1.5"/>
-  <line x1="145" y1="288" x2="145" y2="300" stroke="#f43f5e" stroke-width="1.5"/>
-  <line x1="223" y1="288" x2="223" y2="300" stroke="#f43f5e" stroke-width="1.5"/>
-  <rect x="134" y="304" width="100" height="20" rx="3" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
-  <text x="184" y="317.5" fill="#fecdd3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle">+30 CM OVERREACH</text>
-
-  <!-- Warning Badge at Bottom -->
-  <rect x="250" y="304" width="186" height="26" rx="5" fill="#4c0519" stroke="#e11d48" stroke-width="1.5"/>
-  <text x="343" y="321" fill="#fda4af" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="800" text-anchor="middle">✗ BRAKING SHOCKWAVE</text>
-</svg>
+            <!-- Biomechanical Athletic Kinematic Illustration -->
+            <div class="illustration-img-wrap">
+              <img src="assets/images/overstride_illustration.png" alt="Overstriding Biomechanics — Foot reaches ahead with locked knee creating braking shockwave" class="illustration-img" width="1376" height="768" loading="lazy">
             </div>
 
             <div class="kinematic-summary-box overstride" style="display: flex; flex-direction: column; gap: 9px; background: rgba(244, 63, 94, 0.06); border: 1px solid rgba(244, 63, 94, 0.24); border-radius: 12px; padding: 14px 18px; margin: 16px 0 20px 0;">
