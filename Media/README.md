@@ -43,10 +43,12 @@ Designed for social launches, landing page hero backgrounds, Product Hunt, and a
   * *100% Private & HealthKit-Native*
 
 ### Deliverables:
-1. **`Runalyst_Promo_9x16.mp4`** (1080 × 1920, 5.8 MB)
-   * Target: Instagram Reels, TikTok, YouTube Shorts, Apple Search Ads
-2. **`Runalyst_Promo_16x9.mp4`** (1920 × 1080, 4.1 MB)
-   * Target: Twitter/X, Product Hunt, YouTube Landscape, Website Hero
+1. **`Runalyst_Promo_9x16.mp4`** (1080 × 1920, 13.3 MB)
+   * Target: Instagram Reels, TikTok, YouTube Shorts, Apple Search Ads (iPhone)
+2. **`Runalyst_Promo_16x9.mp4`** (1920 × 1080, 8.3 MB)
+   * Target: Twitter/X, Product Hunt, YouTube Landscape, Website Hero (iPhone)
+3. **`Runalyst_Promo_iPad_16x9.mp4`** (1920 × 1080, 10.0 MB)
+   * Target: iPad Feature Showcase, Tablet Marketing, App Store Video (iPad)
 
 ---
 
@@ -98,7 +100,14 @@ Features high-resolution tablet presentation cards framing the app UI with categ
 
 ---
 
+## 5. Raw Authentic Screenshots
+* `Media/Screenshots/iPhone_Raw/` — Native 1206 × 2622 pixel unscaled captures from iPhone 17 Pro.
+* `Media/Screenshots/iPad_Raw/` — Native 2064 × 2752 pixel unscaled captures from iPad Pro 13-inch M5.
+
+---
+
 ## Automation Scripts
-* `generate_app_store_screenshots.py` — Renders iPhone screenshot presentation cards (1284×2778 and 1242×2688).
+* `generate_app_store_screenshots.py` — Renders iPhone screenshot presentation cards (1284×2778 and 1242×2688) and updates website assets.
 * `generate_ipad_screenshots.py` — Renders iPad screenshot presentation cards (2048×2732 and 2064×2752).
-* `generate_promo_video.py` — Renders motion frames and compiles both 9:16 vertical and 16:9 landscape marketing videos without audio.
+* `generate_promo_video.py` — Renders cinematic motion frames and compiles both 9:16 vertical and 16:9 landscape marketing videos for iPhone.
+* `generate_ipad_promo_video.py` — Renders cinematic 16:9 landscape marketing promo video for iPad.
