@@ -116,17 +116,21 @@ struct WorkoutPhaseTimelineView: View {
     }
 
     private func blockWidth(for phase: WorkoutPhase) -> CGFloat {
+        let sec = CGFloat(phase.durationSeconds)
         switch phase.kind {
         case .warmup:
-            return 64 // Long block
+            // Long block scaling with warm-up length (e.g. 1m -> 54pt, 5m -> 88pt)
+            return min(95, max(54, 45 + sec * 0.15))
         case .cooldown:
-            return 56
+            return min(80, max(46, 40 + sec * 0.15))
         case .steady:
-            return 100
+            return 110
         case .work:
-            return 28 // Short spike
+            // Narrow spikes (height = effort, width = duration): 15s -> 25pt, 20s -> 27pt, 30s -> 31pt
+            return min(55, max(24, 20 + sec * 0.35))
         case .recovery:
-            return 28 // Flat block
+            // Flat recovery blocks: 30s -> 37pt, 60s (1 min walk) -> 52pt
+            return min(75, max(32, 22 + sec * 0.50))
         }
     }
 }
