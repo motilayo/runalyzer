@@ -1440,6 +1440,22 @@ body {
   border: 1px solid var(--pastel-coral-border);
 }
 
+.illustration-img-wrap {
+  width: 100%;
+  margin-bottom: 20px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #f1f5f9;
+  border: 1px solid var(--border-card);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+.illustration-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .kinematic-svg-container {
   width: 100%;
   margin-bottom: 20px;
