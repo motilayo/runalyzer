@@ -333,7 +333,7 @@ struct PreRunDrill: Sendable {
             coolDownDurationMinutes = 0.0
         } else {
             warmUpDurationMinutes = duration == .fiveMinutes ? 1.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 4.0 : 3.0))
-            coolDownDurationMinutes = duration == .fiveMinutes ? 0.5 : (duration == .tenMinutes ? 1.0 : (duration == .thirtyMinutes ? 3.0 : 2.0))
+            coolDownDurationMinutes = duration == .fiveMinutes ? 0.5 : (duration == .tenMinutes ? 1.0 : (duration == .thirtyMinutes ? 2.0 : 2.0))
         }
 
         if warmUpDurationMinutes > 0 && id != .zone2Run {

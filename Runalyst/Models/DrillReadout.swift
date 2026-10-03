@@ -34,8 +34,8 @@ struct DrillReadout: Sendable, Identifiable {
     ) -> DrillReadout {
         switch drillId {
         case .tempoSurges:
-            let resolvedTitle = customTitle ?? (drillId == .tempoSurges ? "Posture Check" : drillId.title)
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
+            let resolvedTitle = customTitle ?? (drillId == .tempoSurges && duration == .tenMinutes ? "Posture Check" : drillId.title)
             let targetStr = targetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" } ?? "160 SPM"
 
             let drill = PreRunDrill(
@@ -46,12 +46,30 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let overviewText: String
+            let breakdownText: String
+
+            switch duration {
+            case .fiveMinutes:
+                overviewText = "In this drill, you will complete a 5-minute mechanical reset before your main run."
+                breakdownText = "You’ll start with a 1-minute easy warm-up jog. This is followed by 3 sets of brisk intervals for 30 seconds, followed by 45 seconds of walk recovery."
+            case .tenMinutes:
+                overviewText = "In this drill, you will complete a 10-minute mechanical reset before your main run."
+                breakdownText = "You’ll start with a 2.5-minute easy warm-up jog. This is followed by 5 sets of intervals where you will run at a high, brisk cadence for 30 seconds, followed by a strict 60-second walk to catch your breath."
+            case .fifteenMinutes:
+                overviewText = "In this drill, you will complete a 15-minute tempo surge workout to build speed endurance."
+                breakdownText = "You’ll start with a 3-minute easy warm-up jog. This is followed by 3 sets of 2-minute tempo surges, paired with 2 minutes of walk recovery."
+            case .thirtyMinutes:
+                overviewText = "In this drill, you will complete a 30-minute tempo surge workout to build sustained speed and aerobic power."
+                breakdownText = "You’ll start with a 4-minute easy warm-up jog. This is followed by 4 sets of 3-minute tempo surges, paired with 3 minutes of walk recovery, finishing with a 2-minute cool-down."
+            }
+
             return DrillReadout(
                 drillId: .tempoSurges,
                 title: resolvedTitle,
                 subtitle: "Tempo Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute mechanical reset before your main run.",
-                breakdown: "You’ll start with a 2.5-minute easy warm-up jog. This is followed by 5 sets of intervals where you will run at a high, brisk cadence for 30 seconds, followed by a strict 60-second walk to catch your breath.",
+                overview: overviewText,
+                breakdown: breakdownText,
                 coachingTip: "A taller posture reduces vertical bounce and saves energy. Drop your shoulders, keep your eyes up, and focus on quick, light steps to hit your \(targetStr) target without sprinting.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -61,7 +79,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .strides:
             let resolvedTitle = customTitle ?? "Strides"
-            let duration = customDuration ?? .fifteenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
             let targetStr = targetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" }
 
             let drill = PreRunDrill(
@@ -72,12 +90,30 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let overviewText: String
+            let breakdownText: String
+
+            switch duration {
+            case .fiveMinutes:
+                overviewText = "In this drill, you will complete a 5-minute neuromuscular wake-up to prime your fast-twitch fibers."
+                breakdownText = "You’ll start with a 1-minute easy jog, followed by 4 short interval sets of 15-second strides and 45-second walks."
+            case .tenMinutes:
+                overviewText = "In this drill, you will complete a 10-minute neuromuscular wake-up to prime your fast-twitch fibers."
+                breakdownText = "You’ll start with a 2-minute easy jog, followed by 4 short interval sets of 15-second strides and 45-second walks."
+            case .fifteenMinutes:
+                overviewText = "In this drill, you will complete a 15-minute neuromuscular wake-up to prime your fast-twitch fibers."
+                breakdownText = "You’ll start with a 5-minute easy jog to warm up the joints, followed by 6 short interval sets. In each interval, you’ll accelerate into a 20-second sprint, followed immediately by a 60-second walk to let your heart rate drop completely."
+            case .thirtyMinutes:
+                overviewText = "In this drill, you will complete a 30-minute extended stride and neuromuscular activation workout."
+                breakdownText = "You’ll start with a 5-minute easy jog, followed by 8 sets of 30-second strides and 90-second walks, finishing with a 5-minute cool-down."
+            }
+
             return DrillReadout(
                 drillId: .strides,
                 title: resolvedTitle,
                 subtitle: "Interval Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 15-minute neuromuscular wake-up to prime your fast-twitch fibers.",
-                breakdown: "You’ll start with a 5-minute easy jog to warm up the joints, followed by 6 short interval sets. In each interval, you’ll accelerate into a 20-second sprint, followed immediately by a 60-second walk to let your heart rate drop completely.",
+                overview: overviewText,
+                breakdown: breakdownText,
                 coachingTip: "Don't fight through fatigue. Use the full 60-second walk to recover so you can focus 100% on your form during the sprints. Drive your elbows backward and keep your hands relaxed.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -101,8 +137,8 @@ struct DrillReadout: Sendable, Identifiable {
                 drillId: .zone2Run,
                 title: resolvedTitle,
                 subtitle: "Long Run / Zone 2 Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 5-minute continuous warm-up to lubricate your joints without burning vital glycogen.",
-                breakdown: "You’ll execute a single, continuous 5-minute block of low-intensity movement. There are no sprints or intervals—just a steady, progressive effort to elevate your core temperature before your long miles.",
+                overview: "In this drill, you will complete a \(duration.rawValue)-minute continuous warm-up to lubricate your joints without burning vital glycogen.",
+                breakdown: "You’ll execute a single, continuous \(duration.rawValue)-minute block of low-intensity movement. There are no sprints or intervals—just a steady, progressive effort to elevate your core temperature before your long miles.",
                 coachingTip: "Keep your breathing entirely through your nose. If you feel the need to open your mouth to breathe, you are pushing too hard and leaving Zone 2.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -112,7 +148,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .cadencePyramids:
             let resolvedTitle = customTitle ?? "Cadence Pyramids"
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
             let targetStr = targetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" } ?? "165 SPM"
 
             let drill = PreRunDrill(
@@ -123,12 +159,24 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let breakdownText: String
+            switch duration {
+            case .fiveMinutes:
+                breakdownText = "You’ll start with a 1-minute easy warm-up jog. This is followed by 3 sets of 20-second high cadence intervals, paired with 30 seconds of walk recovery."
+            case .tenMinutes:
+                breakdownText = "You’ll start with a 2-minute easy jog warm-up. This is followed by 4 sets of intervals where you run at high cadence for 30 seconds, followed by 45 seconds of walk recovery to reset."
+            case .fifteenMinutes:
+                breakdownText = "You’ll start with a 3-minute easy jog warm-up. This is followed by 4 sets of 1-minute high cadence intervals, paired with 90 seconds of walk recovery."
+            case .thirtyMinutes:
+                breakdownText = "You’ll start with a 4-minute easy jog warm-up. This is followed by 6 sets of 90-second high cadence intervals, paired with 2 minutes of walk recovery."
+            }
+
             return DrillReadout(
                 drillId: .cadencePyramids,
                 title: resolvedTitle,
                 subtitle: "Cadence & Form Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute cadence progression to eliminate overstriding and protect your knees.",
-                breakdown: "You’ll start with a 2-minute easy jog warm-up. This is followed by 4 sets of intervals where you run at high cadence for 30 seconds, followed by 45 seconds of walk recovery to reset.",
+                overview: "In this drill, you will complete a \(duration.rawValue)-minute cadence progression to eliminate overstriding and protect your knees.",
+                breakdown: breakdownText,
                 coachingTip: "Focus on landing lightly underneath your hips. Let your feet kiss the ground and lift quickly rather than reaching forward.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -212,7 +260,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .hillBounds:
             let resolvedTitle = customTitle ?? "Hill Bounds"
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
 
             let drill = PreRunDrill(
                 id: .hillBounds,
@@ -222,12 +270,24 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let breakdownText: String
+            switch duration {
+            case .fiveMinutes:
+                breakdownText = "You’ll start with a 1-minute warm-up jog. This is followed by 3 sets of 15-second uphill bounds, followed by 30 seconds of walk recovery."
+            case .tenMinutes:
+                breakdownText = "You’ll start with a 2-minute warm-up jog. This is followed by 4 sets of 20-second uphill bounds, followed by 40 seconds of walk recovery."
+            case .fifteenMinutes:
+                breakdownText = "You’ll start with a 3-minute warm-up jog. This is followed by 5 sets of 30-second uphill bounds, followed by 60 seconds of walk recovery."
+            case .thirtyMinutes:
+                breakdownText = "You’ll start with a 4-minute warm-up jog. This is followed by 6 sets of 45-second uphill bounds, followed by 90 seconds of walk recovery."
+            }
+
             return DrillReadout(
                 drillId: .hillBounds,
                 title: resolvedTitle,
                 subtitle: "Power & Stride Length Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute explosive uphill prep to build push-off power and glute drive.",
-                breakdown: "You’ll start with a 2-minute warm-up jog. This is followed by 4 sets of 20-second uphill bounds, followed by 40 seconds of walk recovery.",
+                overview: "In this drill, you will complete a \(duration.rawValue)-minute explosive uphill prep to build push-off power and glute drive.",
+                breakdown: breakdownText,
                 coachingTip: "Pump your arms forward and drive through your hips. Maintain tall posture without collapsing your chest into the incline.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -237,7 +297,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .recoveryJog:
             let resolvedTitle = customTitle ?? "Recovery Jog"
-            let duration = customDuration ?? .fifteenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
 
             let drill = PreRunDrill(
                 id: .recoveryJog,
@@ -251,8 +311,8 @@ struct DrillReadout: Sendable, Identifiable {
                 drillId: .recoveryJog,
                 title: resolvedTitle,
                 subtitle: "Zone 1 Recovery Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 15-minute gentle flush to stimulate blood flow and release muscular tension.",
-                breakdown: "You’ll execute a continuous 15-minute easy shakeout in Zone 1. No intervals or surges—just effortless, smooth steps to release stiffness.",
+                overview: "In this drill, you will complete a \(duration.rawValue)-minute gentle flush to stimulate blood flow and release muscular tension.",
+                breakdown: "You’ll execute a continuous \(duration.rawValue)-minute easy shakeout in Zone 1. No intervals or surges—just effortless, smooth steps to release stiffness.",
                 coachingTip: "Keep the effort completely conversational. If you cannot speak in full sentences comfortably, slow down.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -262,7 +322,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .aerobicFlush:
             let resolvedTitle = customTitle ?? "Aerobic Flush"
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
 
             let drill = PreRunDrill(
                 id: .aerobicFlush,
@@ -276,8 +336,8 @@ struct DrillReadout: Sendable, Identifiable {
                 drillId: .aerobicFlush,
                 title: resolvedTitle,
                 subtitle: "Active Recovery Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute recovery flush to clear metabolic fatigue.",
-                breakdown: "You’ll execute a continuous 10-minute low-intensity aerobic block. There are no high-intensity spikes—just a steady, relaxed shakeout.",
+                overview: "In this drill, you will complete a \(duration.rawValue)-minute recovery flush to clear metabolic fatigue.",
+                breakdown: "You’ll execute a continuous \(duration.rawValue)-minute low-intensity aerobic block. There are no high-intensity spikes—just a steady, relaxed shakeout.",
                 coachingTip: "Focus on deep diaphragmatic belly breathing and relaxing your neck, jaw, and shoulders.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
@@ -287,7 +347,7 @@ struct DrillReadout: Sendable, Identifiable {
 
         case .fartlekPrimer:
             let resolvedTitle = customTitle ?? "Fartlek Primer"
-            let duration = customDuration ?? .tenMinutes
+            let duration = customDuration ?? drillId.defaultDuration
             let targetStr = targetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" } ?? "165 SPM"
 
             let drill = PreRunDrill(
@@ -298,12 +358,24 @@ struct DrillReadout: Sendable, Identifiable {
             )
             let phases = drill.generatePhases()
 
+            let breakdownText: String
+            switch duration {
+            case .fiveMinutes:
+                breakdownText = "You’ll start with a 1-minute warm-up jog. This is followed by 3 sets of 30-second pick-ups, alternating with 30 seconds of relaxed recovery."
+            case .tenMinutes:
+                breakdownText = "You’ll start with a 2-minute warm-up jog. This is followed by 4 sets of 45-second pick-ups, alternating with 45 seconds of relaxed recovery."
+            case .fifteenMinutes:
+                breakdownText = "You’ll start with a 3-minute warm-up jog. This is followed by 5 sets of 1-minute pick-ups, alternating with 1 minute of relaxed recovery."
+            case .thirtyMinutes:
+                breakdownText = "You’ll start with a 4-minute warm-up jog. This is followed by 6 sets of 2-minute pick-ups, alternating with 2 minutes of relaxed recovery."
+            }
+
             return DrillReadout(
                 drillId: .fartlekPrimer,
                 title: resolvedTitle,
                 subtitle: "Gear-Shifting Pre-Run • \(duration.rawValue) min",
-                overview: "In this drill, you will complete a 10-minute speed-play activation to wake up gear-shifting neuromuscular patterns.",
-                breakdown: "You’ll start with a 2-minute warm-up jog. This is followed by 4 sets of 45-second pick-ups, alternating with 45 seconds of relaxed recovery.",
+                overview: "In this drill, you will complete a \(duration.rawValue)-minute speed-play activation to wake up gear-shifting neuromuscular patterns.",
+                breakdown: breakdownText,
                 coachingTip: "Shift your cadence smoothly between gears without tensing your upper body.",
                 phases: phases,
                 durationMinutes: duration.rawValue,
