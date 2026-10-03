@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Duration categories for prescribed corrective drills.
 public enum DrillDuration: Int, CaseIterable, Sendable, Codable {
+    case fiveMinutes = 5
     case tenMinutes = 10
     case fifteenMinutes = 15
     case thirtyMinutes = 30
@@ -76,14 +77,14 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         switch rawValue {
         case "cadence_pyramids": self = .cadencePyramids
         case "rhythm_intervals": self = .rhythmIntervals
-        case "tempo_surges": self = .tempoSurges
+        case "tempo_surges", "posture_check": self = .tempoSurges
         case "strides": self = .strides
         case "neuromuscular_primer": self = .neuromuscularPrimer
         case "aerobic_flush": self = .aerobicFlush
         case "fartlek_primer": self = .fartlekPrimer
         case "hill_bounds": self = .hillBounds
         case "recovery_jog": self = .recoveryJog
-        case "zone_2_run", "aerobic_base_builder": self = .zone2Run
+        case "zone_2_run", "aerobic_base_builder", "dynamic_activation": self = .zone2Run
         default: return nil
         }
     }
@@ -100,6 +101,18 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         case .hillBounds: return "Hill Bounds"
         case .recoveryJog: return "Recovery Jog"
         case .zone2Run: return "Zone 2 Run"
+        }
+    }
+
+    /// Default canonical duration for this drill when prescribed or activated
+    public var defaultDuration: DrillDuration {
+        switch self {
+        case .zone2Run:
+            return .fiveMinutes
+        case .strides, .recoveryJog:
+            return .fifteenMinutes
+        case .tempoSurges, .cadencePyramids, .rhythmIntervals, .neuromuscularPrimer, .hillBounds, .aerobicFlush, .fartlekPrimer:
+            return .tenMinutes
         }
     }
 
@@ -184,6 +197,15 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
             return nil
         }
 
+        if clean.localizedCaseInsensitiveCompare("posture_check") == .orderedSame ||
+           clean.localizedCaseInsensitiveCompare("Posture Check") == .orderedSame {
+            return PreRunDrillId.tempoSurges.correspondingClassification
+        }
+        if clean.localizedCaseInsensitiveCompare("dynamic_activation") == .orderedSame ||
+           clean.localizedCaseInsensitiveCompare("Dynamic Activation") == .orderedSame {
+            return PreRunDrillId.zone2Run.correspondingClassification
+        }
+
         for drill in PreRunDrillId.allCases {
             if drill.rawValue.localizedCaseInsensitiveCompare(clean) == .orderedSame ||
                drill.title.localizedCaseInsensitiveCompare(clean) == .orderedSame {
@@ -208,6 +230,15 @@ enum PreRunDrillId: String, CaseIterable, Codable, Sendable {
         ]
         if standardClassifications.contains(where: { $0.localizedCaseInsensitiveCompare(clean) == .orderedSame }) {
             return nil
+        }
+
+        if clean.localizedCaseInsensitiveCompare("posture_check") == .orderedSame ||
+           clean.localizedCaseInsensitiveCompare("Posture Check") == .orderedSame {
+            return "Posture Check"
+        }
+        if clean.localizedCaseInsensitiveCompare("dynamic_activation") == .orderedSame ||
+           clean.localizedCaseInsensitiveCompare("Dynamic Activation") == .orderedSame {
+            return "Dynamic Activation"
         }
 
         for drill in PreRunDrillId.allCases {

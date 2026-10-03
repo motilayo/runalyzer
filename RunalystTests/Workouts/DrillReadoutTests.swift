@@ -1,0 +1,193 @@
+import XCTest
+@testable import Runalyst
+
+final class DrillReadoutTests: XCTestCase {
+
+    func testPostureCheckReadoutFormat() {
+        let readout = DrillReadout.readout(for: .tempoSurges)
+
+        XCTAssertEqual(readout.drillId, .tempoSurges)
+        XCTAssertEqual(readout.title, "Posture Check")
+        XCTAssertEqual(readout.subtitle, "Tempo Pre-Run • 10 min")
+        XCTAssertEqual(
+            readout.overview,
+            "In this drill, you will complete a 10-minute mechanical reset before your main run."
+        )
+        XCTAssertEqual(
+            readout.breakdown,
+            "You’ll start with a 2.5-minute easy warm-up jog. This is followed by 5 sets of intervals where you will run at a high, brisk cadence for 30 seconds, followed by a strict 60-second walk to catch your breath."
+        )
+        XCTAssertTrue(readout.coachingTip.contains("A taller posture reduces vertical bounce and saves energy."))
+        XCTAssertTrue(readout.coachingTip.contains("160 SPM target without sprinting."))
+
+        // Verify phase geometry
+        let phases = readout.phases
+        XCTAssertFalse(phases.isEmpty)
+
+        // Warmup: 2.5 min = 150 seconds
+        XCTAssertEqual(phases.first?.kind, .warmup)
+        XCTAssertEqual(phases.first?.durationSeconds, 150)
+
+        // 5 sets of (30s work + 60s walk)
+        let workPhases = phases.filter { $0.kind == .work }
+        let walkPhases = phases.filter {
+            if case .recovery(let isWalk) = $0.kind {
+                return isWalk
+            }
+            return false
+        }
+        XCTAssertEqual(workPhases.count, 5)
+        XCTAssertEqual(walkPhases.count, 5)
+        XCTAssertEqual(workPhases.first?.durationSeconds, 30)
+        XCTAssertEqual(walkPhases.first?.durationSeconds, 60)
+
+        let totalDuration = phases.reduce(0) { $0 + $1.durationSeconds }
+        XCTAssertEqual(totalDuration, 600) // 10 minutes total
+    }
+
+    func testStridesReadoutFormat() {
+        let readout = DrillReadout.readout(for: .strides)
+
+        XCTAssertEqual(readout.drillId, .strides)
+        XCTAssertEqual(readout.title, "Strides")
+        XCTAssertEqual(readout.subtitle, "Interval Pre-Run • 15 min")
+        XCTAssertEqual(
+            readout.overview,
+            "In this drill, you will complete a 15-minute neuromuscular wake-up to prime your fast-twitch fibers."
+        )
+        XCTAssertEqual(
+            readout.breakdown,
+            "You’ll start with a 5-minute easy jog to warm up the joints, followed by 6 short interval sets. In each interval, you’ll accelerate into a 20-second sprint, followed immediately by a 60-second walk to let your heart rate drop completely."
+        )
+        XCTAssertTrue(readout.coachingTip.contains("Don't fight through fatigue."))
+        XCTAssertTrue(readout.coachingTip.contains("Use the full 60-second walk to recover"))
+
+        // Verify phase geometry
+        let phases = readout.phases
+        XCTAssertFalse(phases.isEmpty)
+
+        // Warm-up: 5 minutes = 300 seconds
+        XCTAssertEqual(phases.first?.kind, .warmup)
+        XCTAssertEqual(phases.first?.durationSeconds, 300)
+
+        // 6 sets of (20s sprint + 60s walk)
+        let workPhases = phases.filter { $0.kind == .work }
+        let walkPhases = phases.filter {
+            if case .recovery(let isWalk) = $0.kind {
+                return isWalk
+            }
+            return false
+        }
+        XCTAssertEqual(workPhases.count, 6)
+        XCTAssertEqual(walkPhases.count, 6)
+        XCTAssertEqual(workPhases.first?.durationSeconds, 20)
+        XCTAssertEqual(walkPhases.first?.durationSeconds, 60)
+
+        let totalDuration = phases.reduce(0) { $0 + $1.durationSeconds }
+        XCTAssertEqual(totalDuration, 900) // 15 minutes total
+    }
+
+    func testDynamicActivationReadoutFormat() {
+        let readout = DrillReadout.readout(for: .zone2Run)
+
+        XCTAssertEqual(readout.drillId, .zone2Run)
+        XCTAssertEqual(readout.title, "Dynamic Activation")
+        XCTAssertEqual(readout.subtitle, "Long Run / Zone 2 Pre-Run • 5 min")
+        XCTAssertEqual(
+            readout.overview,
+            "In this drill, you will complete a 5-minute continuous warm-up to lubricate your joints without burning vital glycogen."
+        )
+        XCTAssertEqual(
+            readout.breakdown,
+            "You’ll execute a single, continuous 5-minute block of low-intensity movement. There are no sprints or intervals—just a steady, progressive effort to elevate your core temperature before your long miles."
+        )
+        XCTAssertTrue(readout.coachingTip.contains("Keep your breathing entirely through your nose."))
+        XCTAssertTrue(readout.coachingTip.contains("Zone 2."))
+
+        // Verify phase geometry
+        let phases = readout.phases
+        XCTAssertEqual(phases.count, 1)
+        XCTAssertEqual(phases.first?.kind, .warmup)
+        XCTAssertEqual(phases.first?.durationSeconds, 300) // 5 minutes total
+    }
+
+    func testCustomTargetCadenceInterpolation() {
+        let readout = DrillReadout.readout(for: .tempoSurges, targetCadence: "164 SPM")
+        XCTAssertEqual(readout.targetCadence, "164 SPM")
+        XCTAssertTrue(readout.coachingTip.contains("164 SPM target without sprinting"))
+    }
+
+    func testAllPreRunDrillsProduceValidReadouts() {
+        for drill in PreRunDrillId.allCases {
+            let readout = DrillReadout.readout(for: drill)
+            XCTAssertFalse(readout.title.isEmpty)
+            XCTAssertFalse(readout.overview.isEmpty)
+            XCTAssertFalse(readout.breakdown.isEmpty)
+            XCTAssertFalse(readout.coachingTip.isEmpty)
+            XCTAssertFalse(readout.phases.isEmpty)
+            XCTAssertGreaterThan(readout.durationMinutes, 0)
+        }
+    }
+
+    func testCoachingTipsMatchBetweenTemplateAndReadout() {
+        for drillId in PreRunDrillId.allCases {
+            let template = DrillTemplate.template(for: drillId)
+            let templateCue = template.generateInstructionalCue("165 SPM")
+            let readout = DrillReadout.readout(for: drillId, targetCadence: "165 SPM")
+            XCTAssertEqual(
+                readout.coachingTip,
+                templateCue,
+                "Coaching tip must exactly match template for \(drillId)"
+            )
+        }
+    }
+
+    func testRhythmIntervalsScalesAcrossAllDurations() {
+        for duration in DrillDuration.allCases {
+            let readout = DrillReadout.readout(for: .rhythmIntervals, customDuration: duration)
+            XCTAssertTrue(
+                readout.overview.contains("\(duration.rawValue)-minute"),
+                "Overview should mention \(duration.rawValue)-minute"
+            )
+            XCTAssertEqual(readout.durationMinutes, duration.rawValue)
+            let totalSeconds = readout.phases.reduce(0) { $0 + $1.durationSeconds }
+            XCTAssertEqual(
+                totalSeconds,
+                duration.rawValue * 60,
+                "Total seconds for rhythmIntervals at \(duration) must equal \(duration.rawValue * 60)"
+            )
+        }
+    }
+
+    func testNeuromuscularPrimerScalesAcrossAllDurations() {
+        for duration in DrillDuration.allCases {
+            let readout = DrillReadout.readout(for: .neuromuscularPrimer, customDuration: duration)
+            XCTAssertTrue(
+                readout.overview.contains("\(duration.rawValue)-minute"),
+                "Overview should mention \(duration.rawValue)-minute"
+            )
+            XCTAssertEqual(readout.durationMinutes, duration.rawValue)
+            let totalSeconds = readout.phases.reduce(0) { $0 + $1.durationSeconds }
+            XCTAssertEqual(
+                totalSeconds,
+                duration.rawValue * 60,
+                "Total seconds for neuromuscularPrimer at \(duration) must equal \(duration.rawValue * 60)"
+            )
+        }
+    }
+
+    func testAllDrillPhasesSumToExactSelectedDuration() {
+        for drillId in PreRunDrillId.allCases {
+            for duration in DrillDuration.allCases {
+                let drill = PreRunDrill(id: drillId, duration: duration)
+                let phases = drill.generatePhases()
+                let totalSeconds = phases.reduce(0) { $0 + $1.durationSeconds }
+                XCTAssertEqual(
+                    totalSeconds,
+                    duration.rawValue * 60,
+                    "Total phase duration for \(drillId) at \(duration) must be exactly \(duration.rawValue * 60)s"
+                )
+            }
+        }
+    }
+}

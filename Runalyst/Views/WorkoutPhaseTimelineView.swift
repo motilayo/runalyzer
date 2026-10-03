@@ -4,22 +4,44 @@ import SwiftUI
 /// Translates complex WorkoutKit phase data into plain English and visual geometry using native SwiftUI shapes.
 struct WorkoutPhaseTimelineView: View {
     let phases: [WorkoutPhase]
+    var showHeader: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.caption2.bold())
-                        .foregroundColor(.secondary)
-                    Text("Breakdown")
-                        .font(.caption.bold())
-                        .foregroundColor(.secondary)
+            if showHeader {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.caption2.bold())
+                            .foregroundColor(.secondary)
+                        Text("Breakdown")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Text(totalDurationString)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary.opacity(0.85))
                 }
-                Spacer()
-                Text(totalDurationString)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundColor(.secondary.opacity(0.85))
+            } else {
+                HStack(spacing: 8) {
+                    HStack(spacing: 3) {
+                        Circle().fill(Color.blue).frame(width: 6, height: 6)
+                        Text("Warm-up").font(.system(size: 9)).foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 3) {
+                        Circle().fill(Color.orange).frame(width: 6, height: 6)
+                        Text("Work").font(.system(size: 9)).foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 3) {
+                        Circle().fill(Color(UIColor.systemGray4)).frame(width: 6, height: 6)
+                        Text("Walk / Rest").font(.system(size: 9)).foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Text(totalDurationString)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary.opacity(0.85))
+                }
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -94,17 +116,21 @@ struct WorkoutPhaseTimelineView: View {
     }
 
     private func blockWidth(for phase: WorkoutPhase) -> CGFloat {
+        let sec = CGFloat(phase.durationSeconds)
         switch phase.kind {
         case .warmup:
-            return 64 // Long block
+            // Long block scaling with warm-up length (e.g. 1m -> 54pt, 5m -> 88pt)
+            return min(95, max(54, 45 + sec * 0.15))
         case .cooldown:
-            return 56
+            return min(80, max(46, 40 + sec * 0.15))
         case .steady:
-            return 100
+            return 110
         case .work:
-            return 28 // Short spike
+            // Narrow spikes (height = effort, width = duration): 15s -> 25pt, 20s -> 27pt, 30s -> 31pt
+            return min(55, max(24, 20 + sec * 0.35))
         case .recovery:
-            return 28 // Flat block
+            // Flat recovery blocks: 30s -> 37pt, 60s (1 min walk) -> 52pt
+            return min(75, max(32, 22 + sec * 0.50))
         }
     }
 }
