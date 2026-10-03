@@ -479,7 +479,7 @@
           </div>
         </div>
 
-        <!-- Kinematic Sports-Science Comparison -->
+                <!-- Kinematic Sports-Science Comparison -->
         <div class="illustration-comparison-grid">
           <!-- Good Stride Card -->
           <div class="illustration-card">
@@ -487,6 +487,78 @@
               <span class="illustration-card-title">Good Stride Kinematics</span>
               <span class="illustration-badge good">Spring Elasticity</span>
             </div>
+            
+            <!-- Mathematical Vector Kinematic Diagram -->
+            <div class="kinematic-svg-container">
+              <svg class="kinematic-svg" viewBox="0 0 380 340" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goodBoneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <marker id="goodArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399"/>
+    </marker>
+  </defs>
+
+  <!-- Dark slate backdrop -->
+  <rect width="380" height="340" rx="14" fill="#0b111e"/>
+  
+  <!-- Ground surface datum -->
+  <line x1="20" y1="265" x2="360" y2="265" stroke="#334155" stroke-width="2"/>
+  <path d="M 30 271 L 35 265 M 60 271 L 65 265 M 90 271 L 95 265 M 120 271 L 125 265 M 150 271 L 155 265 M 180 271 L 185 265 M 210 271 L 215 265 M 240 271 L 245 265 M 270 271 L 275 265 M 300 271 L 305 265 M 330 271 L 335 265" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- Plumb Line from Center of Mass (COM) -->
+  <line x1="193.9" y1="36" x2="193.9" y2="265" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8"/>
+  
+  <!-- Center of Mass Badge at Top (Safe clearance above head) -->
+  <rect x="128.9" y="10" width="130" height="20" rx="4" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+  <text x="193.9" y="24" fill="#a7f3d0" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">CENTER OF MASS (PLUMB LINE)</text>
+
+  <!-- Forward Drive Vector Arrow from Pelvis -->
+  <line x1="202.0" y1="123.2" x2="270.0" y2="123.2" stroke="#34d399" stroke-width="3" marker-end="url(#goodArrow)"/>
+  <rect x="274.0" y="113.2" width="84" height="18" rx="3" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+  <text x="316.0" y="125.2" fill="#34d399" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">FORWARD DRIVE</text>
+
+  <!-- Trailing Arm (Background) -->
+  <line x1="198.6" y1="65.8" x2="176.6" y2="83.8" stroke="#334155" stroke-width="4.5" stroke-linecap="round"/>
+  <line x1="176.6" y1="83.8" x2="160.6" y2="69.8" stroke="#334155" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Trailing Leg (Background) -->
+  <line x1="190.0" y1="123.2" x2="155.0" y2="179.1" stroke="#334155" stroke-width="6.5" stroke-linecap="round"/>
+  <line x1="155.0" y1="179.1" x2="91.3" y2="196.2" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+  <line x1="91.3" y1="196.2" x2="75.3" y2="202.2" stroke="#334155" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Torso & Head -->
+  <line x1="190.0" y1="123.2" x2="198.6" y2="65.8" stroke="#e2e8f0" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="201.7" cy="45.0" r="11" fill="#f8fafc"/>
+  <circle cx="193.9" cy="97.3" r="5" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>
+
+  <!-- Lead Leg (Foreground - Active Spring) -->
+  <line x1="190.0" y1="123.2" x2="204.5" y2="187.5" stroke="url(#goodBoneGrad)" stroke-width="7.5" stroke-linecap="round"/>
+  <line x1="204.5" y1="187.5" x2="196.0" y2="253.0" stroke="url(#goodBoneGrad)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 182.0 263.0 L 196.0 253.0 L 218.0 265.0 L 198.0 265.0 Z" fill="#34d399" stroke="#10b981" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Knee Joint Spring Cushion Callout -->
+  <circle cx="204.5" cy="187.5" r="5.5" fill="#10b981" stroke="#ffffff" stroke-width="2"/>
+  <line x1="204.5" y1="187.5" x2="239.5" y2="172.5" stroke="#6ee7b7" stroke-width="1.5"/>
+  <rect x="242.5" y="162.5" width="114" height="20" rx="3" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+  <text x="299.5" y="175.5" fill="#a7f3d0" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="600" text-anchor="middle">Soft Knee (~20° Cushion)</text>
+
+  <!-- Lead Arm (Foreground) -->
+  <line x1="198.6" y1="65.8" x2="220.6" y2="85.8" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>
+  <line x1="220.6" y1="85.8" x2="240.6" y2="69.8" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Ground Contact & Plumb Line Alignment Indicator -->
+  <ellipse cx="198.0" cy="265.0" rx="10" ry="3.5" fill="#10b981"/>
+  <circle cx="198.0" cy="265.0" r="3" fill="#ffffff"/>
+  
+  <!-- Alignment Badge Below Ground -->
+  <rect x="108.0" y="284" width="180" height="24" rx="5" fill="#064e3b" stroke="#059669" stroke-width="1.5"/>
+  <text x="198.0" y="300" fill="#34d399" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">✓ FOOT DIRECTLY UNDER PELVIS</text>
+</svg>
+            </div>
+
             <div class="kinematic-summary-box good">
               <div class="summary-stat-row">
                 <span class="stat-k">Foot Strike Alignment</span>
@@ -497,26 +569,27 @@
                 <span class="stat-v good">15°–20° Soft Spring Cushion</span>
               </div>
               <div class="summary-stat-row">
-                <span class="stat-k">Tibial Angle</span>
-                <span class="stat-v good">Near-Vertical (85°–90°)</span>
+                <span class="stat-k">The Visual Tell</span>
+                <span class="stat-v good">Shin drops straight down beneath hip</span>
               </div>
               <div class="summary-stat-row">
-                <span class="stat-k">Kinetic Energy Transfer</span>
-                <span class="stat-v good">Horizontal Forward Propulsion</span>
+                <span class="stat-k">How It Feels</span>
+                <span class="stat-v good">Stepping onto a low step beneath you</span>
               </div>
             </div>
+
             <ul class="illustration-points">
               <li>
                 <span class="point-icon good">✓</span>
-                <div><strong>Landing Beneath Pelvis:</strong> Foot strikes close to center of mass with slight forward ankle lean, directing ground reaction force horizontally.</div>
+                <div><strong>No Protractor Needed — How It Feels:</strong> You feel weightless and light, like stepping onto a low step right beneath your pelvis. Your knee stays soft like a shock absorber, immediately rolling into effortless forward propulsion.</div>
               </li>
               <li>
                 <span class="point-icon good">✓</span>
-                <div><strong>Soft, Flexed Knee:</strong> Bent knee cushions landing naturally through muscle engagement and Achilles tendon elastic recoil (&lt;230 ms).</div>
+                <div><strong>How Apple Watch Confirms It:</strong> Rapid Achilles tendon elastic recoil (&lt;230 ms Ground Contact Time), controlled vertical bounce (6.0–9.0 cm), and fluid cadence (170–182 SPM).</div>
               </li>
               <li>
                 <span class="point-icon good">✓</span>
-                <div><strong>Near-Vertical Shin:</strong> Smoothly rolls into rearward hip extension and glute push-off without braking momentum.</div>
+                <div><strong>Forward Energy Transfer:</strong> Because ground force directs horizontally through the hip, zero energy is lost fighting deceleration.</div>
               </li>
             </ul>
           </div>
@@ -527,36 +600,116 @@
               <span class="illustration-card-title">Overstriding Kinematics</span>
               <span class="illustration-badge overstride">Braking Shockwave</span>
             </div>
+
+            <!-- Mathematical Vector Kinematic Diagram -->
+            <div class="kinematic-svg-container">
+              <svg class="kinematic-svg" viewBox="0 0 380 340" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="badBoneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+    <marker id="badArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e"/>
+    </marker>
+  </defs>
+
+  <!-- Dark slate backdrop -->
+  <rect width="380" height="340" rx="14" fill="#0b111e"/>
+  
+  <!-- Ground surface datum -->
+  <line x1="20" y1="265" x2="360" y2="265" stroke="#334155" stroke-width="2"/>
+  <path d="M 30 271 L 35 265 M 60 271 L 65 265 M 90 271 L 95 265 M 120 271 L 125 265 M 150 271 L 155 265 M 180 271 L 185 265 M 210 271 L 215 265 M 240 271 L 245 265 M 270 271 L 275 265 M 300 271 L 305 265 M 330 271 L 335 265" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- Plumb Line from Center of Mass (COM) -->
+  <line x1="145.7" y1="36" x2="145.7" y2="265" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+  
+  <!-- Center of Mass Badge at Top -->
+  <rect x="80.7" y="10" width="130" height="20" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="145.7" y="24" fill="#cbd5e1" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">CENTER OF MASS (PLUMB LINE)</text>
+
+  <!-- Trailing Arm (Background) -->
+  <line x1="146.5" y1="81.0" x2="126.5" y2="101.0" stroke="#334155" stroke-width="4.5" stroke-linecap="round"/>
+  <line x1="126.5" y1="101.0" x2="110.5" y2="89.0" stroke="#334155" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Trailing Leg (Background) -->
+  <line x1="145.0" y1="139.0" x2="118.2" y2="199.3" stroke="#334155" stroke-width="6.5" stroke-linecap="round"/>
+  <line x1="118.2" y1="199.3" x2="55.4" y2="178.9" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+  <line x1="55.4" y1="178.9" x2="39.4" y2="184.9" stroke="#334155" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Torso & Head (Upright, zero forward momentum) -->
+  <line x1="145.0" y1="139.0" x2="146.5" y2="81.0" stroke="#e2e8f0" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="147.1" cy="60.0" r="11" fill="#f8fafc"/>
+  <circle cx="145.7" cy="112.9" r="5" fill="#94a3b8" stroke="#ffffff" stroke-width="1.5"/>
+
+  <!-- Lead Leg (Foreground - Locked Straight Knee) -->
+  <line x1="145.0" y1="139.0" x2="180.6" y2="194.6" stroke="url(#badBoneGrad)" stroke-width="7.5" stroke-linecap="round"/>
+  <line x1="180.6" y1="194.6" x2="211.3" y2="253.0" stroke="url(#badBoneGrad)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 207.3 265.0 L 211.3 253.0 L 237.3 249.0 L 221.3 258.0 Z" fill="#fb7185" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Locked Knee Warning Callout (Cleanly in open space to the right) -->
+  <circle cx="180.6" cy="194.6" r="5.5" fill="#e11d48" stroke="#ffffff" stroke-width="2"/>
+  <line x1="180.6" y1="194.6" x2="218.6" y2="174.6" stroke="#fda4af" stroke-width="1.5"/>
+  <rect x="220.6" y="164.6" width="112" height="20" rx="3" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
+  <text x="276.6" y="177.6" fill="#fecdd3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">Locked Knee (&lt;5° Flex)</text>
+
+  <!-- Braking Force Vector Arrow (Backward & Upward Shockwave) -->
+  <line x1="207.3" y1="265.0" x2="155.3" y2="221.0" stroke="#f43f5e" stroke-width="3" marker-end="url(#badArrow)"/>
+  <rect x="65.3" y="211.0" width="86" height="18" rx="3" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
+  <text x="108.3" y="223.0" fill="#fb7185" font-size="8" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">BRAKING FORCE</text>
+
+  <!-- Lead Arm (Foreground) -->
+  <line x1="146.5" y1="81.0" x2="164.5" y2="103.0" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>
+  <line x1="164.5" y1="103.0" x2="182.5" y2="91.0" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Collision Point at Ground -->
+  <circle cx="207.3" cy="265.0" r="4" fill="#e11d48"/>
+  <circle cx="207.3" cy="265.0" r="1.5" fill="#ffffff"/>
+
+  <!-- Overstride Gap Dimension Line (Below Ground) -->
+  <line x1="145.7" y1="278" x2="207.3" y2="278" stroke="#f43f5e" stroke-width="1.5"/>
+  <line x1="145.7" y1="272" x2="145.7" y2="284" stroke="#f43f5e" stroke-width="1.5"/>
+  <line x1="207.3" y1="272" x2="207.3" y2="284" stroke="#f43f5e" stroke-width="1.5"/>
+  <rect x="126.5" y="268" width="100" height="18" rx="3" fill="#4c0519" stroke="#e11d48" stroke-width="1"/>
+  <text x="176.5" y="280" fill="#fecdd3" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">+30 CM OVERREACH</text>
+
+  <!-- Warning Badge at Bottom -->
+  <rect x="117.3" y="296" width="180" height="22" rx="5" fill="#4c0519" stroke="#e11d48" stroke-width="1.5"/>
+  <text x="207.3" y="311" fill="#fda4af" font-size="8.5" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-weight="700" text-anchor="middle">✗ BRAKING IMPACT COLLISION</text>
+</svg>
+            </div>
+
             <div class="kinematic-summary-box overstride">
               <div class="summary-stat-row">
                 <span class="stat-k">Foot Strike Alignment</span>
-                <span class="stat-v overstride">Ahead of Pelvis (&gt;30 cm)</span>
+                <span class="stat-v overstride">Ahead of Pelvis (&gt;30 cm Reach)</span>
               </div>
               <div class="summary-stat-row">
                 <span class="stat-k">Knee Flexion on Contact</span>
                 <span class="stat-v overstride">Locked &amp; Straightened (&lt;5°)</span>
               </div>
               <div class="summary-stat-row">
-                <span class="stat-k">Tibial Angle</span>
-                <span class="stat-v overstride">Forward-Casting Angled Shin</span>
+                <span class="stat-k">The Visual Tell</span>
+                <span class="stat-v overstride">Shin kicks forward ahead of body</span>
               </div>
               <div class="summary-stat-row">
-                <span class="stat-k">Kinetic Energy Transfer</span>
-                <span class="stat-v overstride">Upward Bounce &amp; Braking Collision</span>
+                <span class="stat-k">How It Feels</span>
+                <span class="stat-v overstride">Stomping the brakes on each step</span>
               </div>
             </div>
+
             <ul class="illustration-points">
               <li>
                 <span class="point-icon bad">✗</span>
-                <div><strong>Landing Ahead of Center of Mass (&gt;30 cm):</strong> Foot casts outward with an angled shin, generating heavy deceleration shockwaves.</div>
+                <div><strong>No Protractor Needed — How It Feels:</strong> You feel a sharp deceleration jolt through your heel, knee joint, and lower back with every step. You feel like you are continually stomping the brakes and fighting your own momentum.</div>
               </li>
               <li>
                 <span class="point-icon bad">✗</span>
-                <div><strong>Locked Knee on Impact:</strong> Rigid, straightened leg cannot compress like a spring, transmitting kinetic collision directly into knee and hip joints.</div>
+                <div><strong>How Apple Watch Detects It:</strong> Prolonged pavement stall (&gt;260 ms Ground Contact Time), excessive vertical bouncing (&gt;10.0 cm), and sluggish turnover (&lt;160 SPM).</div>
               </li>
               <li>
                 <span class="point-icon bad">✗</span>
-                <div><strong>High Braking &amp; Vertical Bounce:</strong> Energy stalls in prolonged ground contact (&gt;260 ms) and deflects upward into excessive vertical oscillation (&gt;10 cm).</div>
+                <div><strong>Braking Collision Shockwave:</strong> Landing ahead of the hip converts forward speed into severe joint collision forces, spiking shin splint and patellar tendinitis risk.</div>
               </li>
             </ul>
           </div>
