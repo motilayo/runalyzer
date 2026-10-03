@@ -66,11 +66,17 @@ Ready for direct App Store Connect product page upload:
    * Subtitle: *Apple FoundationModels guidance tailored to fatigue*
 3. **`03_Targeted_Drills.png`**
    * Headline: *Targeted Form Drills*
-   * Subtitle: *Prescriptive cadence pyramids & active recovery*
-4. **`04_Longitudinal_Progression.png`**
+   * Subtitle: *Structured phase breakdown & Apple Watch export*
+4. **`04_Biomechanical_Analysis.png`**
+   * Headline: *Biomechanical Form Analysis*
+   * Subtitle: *Vertical bounce, ground contact time & overstride alerts*
+5. **`05_PreRun_Library.png`**
+   * Headline: *Curated Pre-Run Drills*
+   * Subtitle: *Customizable durations, workout phases & haptic cues*
+6. **`06_Longitudinal_Progression.png`**
    * Headline: *Longitudinal Progression*
    * Subtitle: *Track efficiency factor gains and cadence over time*
-5. **`05_HealthKit_Privacy.png`**
+7. **`07_HealthKit_Privacy.png`**
    * Headline: *100% Private & HealthKit-Native*
    * Subtitle: *Zero cloud tracking. Seamless Apple Watch sync.*
 
@@ -85,8 +91,10 @@ Features high-resolution tablet presentation cards framing the app UI with categ
 1. `01_Intelligent_Biometrics.png`
 2. `02_AI_Coaching.png`
 3. `03_Targeted_Drills.png`
-4. `04_Longitudinal_Progression.png`
-5. `05_HealthKit_Privacy.png`
+4. `04_Biomechanical_Analysis.png`
+5. `05_PreRun_Library.png`
+6. `06_Longitudinal_Progression.png`
+7. `07_HealthKit_Privacy.png`
 
 ---
 

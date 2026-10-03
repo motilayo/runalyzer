@@ -137,9 +137,24 @@ def render_card(title, subtitle, tag, screenshot_path, output_filename, glow_col
     bg.paste(framed, (fx, fy), mask=framed)
     
     # Save output
+    # Save primary 1284 x 2778 (6.7" / 6.9" display)
     out_path = os.path.join(OUTPUT_DIR, output_filename)
-    bg.convert("RGB").save(out_path, "PNG", quality=98)
-    print(f"Rendered: {out_path}")
+    bg_rgb = bg.convert("RGB")
+    bg_rgb.save(out_path, "PNG", quality=98)
+    print(f"Rendered 1284x2778: {out_path}")
+
+    # Save 1242 x 2688 (6.5" display)
+    out_1242_dir = "/Users/motilayo/workspace/runalyzer/Media/Screenshots/AppStore_1242x2688"
+    os.makedirs(out_1242_dir, exist_ok=True)
+    out_1242 = os.path.join(out_1242_dir, output_filename)
+    bg_1242 = bg_rgb.resize((1242, 2688), Image.Resampling.LANCZOS)
+    bg_1242.save(out_1242, "PNG", quality=98)
+
+    # Save to website assets
+    web_dir = "/Users/motilayo/workspace/runalyzer/website/assets/images"
+    os.makedirs(web_dir, exist_ok=True)
+    out_web = os.path.join(web_dir, output_filename)
+    bg_rgb.save(out_web, "PNG", quality=98)
 
 cards = [
     {
@@ -170,6 +185,43 @@ cards = [
         "bg": ((8, 22, 22), (12, 34, 34))
     },
     {
+        "title": "Biomechanical Form Analysis",
+        "subtitle": "Vertical bounce, ground contact time & overstride alerts",
+        "tag": "Running Kinematics",
+        "screenshot": "/Users/motilayo/workspace/runalyzer/Media/Screenshots/screen_biomechanics.png",
+        "output": "04_Biomechanical_Analysis.png",
+        "glow": (255, 120, 40, 105),
+        "bg": ((28, 14, 10), (44, 20, 14))
+    },
+    {
+        "title": "Curated Pre-Run Drills",
+        "subtitle": "Customizable durations, workout phases & haptic cues",
+        "tag": "Drill Library",
+        "screenshot": "/Users/motilayo/workspace/runalyzer/Media/Screenshots/screen_drills.png",
+        "output": "05_PreRun_Library.png",
+        "glow": (0, 210, 255, 110),
+        "bg": ((10, 20, 32), (14, 32, 48))
+    },
+    {
+        "title": "Longitudinal Progression",
+        "subtitle": "Track efficiency factor gains and cadence over time",
+        "tag": "Deep Analytics",
+        "screenshot": "/Users/motilayo/workspace/runalyzer/Media/Screenshots/screen_progression.png",
+        "output": "06_Longitudinal_Progression.png",
+        "glow": (0, 210, 255, 110),
+        "bg": ((10, 18, 32), (16, 28, 50))
+    },
+    {
+        "title": "100% Private & HealthKit-Native",
+        "subtitle": "Zero cloud tracking. Seamless Apple Watch sync.",
+        "tag": "Privacy First",
+        "screenshot": "/Users/motilayo/workspace/runalyzer/Media/Screenshots/screen_settings.png",
+        "output": "07_HealthKit_Privacy.png",
+        "glow": (255, 80, 110, 95),
+        "bg": ((24, 10, 18), (38, 14, 26))
+    },
+    # Backward-compatible 5-slot fallbacks for existing listings/website
+    {
         "title": "Longitudinal Progression",
         "subtitle": "Track efficiency factor gains and cadence over time",
         "tag": "Deep Analytics",
@@ -191,3 +243,4 @@ cards = [
 
 for c in cards:
     render_card(c["title"], c["subtitle"], c["tag"], c["screenshot"], c["output"], c["glow"], c["bg"])
+

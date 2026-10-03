@@ -45,16 +45,34 @@ function initScreenshotShowcase() {
     },
     drills: {
       src: 'assets/images/03_Targeted_Drills.png',
-      badge: '03 / PRE-RUN DRILL PRESCRIPTION & TIMELINES',
-      title: 'Targeted Form Drills & Workout Timelines',
+      badge: '03 / PRE-RUN DRILL BREAKDOWN',
+      title: 'Targeted Form Drills & Mental Preparation',
       desc: 'Never guess what warm-up to run. When low cadence or fatigue is detected, Runalyst prescribes targeted drills with proportional phase timelines and an interstitial mental preparation readout before syncing to Apple Watch.',
       b1: 'Structured 5-point mental readout: Target Cues, Biomechanical Focus, Phase Breakdown, Strategy, Effort',
       b2: 'Proportional horizontal geometry blocks visualizing warmups, surges, and recovery intervals',
       b3: 'Dynamic duration scaling (5m, 10m, 15m) with one-tap export to Apple Watch WorkoutKit'
     },
+    biomechanics: {
+      src: 'assets/images/04_Biomechanical_Analysis.png',
+      badge: '04 / KINEMATIC FOOT-STRIKE & BOUNCE',
+      title: 'Biomechanical Form & Overstride Analysis',
+      desc: 'Overstriding acts as an invisible brake on every stride. Runalyst inspects ground contact duration, vertical oscillation, and vertical ratio from your Apple Watch to identify high-impact braking forces before they cause injury.',
+      b1: 'Kinematic checklist: center-of-mass landing, knee spring absorption, and vertical bounce',
+      b2: 'Actionable real-time alerts when vertical bounce exceeds 10 cm or ground contact exceeds 260 ms',
+      b3: 'Targeted form cues: quick step frequency, soft foot landing, and forward pelvis drive'
+    },
+    catalog: {
+      src: 'assets/images/05_PreRun_Library.png',
+      badge: '05 / CURATED PRE-RUN DRILL CATALOG',
+      title: 'Curated Pre-Run Drills Library',
+      desc: 'Browse a complete library of biomechanically targeted primers—from Neuromuscular Primers and Cadence Pyramids to Aerobic Flushes. Adjust drill duration (5, 10, 15, or 30 mins) with one tap.',
+      b1: '10+ structured drill archetypes covering foundation, tempo surges, hills, and recovery',
+      b2: 'Live haptic feedback toggle for wrist vibration cues on interval transitions',
+      b3: 'Seamless one-tap push to Apple Watch WorkoutKit for guided wrist workouts'
+    },
     progression: {
-      src: 'assets/images/04_Longitudinal_Progression.png',
-      badge: '04 / EFFICIENCY FACTOR & METRICS',
+      src: 'assets/images/06_Longitudinal_Progression.png',
+      badge: '06 / EFFICIENCY FACTOR & METRICS',
       title: 'Longitudinal Progression',
       desc: 'Watch your running economy evolve over weeks and months. Interactive charts reveal whether your aerobic pace is accelerating while your cardiac cost and vertical oscillation trend lower.',
       b1: 'Efficiency Factor (Pace-to-Heart Rate ratio) tracking over time',
@@ -62,8 +80,8 @@ function initScreenshotShowcase() {
       b3: 'Automatic classification into Steady Effort, Progression, Intervals, or Recovery'
     },
     privacy: {
-      src: 'assets/images/05_HealthKit_Privacy.png',
-      badge: '05 / ZERO-TRACKING MANIFESTO',
+      src: 'assets/images/07_HealthKit_Privacy.png',
+      badge: '07 / ZERO-TRACKING MANIFESTO',
       title: '100% Private & HealthKit-Native',
       desc: 'Your health data belongs to you—not third-party ad networks or subscription servers. Runalyst reads and writes exclusively to your iPhone local SwiftData store and Apple HealthKit.',
       b1: 'No account creation, no email signups, and zero cloud tracking',
