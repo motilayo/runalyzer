@@ -4,9 +4,38 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'Runalyst/**'
+      - 'RunalystTests/**'
+      - 'RunalystUITests/**'
+      - 'Runalyst.xcodeproj/**'
+      - 'Runalyst.xcworkspace/**'
+      - 'ci_scripts/**'
+      - 'BuildSettings.xcconfig'
+      - 'PrivacyInfo.xcprivacy'
+      - '.swiftlint.yml'
+      - '.swiftformat'
+      - '.github/workflows/ci.yml'
+      - '*.swift'
+      - '*.mlmodel'
   pull_request:
     branches:
       - main
+    paths:
+      - 'Runalyst/**'
+      - 'RunalystTests/**'
+      - 'RunalystUITests/**'
+      - 'Runalyst.xcodeproj/**'
+      - 'Runalyst.xcworkspace/**'
+      - 'ci_scripts/**'
+      - 'BuildSettings.xcconfig'
+      - 'PrivacyInfo.xcprivacy'
+      - '.swiftlint.yml'
+      - '.swiftformat'
+      - '.github/workflows/ci.yml'
+      - '*.swift'
+      - '*.mlmodel'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -2,8 +2,11 @@ name: Generate Seed Data
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'generate_seed_runs.py'
+      - '.github/workflows/generate-seed-data.yml'
   workflow_dispatch: # Allow manual triggering
 
 jobs:
