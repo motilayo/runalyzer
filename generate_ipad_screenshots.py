@@ -150,7 +150,7 @@ cards = [
         "title": "Intelligent Running Biometrics",
         "subtitle": "Live cadence deltas & 30-day relative baselines",
         "tag": "Adaptive Metrics",
-        "screen": "Media/Screenshots/iPad_Raw/screen_01.png",
+        "screen": "Media/Screenshots/iPad_Raw/screen_dashboard.png",
         "output": "01_Intelligent_Biometrics.png",
         "glow": (0, 180, 255, 110),
         "bg": ((10, 14, 26), (15, 22, 42))
@@ -159,25 +159,62 @@ cards = [
         "title": "On-Device AI Coaching",
         "subtitle": "Apple FoundationModels guidance tailored to fatigue",
         "tag": "Apple Intelligence",
-        "screen": "Media/Screenshots/iPad_Raw/screen_02.png",
+        "screen": "Media/Screenshots/iPad_Raw/screen_run_detail.png",
         "output": "02_AI_Coaching.png",
         "glow": (180, 60, 255, 100),
         "bg": ((14, 10, 28), (24, 14, 46))
     },
     {
         "title": "Targeted Form Drills",
-        "subtitle": "Prescriptive cadence pyramids & active recovery",
-        "tag": "Form Optimization",
-        "screen": "Media/Screenshots/iPad_Raw/screen_03.png",
+        "subtitle": "Structured phase breakdown & Apple Watch export",
+        "tag": "Drill Breakdown",
+        "screen": "Media/Screenshots/iPad_Raw/screen_drill_readout.png",
         "output": "03_Targeted_Drills.png",
         "glow": (0, 220, 140, 100),
         "bg": ((8, 22, 22), (12, 34, 34))
     },
     {
+        "title": "Biomechanical Form Analysis",
+        "subtitle": "Vertical bounce, ground contact time & overstride alerts",
+        "tag": "Running Kinematics",
+        "screen": "Media/Screenshots/iPad_Raw/screen_biomechanics.png",
+        "output": "04_Biomechanical_Analysis.png",
+        "glow": (255, 120, 40, 105),
+        "bg": ((28, 14, 10), (44, 20, 14))
+    },
+    {
+        "title": "Curated Pre-Run Drills",
+        "subtitle": "Customizable durations, workout phases & haptic cues",
+        "tag": "Drill Library",
+        "screen": "Media/Screenshots/iPad_Raw/screen_drills.png",
+        "output": "05_PreRun_Library.png",
+        "glow": (0, 210, 255, 110),
+        "bg": ((10, 20, 32), (14, 32, 48))
+    },
+    {
         "title": "Longitudinal Progression",
         "subtitle": "Track efficiency factor gains and cadence over time",
         "tag": "Deep Analytics",
-        "screen": "Media/Screenshots/iPad_Raw/screen_04.png",
+        "screen": "Media/Screenshots/iPad_Raw/screen_progression.png",
+        "output": "06_Longitudinal_Progression.png",
+        "glow": (0, 210, 255, 110),
+        "bg": ((10, 18, 32), (16, 28, 50))
+    },
+    {
+        "title": "100% Private & HealthKit-Native",
+        "subtitle": "Zero cloud tracking. Seamless Apple Watch sync.",
+        "tag": "Privacy First",
+        "screen": "Media/Screenshots/iPad_Raw/screen_settings.png",
+        "output": "07_HealthKit_Privacy.png",
+        "glow": (255, 80, 110, 95),
+        "bg": ((24, 10, 18), (38, 14, 26))
+    },
+    # Backward-compatible 5-slot fallbacks
+    {
+        "title": "Longitudinal Progression",
+        "subtitle": "Track efficiency factor gains and cadence over time",
+        "tag": "Deep Analytics",
+        "screen": "Media/Screenshots/iPad_Raw/screen_progression.png",
         "output": "04_Longitudinal_Progression.png",
         "glow": (0, 210, 255, 110),
         "bg": ((10, 18, 32), (16, 28, 50))
@@ -186,7 +223,7 @@ cards = [
         "title": "100% Private & HealthKit-Native",
         "subtitle": "Zero cloud tracking. Seamless Apple Watch sync.",
         "tag": "Privacy First",
-        "screen": "Media/Screenshots/iPad_Raw/screen_05.png",
+        "screen": "Media/Screenshots/iPad_Raw/screen_settings.png",
         "output": "05_HealthKit_Privacy.png",
         "glow": (255, 80, 110, 95),
         "bg": ((24, 10, 18), (38, 14, 26))
@@ -195,3 +232,4 @@ cards = [
 
 for c in cards:
     render_ipad_card(c["title"], c["subtitle"], c["tag"], c["screen"], c["output"], c["glow"], c["bg"])
+

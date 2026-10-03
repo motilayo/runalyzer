@@ -82,6 +82,10 @@ struct ContentView: View {
                     }
                 case "DRILL_READOUT":
                     drillReadoutPreview
+                case "BIOMECHANICS":
+                    NavigationStack {
+                        OverstrideBiomechanicsSheet()
+                    }
                 case "SETTINGS":
                     NavigationStack {
                         SettingsView(onForceSync: nil)
