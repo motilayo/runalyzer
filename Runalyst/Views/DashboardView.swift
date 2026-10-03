@@ -1242,21 +1242,25 @@ struct DashboardView: View {
             .task {
                 if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == "AUTO_TOUR" {
                     Task {
-                        try? await Task.sleep(nanoseconds: 3_200_000_000)
-                        withAnimation(.easeInOut(duration: 2.2)) {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        withAnimation(.easeInOut(duration: 2.0)) {
                             scrollProxy.scrollTo("pastRunsSection", anchor: .top)
                         }
                     }
                 }
                 sanitizeSpuriousDrillTags()
-                do {
-                    try await HealthKitManager.shared.requestAuthorization()
-                    if let vo2s = try? await HealthKitManager.shared.fetchRecentGlobalVO2Maxes(limit: 1), !vo2s.isEmpty {
-                        globalVO2Max = vo2s[0]
+                if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == nil {
+                    do {
+                        try await HealthKitManager.shared.requestAuthorization()
+                        if let vo2s = try? await HealthKitManager.shared.fetchRecentGlobalVO2Maxes(limit: 1), !vo2s.isEmpty {
+                            globalVO2Max = vo2s[0]
+                        }
+                        refreshBaselineVO2Max()
+                    } catch {
+                        print("Error requesting HealthKit authorization on dashboard: \(error.localizedDescription)")
                     }
+                } else {
                     refreshBaselineVO2Max()
-                } catch {
-                    print("Error requesting HealthKit authorization on dashboard: \(error.localizedDescription)")
                 }
 
                 if let onSync {

@@ -252,4 +252,7 @@ subprocess.run(cmd_horiz, check=True)
 print(f"Created landscape promo video: {video_landscape}")
 
 shutil.rmtree(TEMP_FRAMES_DIR)
+web_landscape = "/Users/motilayo/workspace/runalyzer/website/assets/videos/promo_landscape.mp4"
+shutil.copyfile(video_landscape, web_landscape)
+print(f"Copied landscape promo video to {web_landscape}")
 print("Complete!")

@@ -162,9 +162,9 @@ cards = [
     },
     {
         "title": "Targeted Form Drills",
-        "subtitle": "Prescriptive cadence pyramids & active recovery",
-        "tag": "Form Optimization",
-        "screenshot": "/Users/motilayo/workspace/runalyzer/Media/Screenshots/screen_drills2.png",
+        "subtitle": "Structured phase breakdown & Apple Watch export",
+        "tag": "Drill Breakdown",
+        "screenshot": "/Users/motilayo/workspace/runalyzer/Media/Screenshots/screen_drill_readout.png",
         "output": "03_Targeted_Drills.png",
         "glow": (0, 220, 140, 100),
         "bg": ((8, 22, 22), (12, 34, 34))
