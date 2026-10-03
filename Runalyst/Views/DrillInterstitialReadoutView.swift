@@ -139,28 +139,31 @@ struct DrillInterstitialReadoutView: View {
                         .background(Color.orange.opacity(0.12))
                         .cornerRadius(12)
                     }
-
-                    // Primary Action Button: Bridge to WorkoutKit
-                    Button(action: {
-                        commitAndStart()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "applewatch")
-                                .font(.headline)
-                            Text("Send to Apple Watch")
-                                .font(.subheadline.bold())
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.green)
-                        .cornerRadius(12)
-                        .shadow(color: Color.green.opacity(0.3), radius: 6, x: 0, y: 3)
-                    }
-                    .padding(.top, 4)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button(action: {
+                    commitAndStart()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "applewatch")
+                            .font(.headline)
+                        Text("Send to Apple Watch")
+                            .font(.subheadline.bold())
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.green)
+                    .cornerRadius(12)
+                    .shadow(color: Color.green.opacity(0.25), radius: 6, x: 0, y: 3)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
@@ -176,7 +179,7 @@ struct DrillInterstitialReadoutView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
 

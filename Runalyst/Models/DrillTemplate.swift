@@ -78,7 +78,7 @@ struct DrillTemplate: Sendable {
                     return "\(max(140, target - 3))-\(min(190, target + 3))"
                 },
                 generateInstructionalCue: { _ in
-                    "Arms at 90 degrees, gentle grip, drop your shoulders and let your arms propel your rhythm."
+                    "Relax your shoulders and bend your elbows at 90 degrees. Let the cadence of your arms dictate the turnover of your feet."
                 }
             )
         case .tempoSurges:

@@ -1105,7 +1105,7 @@ private struct DrillCardView: View {
                     }
                 }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
