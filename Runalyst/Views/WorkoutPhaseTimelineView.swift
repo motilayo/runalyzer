@@ -4,22 +4,44 @@ import SwiftUI
 /// Translates complex WorkoutKit phase data into plain English and visual geometry using native SwiftUI shapes.
 struct WorkoutPhaseTimelineView: View {
     let phases: [WorkoutPhase]
+    var showHeader: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.caption2.bold())
-                        .foregroundColor(.secondary)
-                    Text("Breakdown")
-                        .font(.caption.bold())
-                        .foregroundColor(.secondary)
+            if showHeader {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.caption2.bold())
+                            .foregroundColor(.secondary)
+                        Text("Breakdown")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Text(totalDurationString)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary.opacity(0.85))
                 }
-                Spacer()
-                Text(totalDurationString)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundColor(.secondary.opacity(0.85))
+            } else {
+                HStack(spacing: 8) {
+                    HStack(spacing: 3) {
+                        Circle().fill(Color.blue).frame(width: 6, height: 6)
+                        Text("Warm-up").font(.system(size: 9)).foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 3) {
+                        Circle().fill(Color.orange).frame(width: 6, height: 6)
+                        Text("Work").font(.system(size: 9)).foregroundColor(.secondary)
+                    }
+                    HStack(spacing: 3) {
+                        Circle().fill(Color(UIColor.systemGray4)).frame(width: 6, height: 6)
+                        Text("Walk / Rest").font(.system(size: 9)).foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Text(totalDurationString)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary.opacity(0.85))
+                }
             }
 
             ScrollView(.horizontal, showsIndicators: false) {

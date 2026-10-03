@@ -40,14 +40,14 @@ final class WorkoutPlanTests: XCTestCase {
     }
 
     func testWorkoutPhaseTimelineGeneration() {
-        // Strides 15 min: Warmup (3m) + 6 x (20s work + 60s walk) + Cooldown (2m)
+        // Strides 15 min: Warmup (5m) + 6 x (20s work + 60s walk) + Cooldown (2m)
         let stridesDrill = PreRunDrill(id: .strides, duration: .fifteenMinutes)
         let stridesPhases = stridesDrill.generatePhases()
 
         XCTAssertFalse(stridesPhases.isEmpty)
         XCTAssertEqual(stridesPhases.first?.kind, .warmup)
-        XCTAssertEqual(stridesPhases.first?.durationSeconds, 180)
-        XCTAssertEqual(stridesPhases.first?.formattedDuration, "3m")
+        XCTAssertEqual(stridesPhases.first?.durationSeconds, 300)
+        XCTAssertEqual(stridesPhases.first?.formattedDuration, "5m")
 
         let workPhases = stridesPhases.filter { $0.kind == .work }
         let recPhases = stridesPhases.filter {

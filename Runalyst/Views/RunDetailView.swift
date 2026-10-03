@@ -845,18 +845,42 @@ private struct DrillCardView: View {
     @State private var isShowingWorkoutPreview = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
+    @State private var activeReadoutItem: ActiveDrillReadoutItem?
     @State private var showingTargetExplainer = false
     @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
+    private var resolvedPreRunId: PreRunDrillId {
+        if let raw = drill.preRunDrillId, let id = PreRunDrillId(rawValue: raw) {
+            return id
+        }
+        let title = drill.drillTitle
+        if let match = PreRunDrillId.allCases.first(where: {
+            $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame ||
+            $0.rawValue.localizedCaseInsensitiveCompare(title) == .orderedSame
+        }) {
+            return match
+        }
+        let normalized = title.replacingOccurrences(of: "_", with: " ")
+        if let match = PreRunDrillId.allCases.first(where: {
+            $0.title.localizedCaseInsensitiveCompare(normalized) == .orderedSame
+        }) {
+            return match
+        }
+        return .strides
+    }
+
+    private var targetCadenceString: String {
+        let template = DrillTemplate.template(for: resolvedPreRunId)
+        return drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+    }
+
+    private var preRunDrill: PreRunDrill {
+        PreRunDrill(id: resolvedPreRunId, previousCadence: drill.previousCadence, targetCadence: targetCadenceString)
+    }
+
     var body: some View {
-        let preRunId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "")
-            ?? PreRunDrillId.allCases.first(where: {
-                $0.title.localizedCaseInsensitiveCompare(drill.drillTitle) == .orderedSame ||
-                $0.rawValue.localizedCaseInsensitiveCompare(drill.drillTitle) == .orderedSame ||
-                $0.title.localizedCaseInsensitiveCompare(drill.drillTitle.replacingOccurrences(of: "_", with: " ")) == .orderedSame
-            })
-            ?? .strides
+        let preRunId = resolvedPreRunId
         let template = DrillTemplate.template(for: preRunId)
         let displayTitle = drill.formattedTitle.isEmpty ? template.title : drill.formattedTitle
         let work = (drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork
@@ -1023,22 +1047,11 @@ private struct DrillCardView: View {
                 }
             }
 
-            let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
-
-            let preRunDrill = PreRunDrill(id: preRunId, previousCadence: drill.previousCadence, targetCadence: targetInt)
             WorkoutPhaseTimelineView(phases: preRunDrill.generatePhases())
 
             HStack(spacing: 12) {
                 Button(action: {
-                    activeWorkoutPlan = preRunDrill.buildWorkoutPlan()
-                    pendingWatchDrillDTO = DrillPrescriptionDTO(
-                        title: displayTitle,
-                        preRunDrillId: preRunId.rawValue,
-                        purpose: drill.drillPurpose ?? "",
-                        targetCadence: targetInt,
-                        previousCadence: drill.previousCadence
-                    )
-                    isShowingWorkoutPreview = true
+                    openDrillReadout(displayTitle: displayTitle)
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")
@@ -1071,10 +1084,28 @@ private struct DrillCardView: View {
             }
             .padding(.top, 4)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            openDrillReadout(displayTitle: displayTitle)
+        }
         .frame(maxWidth: .infinity, minHeight: 1)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(20)
+        .sheet(item: $activeReadoutItem) { item in
+            DrillInterstitialReadoutView(
+                readout: item.readout,
+                workoutPlan: item.plan,
+                prescriptionDTO: item.dto,
+                onCommitToWatch: { plan, dto in
+                    activeWorkoutPlan = plan
+                    pendingWatchDrillDTO = dto
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isShowingWorkoutPreview = true
+                    }
+                }
+            )
+        }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
         .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
             if oldValue && !newValue, let dto = pendingWatchDrillDTO {
@@ -1082,6 +1113,29 @@ private struct DrillCardView: View {
                 scheduleToWatch(dto: dto)
             }
         }
+    }
+
+    private func openDrillReadout(displayTitle: String) {
+        let currentPreRunId = resolvedPreRunId
+        let currentTargetCadence = targetCadenceString
+        let currentDrill = preRunDrill
+        let plan = currentDrill.buildWorkoutPlan()
+        let dto = DrillPrescriptionDTO(
+            title: displayTitle,
+            preRunDrillId: currentPreRunId.rawValue,
+            purpose: drill.drillPurpose ?? "",
+            targetCadence: currentTargetCadence,
+            previousCadence: drill.previousCadence,
+            durationMinutes: currentDrill.duration.rawValue
+        )
+        let readout = DrillReadout.readout(
+            for: currentPreRunId,
+            customTitle: displayTitle,
+            targetCadence: currentTargetCadence,
+            previousCadence: drill.previousCadence,
+            customDuration: currentDrill.duration
+        )
+        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
     }
 
     private func scheduleToWatch(dto: DrillPrescriptionDTO) {

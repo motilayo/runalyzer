@@ -16,6 +16,7 @@ struct DrillsLibraryView: View {
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var isShowingWorkoutPreview: Bool = false
+    @State private var activeReadoutItem: ActiveDrillReadoutItem?
     @State private var isAutoSyncing: Bool = false
     @State private var autoSyncSuccess: Bool = false
 
@@ -213,6 +214,20 @@ struct DrillsLibraryView: View {
             }
             .padding(.vertical)
         }
+        .sheet(item: $activeReadoutItem) { item in
+            DrillInterstitialReadoutView(
+                readout: item.readout,
+                workoutPlan: item.plan,
+                prescriptionDTO: item.dto,
+                onCommitToWatch: { plan, dto in
+                    activeWorkoutPlan = plan
+                    pendingWatchDrillDTO = dto
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isShowingWorkoutPreview = true
+                    }
+                }
+            )
+        }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
         .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
             if oldValue && !newValue, let dto = pendingWatchDrillDTO {
@@ -238,9 +253,16 @@ struct DrillsLibraryView: View {
     }
 
     private func handleStartDrill(plan: WorkoutPlan, dto: DrillPrescriptionDTO) {
-        activeWorkoutPlan = plan
-        pendingWatchDrillDTO = dto
-        isShowingWorkoutPreview = true
+        let drillId = dto.preRunDrillId.flatMap { PreRunDrillId(rawValue: $0) } ?? .strides
+        let duration = dto.durationMinutes.flatMap { DrillDuration(rawValue: $0) } ?? .fifteenMinutes
+        let readout = DrillReadout.readout(
+            for: drillId,
+            customTitle: dto.title,
+            targetCadence: dto.targetCadence,
+            previousCadence: dto.previousCadence,
+            customDuration: duration
+        )
+        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
     }
 
     private func scheduleDrillToWatch(dto: DrillPrescriptionDTO) {
@@ -510,6 +532,10 @@ struct DrillPrimerCardView: View {
                 .cornerRadius(12)
             }
             .padding(.top, 2)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            startDrill(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))

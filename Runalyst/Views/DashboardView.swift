@@ -37,6 +37,7 @@ struct DashboardView: View {
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
+    @State private var activeReadoutItem: ActiveDrillReadoutItem?
 
     private var timeRangeRuns: [RunRecord] {
         let now = Date()
@@ -729,15 +730,7 @@ struct DashboardView: View {
 
             HStack(spacing: 12) {
                 Button(action: {
-                    activeWorkoutPlan = primerDrill.buildWorkoutPlan()
-                    pendingWatchDrillDTO = DrillPrescriptionDTO(
-                        title: template.title,
-                        preRunDrillId: primerId.rawValue,
-                        purpose: template.defaultPurpose,
-                        targetCadence: computedTarget,
-                        previousCadence: baseCadence
-                    )
-                    isShowingWorkoutPreview = true
+                    openDrillReadout(primerId: primerId, template: template, computedTarget: computedTarget, baseCadence: baseCadence)
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")
@@ -767,11 +760,29 @@ struct DashboardView: View {
                 }
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            openDrillReadout(primerId: primerId, template: template, computedTarget: computedTarget, baseCadence: baseCadence)
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
         .padding(.horizontal)
+        .sheet(item: $activeReadoutItem) { item in
+            DrillInterstitialReadoutView(
+                readout: item.readout,
+                workoutPlan: item.plan,
+                prescriptionDTO: item.dto,
+                onCommitToWatch: { plan, dto in
+                    activeWorkoutPlan = plan
+                    pendingWatchDrillDTO = dto
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isShowingWorkoutPreview = true
+                    }
+                }
+            )
+        }
         .workoutPreview(activeWorkoutPlan, isPresented: $isShowingWorkoutPreview)
         .onChange(of: isShowingWorkoutPreview) { oldValue, newValue in
             if oldValue && !newValue, let dto = pendingWatchDrillDTO {
@@ -779,6 +790,27 @@ struct DashboardView: View {
                 scheduleDashboardDrillToWatch(dto: dto)
             }
         }
+    }
+
+    private func openDrillReadout(primerId: PreRunDrillId, template: DrillTemplate, computedTarget: String?, baseCadence: Int?) {
+        let primerDrill = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget)
+        let plan = primerDrill.buildWorkoutPlan()
+        let dto = DrillPrescriptionDTO(
+            title: template.title,
+            preRunDrillId: primerId.rawValue,
+            purpose: template.defaultPurpose,
+            targetCadence: computedTarget,
+            previousCadence: baseCadence,
+            durationMinutes: primerDrill.duration.rawValue
+        )
+        let readout = DrillReadout.readout(
+            for: primerId,
+            customTitle: template.title,
+            targetCadence: computedTarget,
+            previousCadence: baseCadence,
+            customDuration: primerDrill.duration
+        )
+        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
     }
 
     private func scheduleDashboardDrillToWatch(dto: DrillPrescriptionDTO) {
