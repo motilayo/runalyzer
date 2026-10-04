@@ -6,6 +6,7 @@ import WorkoutKit
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
 
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
@@ -284,7 +285,6 @@ struct DashboardView: View {
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-            .padding(.horizontal)
         }
         .onAppear {
             checkAndFetchInsight()
@@ -768,7 +768,6 @@ struct DashboardView: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
-        .padding(.horizontal)
         .sheet(item: $activeReadoutItem) { item in
             DrillInterstitialReadoutView(
                 readout: item.readout,
@@ -890,198 +889,228 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private var fitnessBaselineCard: some View {
-        VStack(spacing: 16) {
-            // Top Row: VO2 Max & AVG CADENCE
-            HStack(alignment: .top) {
-                // Quadrant 1: VO2 Max
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.fill")
-                            .foregroundColor(.red)
-                            .font(.caption)
-                        Text("VO2 Max")
-                            .font(.caption.bold())
-                            .foregroundColor(.white.opacity(0.8))
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-
-                    if let vo2Val = globalVO2Max {
-                        Text(String(format: "%.1f", vo2Val))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-
-                        if let base = baselineVO2Max {
-                            let diff = vo2Val - base
-                            if abs(diff) > 0.05 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: diff >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                        .font(.caption2.bold())
-                                    Text(String(format: "%@%.1f", diff >= 0 ? "+" : "", diff))
-                                        .font(.caption2.bold())
-                                }
-                                .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.white.opacity(0.12))
-                                .clipShape(Capsule())
-                            }
-                        }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "VO2 Max", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
-
-                // Quadrant 2: AVG CADENCE
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "figure.run")
-                            .foregroundColor(.blue)
-                            .font(.caption)
-                        Text("AVG CADENCE")
-                            .font(.caption.bold())
-                            .foregroundColor(.white.opacity(0.8))
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-
-                    if let cadenceVal = baselineCadence, cadenceVal > 0 {
-                        Text("\(cadenceVal) SPM")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-
-                        if let prevCadence = previousBaselineCadence {
-                            let diff = cadenceVal - prevCadence
-                            if diff != 0 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: diff > 0 ? "arrow.up.right" : "arrow.down.right")
-                                        .font(.caption2.bold())
-                                    Text(String(format: "%@%d SPM", diff > 0 ? "+" : "", diff))
-                                        .font(.caption2.bold())
-                                }
-                                .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.white.opacity(0.12))
-                                .clipShape(Capsule())
-                            }
-                        }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Average Cadence", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
+    private var quadrantVO2Max: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "heart.fill")
+                    .foregroundColor(.red)
+                    .font(.caption)
+                Text("VO2 Max")
+                    .font(.caption.bold())
+                    .foregroundColor(.white.opacity(0.8))
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.6))
             }
 
-            Divider()
-                .background(Color.white.opacity(0.15))
+            if let vo2Val = globalVO2Max {
+                Text(String(format: "%.1f", vo2Val))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
 
-            // Bottom Row: AVG PACE & WORKOUT DENSITY
-            HStack(alignment: .top) {
-                // Quadrant 3: AVG PACE
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "speedometer")
-                            .foregroundColor(.teal)
-                            .font(.caption)
-                        Text("AVG PACE")
-                            .font(.caption.bold())
-                            .foregroundColor(.white.opacity(0.8))
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-
-                    if let paceVal = baselinePace, paceVal > 0 {
-                        let displayPace = PaceFormatter.formatPace(secondsPerKilometer: paceVal)
-                        Text(displayPace)
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-
-                        if let prevPace = previousBaselinePace {
-                            let diffSecs = Int(round(paceVal - prevPace))
-                            if diffSecs != 0 {
-                                let isFaster = diffSecs < 0
-                                HStack(spacing: 4) {
-                                    Image(systemName: isFaster ? "arrow.down.right" : "arrow.up.right")
-                                        .font(.caption2.bold())
-                                    Text(String(format: "%@%ds", diffSecs > 0 ? "+" : "", diffSecs))
-                                        .font(.caption2.bold())
-                                }
-                                .foregroundColor(isFaster ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.white.opacity(0.12))
-                                .clipShape(Capsule())
-                            }
+                if let base = baselineVO2Max {
+                    let diff = vo2Val - base
+                    if abs(diff) > 0.05 {
+                        HStack(spacing: 4) {
+                            Image(systemName: diff >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption2.bold())
+                            Text(String(format: "%@%.1f", diff >= 0 ? "+" : "", diff))
+                                .font(.caption2.bold())
                         }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Average Pace", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
+            } else {
+                Text("—")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            activeExplainer = MetricExplainerInfo(
+                explainer: MetricDetailExplainer.explainer(for: "VO2 Max", isWorkoutStats: false),
+                mode: "Working Stats"
+            )
+        }
+    }
 
-                // Quadrant 4: WORKOUT DENSITY
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bolt.fill")
-                            .foregroundColor(.yellow)
-                            .font(.caption)
-                        Text("WORKOUT DENSITY")
-                            .font(.caption.bold())
-                            .foregroundColor(.white.opacity(0.8))
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
+    @ViewBuilder
+    private var quadrantCadence: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "figure.run")
+                    .foregroundColor(.blue)
+                    .font(.caption)
+                Text("AVG CADENCE")
+                    .font(.caption.bold())
+                    .foregroundColor(.white.opacity(0.8))
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            if let cadenceVal = baselineCadence, cadenceVal > 0 {
+                Text("\(cadenceVal) SPM")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                if let prevCadence = previousBaselineCadence {
+                    let diff = cadenceVal - prevCadence
+                    if diff != 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: diff > 0 ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption2.bold())
+                            Text(String(format: "%@%d SPM", diff > 0 ? "+" : "", diff))
+                                .font(.caption2.bold())
+                        }
+                        .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
                     }
-
-                    let density = workoutDensityTier
-                    Text(density)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .white.opacity(0.6)))))
-
-                    Text(timeRangeRuns.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(timeRangeRuns.count) runs in \(timeRange.lowercased())")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.7))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Workout Density", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
+            } else {
+                Text("—")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            activeExplainer = MetricExplainerInfo(
+                explainer: MetricDetailExplainer.explainer(for: "Average Cadence", isWorkoutStats: false),
+                mode: "Working Stats"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var quadrantPace: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "speedometer")
+                    .foregroundColor(.teal)
+                    .font(.caption)
+                Text("AVG PACE")
+                    .font(.caption.bold())
+                    .foregroundColor(.white.opacity(0.8))
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            if let paceVal = baselinePace, paceVal > 0 {
+                let displayPace = PaceFormatter.formatPace(secondsPerKilometer: paceVal)
+                Text(displayPace)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                if let prevPace = previousBaselinePace {
+                    let diffSecs = Int(round(paceVal - prevPace))
+                    if diffSecs != 0 {
+                        let isFaster = diffSecs < 0
+                        HStack(spacing: 4) {
+                            Image(systemName: isFaster ? "arrow.down.right" : "arrow.up.right")
+                                .font(.caption2.bold())
+                            Text(String(format: "%@%ds", diffSecs > 0 ? "+" : "", diffSecs))
+                                .font(.caption2.bold())
+                        }
+                        .foregroundColor(isFaster ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+            } else {
+                Text("—")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            activeExplainer = MetricExplainerInfo(
+                explainer: MetricDetailExplainer.explainer(for: "Average Pace", isWorkoutStats: false),
+                mode: "Working Stats"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var quadrantDensity: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill")
+                    .foregroundColor(.yellow)
+                    .font(.caption)
+                Text("WORKOUT DENSITY")
+                    .font(.caption.bold())
+                    .foregroundColor(.white.opacity(0.8))
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            let density = workoutDensityTier
+            Text(density)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .white.opacity(0.6)))))
+
+            Text(timeRangeRuns.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(timeRangeRuns.count) runs in \(timeRange.lowercased())")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            activeExplainer = MetricExplainerInfo(
+                explainer: MetricDetailExplainer.explainer(for: "Workout Density", isWorkoutStats: false),
+                mode: "Working Stats"
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var fitnessBaselineCard: some View {
+        VStack(spacing: 16) {
+            if horizontalSizeClass == .regular {
+                HStack(alignment: .top, spacing: 20) {
+                    quadrantVO2Max
+                    Divider()
+                        .background(Color.white.opacity(0.15))
+                        .frame(height: 70)
+                    quadrantCadence
+                    Divider()
+                        .background(Color.white.opacity(0.15))
+                        .frame(height: 70)
+                    quadrantPace
+                    Divider()
+                        .background(Color.white.opacity(0.15))
+                        .frame(height: 70)
+                    quadrantDensity
+                }
+            } else {
+                HStack(alignment: .top) {
+                    quadrantVO2Max
+                    quadrantCadence
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.15))
+
+                HStack(alignment: .top) {
+                    quadrantPace
+                    quadrantDensity
                 }
             }
         }
@@ -1159,17 +1188,35 @@ struct DashboardView: View {
                         fitnessBaselineCard
 
                         if !timeRangeRuns.isEmpty {
-                            aiInsightCard
-
-                            proactiveCoachCard
+                            if horizontalSizeClass == .regular {
+                                HStack(alignment: .top, spacing: 16) {
+                                    aiInsightCard
+                                    proactiveCoachCard
+                                }
+                                .padding(.horizontal)
+                            } else {
+                                aiInsightCard
+                                    .padding(.horizontal)
+                                proactiveCoachCard
+                                    .padding(.horizontal)
+                            }
                         }
                     } else { // 7 Days
                         fitnessBaselineCard
 
                         if !timeRangeRuns.isEmpty {
-                            aiInsightCard
-
-                            proactiveCoachCard
+                            if horizontalSizeClass == .regular {
+                                HStack(alignment: .top, spacing: 16) {
+                                    aiInsightCard
+                                    proactiveCoachCard
+                                }
+                                .padding(.horizontal)
+                            } else {
+                                aiInsightCard
+                                    .padding(.horizontal)
+                                proactiveCoachCard
+                                    .padding(.horizontal)
+                            }
                         }
                     }
 
@@ -1220,11 +1267,23 @@ struct DashboardView: View {
                                                 .font(.title3.bold())
                                                 .padding(.horizontal)
                                                 .frame(maxWidth: .infinity, alignment: .leading)) {
-                                ForEach(filteredRunRecords) { run in
-                                    NavigationLink(value: run) {
-                                        RunListRowView(runRecord: run)
+                                if horizontalSizeClass == .regular {
+                                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                                        ForEach(filteredRunRecords) { run in
+                                            NavigationLink(value: run) {
+                                                RunListRowView(runRecord: run)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
                                     }
-                                    .buttonStyle(.plain)
+                                    .padding(.horizontal)
+                                } else {
+                                    ForEach(filteredRunRecords) { run in
+                                        NavigationLink(value: run) {
+                                            RunListRowView(runRecord: run)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
                             }
                             .id("pastRunsSection")

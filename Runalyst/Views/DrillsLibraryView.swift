@@ -3,6 +3,7 @@ import SwiftData
 import WorkoutKit
 
 struct DrillsLibraryView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var selectedCategory: String = "All"
 
@@ -123,23 +124,44 @@ struct DrillsLibraryView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal)
 
-                        DrillPrimerCardView(
-                            drillId: .recoveryJog,
-                            customTitle: "Recovery Jog",
-                            customTarget: "Target: Zone 1 HR",
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                        if horizontalSizeClass == .regular {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                                DrillPrimerCardView(
+                                    drillId: .recoveryJog,
+                                    customTitle: "Recovery Jog",
+                                    customTarget: "Target: Zone 1 HR",
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
 
-                        DrillPrimerCardView(
-                            drillId: .zone2Run,
-                            customTitle: "Zone 2 Run",
-                            customTarget: "Target: Zone 2 HR",
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                                DrillPrimerCardView(
+                                    drillId: .zone2Run,
+                                    customTitle: "Zone 2 Run",
+                                    customTarget: "Target: Zone 2 HR",
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
+                            }
+                            .padding(.horizontal)
+                        } else {
+                            DrillPrimerCardView(
+                                drillId: .recoveryJog,
+                                customTitle: "Recovery Jog",
+                                customTarget: "Target: Zone 1 HR",
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+
+                            DrillPrimerCardView(
+                                drillId: .zone2Run,
+                                customTitle: "Zone 2 Run",
+                                customTarget: "Target: Zone 2 HR",
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+                        }
                     }
                 }
 
@@ -151,33 +173,62 @@ struct DrillsLibraryView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal)
 
-                        DrillPrimerCardView(
-                            drillId: .cadencePyramids,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                        if horizontalSizeClass == .regular {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                                DrillPrimerCardView(
+                                    drillId: .cadencePyramids,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
 
-                        DrillPrimerCardView(
-                            drillId: .strides,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                                DrillPrimerCardView(
+                                    drillId: .strides,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
 
-                        DrillPrimerCardView(
-                            drillId: .neuromuscularPrimer,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                                DrillPrimerCardView(
+                                    drillId: .neuromuscularPrimer,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
 
-                        DrillPrimerCardView(
-                            drillId: .hillBounds,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                                DrillPrimerCardView(
+                                    drillId: .hillBounds,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
+                            }
+                            .padding(.horizontal)
+                        } else {
+                            DrillPrimerCardView(
+                                drillId: .cadencePyramids,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+
+                            DrillPrimerCardView(
+                                drillId: .strides,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+
+                            DrillPrimerCardView(
+                                drillId: .neuromuscularPrimer,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+
+                            DrillPrimerCardView(
+                                drillId: .hillBounds,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+                        }
                     }
                 }
 
@@ -189,26 +240,49 @@ struct DrillsLibraryView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal)
 
-                        DrillPrimerCardView(
-                            drillId: .rhythmIntervals,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                        if horizontalSizeClass == .regular {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                                DrillPrimerCardView(
+                                    drillId: .rhythmIntervals,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
 
-                        DrillPrimerCardView(
-                            drillId: .tempoSurges,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                                DrillPrimerCardView(
+                                    drillId: .tempoSurges,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
 
-                        DrillPrimerCardView(
-                            drillId: .fartlekPrimer,
-                            baselineCadence: baselineCadence,
-                            onStart: handleStartDrill
-                        )
-                        .padding(.horizontal)
+                                DrillPrimerCardView(
+                                    drillId: .fartlekPrimer,
+                                    baselineCadence: baselineCadence,
+                                    onStart: handleStartDrill
+                                )
+                            }
+                            .padding(.horizontal)
+                        } else {
+                            DrillPrimerCardView(
+                                drillId: .rhythmIntervals,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+
+                            DrillPrimerCardView(
+                                drillId: .tempoSurges,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+
+                            DrillPrimerCardView(
+                                drillId: .fartlekPrimer,
+                                baselineCadence: baselineCadence,
+                                onStart: handleStartDrill
+                            )
+                            .padding(.horizontal)
+                        }
                     }
                 }
             }

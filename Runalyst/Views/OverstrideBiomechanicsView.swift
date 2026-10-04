@@ -286,32 +286,44 @@ private struct CueItemRow: View {
 /// Complete standalone bottom-sheet modal detailing overstriding biomechanics across 3 focused sections
 struct OverstrideBiomechanicsSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var isOverstride = true
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // 1. Form Mode Toggle & Biomechanical Concept Card
-                    VStack(alignment: .leading, spacing: 10) {
-                        Picker("Form", selection: $isOverstride) {
-                            Text("Good Stride").tag(false)
-                            Text("Overstride").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-
-                        BiomechanicalCardView(isOverstride: isOverstride)
+                    // Form Mode Toggle
+                    Picker("Form", selection: $isOverstride) {
+                        Text("Good Stride").tag(false)
+                        Text("Overstride").tag(true)
                     }
+                    .pickerStyle(.segmented)
                     .padding(.horizontal)
                     .padding(.top, 4)
 
-                    // 2. Apple Watch Sensor Telemetry
-                    AppleWatchBiomechanicsBridgeView()
-                        .padding(.horizontal)
+                    if horizontalSizeClass == .regular {
+                        HStack(alignment: .top, spacing: 16) {
+                            BiomechanicalCardView(isOverstride: isOverstride)
+                                .frame(maxWidth: .infinity)
 
-                    // 3. Actionable Coaching Cues
-                    CorrectiveCuesCardView()
+                            VStack(spacing: 16) {
+                                AppleWatchBiomechanicsBridgeView()
+                                CorrectiveCuesCardView()
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
                         .padding(.horizontal)
+                    } else {
+                        BiomechanicalCardView(isOverstride: isOverstride)
+                            .padding(.horizontal)
+
+                        AppleWatchBiomechanicsBridgeView()
+                            .padding(.horizontal)
+
+                        CorrectiveCuesCardView()
+                            .padding(.horizontal)
+                    }
 
                     // Standard AI & Medical Disclaimer
                     AIDisclaimerFooter()
