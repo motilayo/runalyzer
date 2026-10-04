@@ -8,25 +8,39 @@ This directory contains the production-ready promotional media assets, App Store
 Location: `Media/AppStorePreviews/`
 
 Meets all [Apple App Store Preview Specifications](https://developer.apple.com/app-store/app-previews/):
-* **Duration:** 26.5 seconds (within the 15.0 – 30.0s requirement)
+* **Duration:** 25.0 seconds (within the 15.0 – 30.0s requirement)
 * **Framerate:** 30 fps CFR (Constant Frame Rate)
 * **Video Codec:** H.264 High Profile Level 4.2, `yuv420p`
 * **Audio Track:** AAC 44.1 kHz Stereo (required by App Store Connect validator)
-* **Content:** Real on-device application walkthrough (Dashboard -> Run Details & AI Analysis -> Pre-Run Drills Library -> Cadence Progression)
+* **Content:** Real on-device application walkthrough (Dashboard -> Run Details & AI Analysis -> Pre-Run Drills Library -> Drill Interstitial Modal -> Cadence Progression)
 
-### Primary Deliverables for App Store Connect:
-1. **`Runalyst_AppPreview_886x1920.mp4`** (1.7 MB)
-   * **Target:** iPhone App Preview slot (`886 × 1920 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
-2. **`Runalyst_AppPreview_iPad_1200x1600.mp4`** (1.5 MB)
-   * **Target:** iPad App Preview slot (`1200 × 1600 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+### iPhone App Previews (Portrait & Landscape):
+1. **`Runalyst_AppPreview_886x1920.mp4`** (2.1 MB)
+   * **Target:** iPhone Accepted Resolution portrait slot (`886 × 1920 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+2. **`Runalyst_AppPreview_1920x886.mp4`** (1.0 MB)
+   * **Target:** iPhone Accepted Resolution landscape slot (`1920 × 886 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+3. **`Runalyst_AppPreview_1284x2778.mp4`** (3.5 MB)
+   * **Target:** iPhone 6.7" Super Retina Display portrait slot (`1284 × 2778 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+4. **`Runalyst_AppPreview_2778x1284.mp4`** (1.5 MB)
+   * **Target:** iPhone 6.7" Super Retina Display landscape slot (`2778 × 1284 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+5. **`Runalyst_AppPreview_1242x2688.mp4`** (3.3 MB)
+   * **Target:** iPhone 6.5" Super Retina Display portrait slot (`1242 × 2688 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+6. **`Runalyst_AppPreview_2688x1242.mp4`** (1.6 MB)
+   * **Target:** iPhone 6.5" Super Retina Display landscape slot (`2688 × 1242 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
 
-### Alternative Native Full-Resolution Previews:
-3. **`Runalyst_AppPreview_1290x2796.mp4`** (1.5 MB)
-   * Target: iPhone 6.9" & 6.7" Super Retina Displays (`1290 × 2796 px`)
-4. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (1.9 MB)
-   * Target: iPad 12.9" Pro Display slot (`2048 × 2732 px`)
-5. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (1.9 MB)
-   * Target: iPad 13" Pro Display slot (`2064 × 2752 px`)
+### iPad App Previews (Portrait & Landscape):
+7. **`Runalyst_AppPreview_iPad_1200x1600.mp4`** (1.3 MB)
+   * **Target:** iPad Accepted Resolution portrait slot (`1200 × 1600 px`, 3:4, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+8. **`Runalyst_AppPreview_iPad_1600x1200.mp4`** (1.0 MB)
+   * **Target:** iPad Accepted Resolution landscape slot (`1600 × 1200 px`, 4:3, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+9. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (2.7 MB)
+   * **Target:** iPad Pro 12.9" portrait slot (`2048 × 2732 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+10. **`Runalyst_AppPreview_iPad_2732x2048.mp4`** (1.8 MB)
+    * **Target:** iPad Pro 12.9" landscape slot (`2732 × 2048 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+11. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (2.2 MB)
+    * **Target:** iPad Pro 13" portrait slot (`2064 × 2752 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+12. **`Runalyst_AppPreview_iPad_2752x2064.mp4`** (1.7 MB)
+    * **Target:** iPad Pro 13" landscape slot (`2752 × 2064 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
 
 ---
 
@@ -107,7 +121,10 @@ Features high-resolution tablet presentation cards framing the app UI with categ
 ---
 
 ## Automation Scripts
+* `record_app_previews.py` — Orchestrates simulator setup and on-device recording of the automated App Store feature tour.
+* `encode_app_previews.py` — Encodes and validates all iPhone and iPad App Preview resolutions meeting Apple specifications with H.264 High Profile Level 4.2, 30 fps CFR, stereo AAC audio, and +faststart.
 * `generate_app_store_screenshots.py` — Renders iPhone screenshot presentation cards (1284×2778 and 1242×2688) and updates website assets.
 * `generate_ipad_screenshots.py` — Renders iPad screenshot presentation cards (2048×2732 and 2064×2752).
 * `generate_promo_video.py` — Renders cinematic motion frames and compiles both 9:16 vertical and 16:9 landscape marketing videos for iPhone.
 * `generate_ipad_promo_video.py` — Renders cinematic 16:9 landscape marketing promo video for iPad.
+
