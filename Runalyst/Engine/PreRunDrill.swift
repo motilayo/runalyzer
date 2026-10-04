@@ -110,6 +110,14 @@ struct WorkoutPhase: Identifiable, Sendable, Equatable {
     }
 }
 
+/// The repeating interval geometry of a drill (reps × work / recovery).
+struct IntervalSpec: Sendable, Equatable {
+    let iterations: Int
+    let workSeconds: Int
+    let recoverySeconds: Int?
+    let isWalk: Bool
+}
+
 /// Represents an instantiated pre-run drill with user-specific cadence targets,
 /// duration, and native WorkoutKit plan compilation capabilities.
 struct PreRunDrill: Sendable {
@@ -118,19 +126,23 @@ struct PreRunDrill: Sendable {
     let targetCadence: String?
     let duration: DrillDuration
     let hapticMode: HapticFeedbackMode
+    /// Acute readiness modulation (ACWR). `.productive` leaves the standard prescription untouched.
+    let readinessState: ReadinessState
 
     init(
         id: PreRunDrillId,
         previousCadence: Int? = nil,
         targetCadence: String? = nil,
         duration: DrillDuration? = nil,
-        hapticMode: HapticFeedbackMode = .on
+        hapticMode: HapticFeedbackMode = .on,
+        readinessState: ReadinessState = .productive
     ) {
         self.id = id
         self.previousCadence = previousCadence
         self.targetCadence = targetCadence
         self.duration = duration ?? id.defaultDuration
         self.hapticMode = hapticMode
+        self.readinessState = readinessState
     }
 
     // Mathematical variables for constraints
@@ -295,11 +307,129 @@ struct PreRunDrill: Sendable {
     }
 
     var defaultWorkString: String {
-        workString(for: duration)
+        let base = workString(for: duration)
+        guard let adapted = readinessAdjustedIntervalSpec else { return base }
+        // "6 x 20 sec strides" -> suffix "strides"
+        let suffix = base.split(separator: " ").dropFirst(4).joined(separator: " ")
+        return "\(adapted.iterations) x \(Self.formatShortDuration(adapted.workSeconds)) \(suffix)"
     }
 
     var defaultRecoveryString: String {
-        recoveryString(for: duration)
+        let base = recoveryString(for: duration)
+        guard let adapted = readinessAdjustedIntervalSpec, let recovery = adapted.recoverySeconds else { return base }
+        // "60 sec walk recovery" -> suffix "walk recovery"
+        let suffix = base.split(separator: " ").dropFirst(2).joined(separator: " ")
+        return "\(Self.formatShortDuration(recovery)) \(suffix)"
+    }
+
+    static func formatShortDuration(_ seconds: Int) -> String {
+        if seconds >= 120 && seconds % 60 == 0 {
+            return "\(seconds / 60) min"
+        }
+        return "\(seconds) sec"
+    }
+
+    // MARK: - Interval Geometry
+
+    /// Warm-up length used by the visual timeline.
+    var warmUpDurationMinutes: Double {
+        if id == .zone2Run {
+            return duration == .fiveMinutes ? 5.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0))
+        } else if id == .tempoSurges && duration == .tenMinutes {
+            return 2.5
+        } else if id == .strides && duration == .fifteenMinutes {
+            return 5.0
+        } else if id == .aerobicFlush || id == .recoveryJog {
+            return 0.0
+        } else {
+            return duration == .fiveMinutes ? 1.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 4.0 : 3.0))
+        }
+    }
+
+    /// The standard (30-day baseline) interval geometry before any readiness modulation.
+    var standardIntervalSpec: IntervalSpec {
+        switch id {
+        case .cadencePyramids:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 3, workSeconds: 20, recoverySeconds: 30, isWalk: true)
+            case .tenMinutes: return IntervalSpec(iterations: 4, workSeconds: 30, recoverySeconds: 45, isWalk: true)
+            case .fifteenMinutes: return IntervalSpec(iterations: 4, workSeconds: 60, recoverySeconds: 90, isWalk: true)
+            case .thirtyMinutes: return IntervalSpec(iterations: 6, workSeconds: 90, recoverySeconds: 120, isWalk: true)
+            }
+        case .rhythmIntervals:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 3, workSeconds: 20, recoverySeconds: 30, isWalk: false)
+            case .tenMinutes: return IntervalSpec(iterations: 4, workSeconds: 30, recoverySeconds: 45, isWalk: false)
+            case .fifteenMinutes: return IntervalSpec(iterations: 5, workSeconds: 45, recoverySeconds: 75, isWalk: false)
+            case .thirtyMinutes: return IntervalSpec(iterations: 6, workSeconds: 90, recoverySeconds: 120, isWalk: false)
+            }
+        case .tempoSurges:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 3, workSeconds: 30, recoverySeconds: 45, isWalk: true)
+            case .tenMinutes: return IntervalSpec(iterations: 5, workSeconds: 30, recoverySeconds: 60, isWalk: true)
+            case .fifteenMinutes: return IntervalSpec(iterations: 3, workSeconds: 120, recoverySeconds: 120, isWalk: true)
+            case .thirtyMinutes: return IntervalSpec(iterations: 4, workSeconds: 180, recoverySeconds: 180, isWalk: true)
+            }
+        case .strides:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 4, workSeconds: 15, recoverySeconds: 45, isWalk: true)
+            case .tenMinutes: return IntervalSpec(iterations: 4, workSeconds: 15, recoverySeconds: 45, isWalk: true)
+            case .fifteenMinutes: return IntervalSpec(iterations: 6, workSeconds: 20, recoverySeconds: 60, isWalk: true)
+            case .thirtyMinutes: return IntervalSpec(iterations: 8, workSeconds: 30, recoverySeconds: 90, isWalk: true)
+            }
+        case .neuromuscularPrimer:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 3, workSeconds: 15, recoverySeconds: 30, isWalk: true)
+            case .tenMinutes: return IntervalSpec(iterations: 4, workSeconds: 20, recoverySeconds: 40, isWalk: true)
+            case .fifteenMinutes: return IntervalSpec(iterations: 5, workSeconds: 30, recoverySeconds: 60, isWalk: true)
+            case .thirtyMinutes: return IntervalSpec(iterations: 6, workSeconds: 45, recoverySeconds: 90, isWalk: true)
+            }
+        case .fartlekPrimer:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 3, workSeconds: 30, recoverySeconds: 30, isWalk: false)
+            case .tenMinutes: return IntervalSpec(iterations: 4, workSeconds: 45, recoverySeconds: 45, isWalk: false)
+            case .fifteenMinutes: return IntervalSpec(iterations: 5, workSeconds: 60, recoverySeconds: 60, isWalk: false)
+            case .thirtyMinutes: return IntervalSpec(iterations: 6, workSeconds: 120, recoverySeconds: 120, isWalk: false)
+            }
+        case .hillBounds:
+            switch duration {
+            case .fiveMinutes: return IntervalSpec(iterations: 3, workSeconds: 15, recoverySeconds: 30, isWalk: true)
+            case .tenMinutes: return IntervalSpec(iterations: 4, workSeconds: 20, recoverySeconds: 40, isWalk: true)
+            case .fifteenMinutes: return IntervalSpec(iterations: 5, workSeconds: 30, recoverySeconds: 60, isWalk: true)
+            case .thirtyMinutes: return IntervalSpec(iterations: 6, workSeconds: 45, recoverySeconds: 90, isWalk: true)
+            }
+        case .aerobicFlush, .recoveryJog:
+            return IntervalSpec(iterations: 1, workSeconds: duration.rawValue * 60, recoverySeconds: nil, isWalk: false)
+        case .zone2Run:
+            if duration == .fiveMinutes {
+                return IntervalSpec(iterations: 1, workSeconds: 300, recoverySeconds: nil, isWalk: false)
+            }
+            let zone2CoolDown = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
+            let steadySeconds = Int((Double(duration.rawValue) - warmUpDurationMinutes - zone2CoolDown) * 60)
+            return IntervalSpec(iterations: 1, workSeconds: max(60, steadySeconds), recoverySeconds: nil, isWalk: false)
+        }
+    }
+
+    /// The interval geometry actually prescribed today, after readiness modulation.
+    var intervalSpec: IntervalSpec {
+        readinessAdjustedIntervalSpec ?? standardIntervalSpec
+    }
+
+    /// Non-nil only when readiness modulation changes the interval geometry.
+    /// Volume is scaled (min 2 reps) and recovery is scaled and rounded to the nearest 5 s.
+    var readinessAdjustedIntervalSpec: IntervalSpec? {
+        guard readinessState.applies(to: id) else { return nil }
+        let standard = standardIntervalSpec
+        guard let recovery = standard.recoverySeconds else { return nil }
+        let reps = max(2, Int((Double(standard.iterations) * readinessState.volumeScale).rounded()))
+        let scaledRecovery = Int((Double(recovery) * readinessState.recoveryScale / 5.0).rounded()) * 5
+        let adapted = IntervalSpec(
+            iterations: reps,
+            workSeconds: standard.workSeconds,
+            recoverySeconds: scaledRecovery,
+            isWalk: standard.isWalk
+        )
+        return adapted == standard ? nil : adapted
     }
 
     var defaultEffortString: String {
@@ -316,19 +446,7 @@ struct PreRunDrill: Sendable {
     func generatePhases() -> [WorkoutPhase] {
         var phases: [WorkoutPhase] = []
 
-        let warmUpDurationMinutes: Double
-
-        if id == .zone2Run {
-            warmUpDurationMinutes = duration == .fiveMinutes ? 5.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 3.0))
-        } else if id == .tempoSurges && duration == .tenMinutes {
-            warmUpDurationMinutes = 2.5
-        } else if id == .strides && duration == .fifteenMinutes {
-            warmUpDurationMinutes = 5.0
-        } else if id == .aerobicFlush || id == .recoveryJog {
-            warmUpDurationMinutes = 0.0
-        } else {
-            warmUpDurationMinutes = duration == .fiveMinutes ? 1.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 4.0 : 3.0))
-        }
+        let warmUpDurationMinutes = self.warmUpDurationMinutes
 
         if warmUpDurationMinutes > 0 && !(id == .zone2Run && duration == .fiveMinutes) {
             phases.append(
@@ -341,69 +459,11 @@ struct PreRunDrill: Sendable {
             )
         }
 
-        let (iterations, workSeconds, recoverySeconds, isWalk): (Int, Int, Int?, Bool) = {
-            switch id {
-            case .cadencePyramids:
-                switch duration {
-                case .fiveMinutes: return (3, 20, 30, true)
-                case .tenMinutes: return (4, 30, 45, true)
-                case .fifteenMinutes: return (4, 60, 90, true)
-                case .thirtyMinutes: return (6, 90, 120, true)
-                }
-            case .rhythmIntervals:
-                switch duration {
-                case .fiveMinutes: return (3, 20, 30, false)
-                case .tenMinutes: return (4, 30, 45, false)
-                case .fifteenMinutes: return (5, 45, 75, false)
-                case .thirtyMinutes: return (6, 90, 120, false)
-                }
-            case .tempoSurges:
-                switch duration {
-                case .fiveMinutes: return (3, 30, 45, true)
-                case .tenMinutes: return (5, 30, 60, true)
-                case .fifteenMinutes: return (3, 120, 120, true)
-                case .thirtyMinutes: return (4, 180, 180, true)
-                }
-            case .strides:
-                switch duration {
-                case .fiveMinutes: return (4, 15, 45, true)
-                case .tenMinutes: return (4, 15, 45, true)
-                case .fifteenMinutes: return (6, 20, 60, true)
-                case .thirtyMinutes: return (8, 30, 90, true)
-                }
-            case .neuromuscularPrimer:
-                switch duration {
-                case .fiveMinutes: return (3, 15, 30, true)
-                case .tenMinutes: return (4, 20, 40, true)
-                case .fifteenMinutes: return (5, 30, 60, true)
-                case .thirtyMinutes: return (6, 45, 90, true)
-                }
-            case .fartlekPrimer:
-                switch duration {
-                case .fiveMinutes: return (3, 30, 30, false)
-                case .tenMinutes: return (4, 45, 45, false)
-                case .fifteenMinutes: return (5, 60, 60, false)
-                case .thirtyMinutes: return (6, 120, 120, false)
-                }
-            case .hillBounds:
-                switch duration {
-                case .fiveMinutes: return (3, 15, 30, true)
-                case .tenMinutes: return (4, 20, 40, true)
-                case .fifteenMinutes: return (5, 30, 60, true)
-                case .thirtyMinutes: return (6, 45, 90, true)
-                }
-            case .aerobicFlush, .recoveryJog:
-                return (1, duration.rawValue * 60, nil, false)
-            case .zone2Run:
-                if duration == .fiveMinutes {
-                    return (1, 300, nil, false)
-                } else {
-                    let zone2CoolDown = duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0)
-                    let steadySeconds = Int((Double(duration.rawValue) - warmUpDurationMinutes - zone2CoolDown) * 60)
-                    return (1, max(60, steadySeconds), nil, false)
-                }
-            }
-        }()
+        let spec = intervalSpec
+        let iterations = spec.iterations
+        let workSeconds = spec.workSeconds
+        let recoverySeconds = spec.recoverySeconds
+        let isWalk = spec.isWalk
 
         if let recSec = recoverySeconds {
             for idx in 0..<iterations {
@@ -441,7 +501,10 @@ struct PreRunDrill: Sendable {
         } else if id == .zone2Run {
             coolDownDurationMinutes = duration == .fiveMinutes ? 0.0 : (duration == .tenMinutes ? 2.0 : (duration == .thirtyMinutes ? 5.0 : 2.0))
         } else {
-            let intervalSeconds = iterations * (workSeconds + (recoverySeconds ?? 0))
+            // Cool-down is anchored to the standard geometry so a readiness-reduced session
+            // becomes shorter instead of padding an oversized cool-down.
+            let standard = standardIntervalSpec
+            let intervalSeconds = standard.iterations * (standard.workSeconds + (standard.recoverySeconds ?? 0))
             let targetTotalSeconds = duration.rawValue * 60
             let remainingSeconds = targetTotalSeconds - Int(warmUpDurationMinutes * 60) - intervalSeconds
             coolDownDurationMinutes = max(0.0, Double(remainingSeconds) / 60.0)
@@ -648,6 +711,14 @@ struct PreRunDrill: Sendable {
             iterations = 1
             workGoal = .time(Double(duration.rawValue), .minutes)
             recoveryGoal = nil
+        }
+
+        // Readiness modulation (acute fatigue / deload): override volume and recovery so the
+        // Apple Watch session matches the readout timeline exactly.
+        if let adapted = readinessAdjustedIntervalSpec {
+            iterations = adapted.iterations
+            workGoal = .time(Double(adapted.workSeconds), .seconds)
+            recoveryGoal = adapted.recoverySeconds.map { .time(Double($0), .seconds) }
         }
 
         let workStep = WorkoutStep(goal: workGoal, alert: alert)

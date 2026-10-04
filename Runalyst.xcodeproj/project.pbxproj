@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B9C0D1E2F3A4B5C6D7E80102 /* ReadinessModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B9C0D1E2F3A4B5C6D7E801 /* ReadinessModifier.swift */; };
+		D1E2F3A4B5C6D7E801020304 /* ReadinessModifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D1E2F3A4B5C6D7E8010203 /* ReadinessModifierTests.swift */; };
 		075FD91D330B77E5867419C9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C58A0BCEA50BA9ED3463C4 /* ContentView.swift */; };
 		109644F6A12FCEE27F8160DA /* RunalystClassifier.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = B06944F28CDA8831E8FA559D /* RunalystClassifier.mlmodel */; };
 		1D2A9B92689E9EC659EE4030 /* RunalystApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52FF9D9245C901D4BDBA1FFB /* RunalystApp.swift */; };
@@ -83,6 +85,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A8B9C0D1E2F3A4B5C6D7E801 /* ReadinessModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReadinessModifier.swift; path = Runalyst/Engine/ReadinessModifier.swift; sourceTree = SOURCE_ROOT; };
+		C0D1E2F3A4B5C6D7E8010203 /* ReadinessModifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadinessModifierTests.swift; sourceTree = "<group>"; };
 		0FC0868FA1D2D6FB2E59A10C /* DrillRecommendation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DrillRecommendation.swift; path = Runalyst/Models/DrillRecommendation.swift; sourceTree = "<group>"; };
 		2225B5F6B6513A7AC03E5246 /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitManager.swift; path = Runalyst/Managers/HealthKitManager.swift; sourceTree = "<group>"; };
 		35724688B362914BC9EAC058 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ModelManager.swift; path = Runalyst/Engine/ModelManager.swift; sourceTree = SOURCE_ROOT; };
@@ -223,6 +227,7 @@
 			children = (
 				FF6702113B57AA6128E0FBEF /* FramboiseEngineTests.swift */,
 				B5C4F20AE97B4554C7EF2CAA /* SafeTargetCalculatorTests.swift */,
+				C0D1E2F3A4B5C6D7E8010203 /* ReadinessModifierTests.swift */,
 				B4A42CA73D5E956FCF8904D4 /* CardiacGuardrailTests.swift */,
 				E8F28AB98675AE6C20EB792B /* LiveCoachEngineTests.swift */,
 				496FDE679EF9990CBA052270 /* CoachingEngineDataTests.swift */,
@@ -291,6 +296,7 @@
 				E82F6D5F1E2F5F9B0D1E2F3A /* DrillSchedule.swift */,
 				CCBBAC046CE14168A1BB76B0 /* PreRunDrill.swift */,
 				F216137F6DD0451D940D3AF6 /* DrillTemplate.swift */,
+				A8B9C0D1E2F3A4B5C6D7E801 /* ReadinessModifier.swift */,
 				FCEEDA06759A48099F6A59F2 /* HealthKitSeeder.swift */,
 			);
 			name = Runalyst;
@@ -470,6 +476,7 @@
 				D71E5C4E0D1E4E8A9C0D1E2F /* DrillSchedule.swift in Sources */,
 				43D90B67B3C2451D924E0314 /* PreRunDrill.swift in Sources */,
 				B34F9612C3224FC787FE1029 /* DrillTemplate.swift in Sources */,
+				B9C0D1E2F3A4B5C6D7E80102 /* ReadinessModifier.swift in Sources */,
 				D4199BCA5EEC404CA22EC9CA /* HealthKitSeeder.swift in Sources */,
 				A9994594B624150A24D868E9 /* DrillsLibraryView.swift in Sources */,
 				5D7B48CB920BAD17B8EE71E3 /* PersonalizedRunClassifier.mlmodel in Sources */,
@@ -489,6 +496,7 @@
 				912022DFB3EE8B3DA99DDB78 /* HealthKitManagerSeedingTests.swift in Sources */,
 				BCCC58D89E55F0E512F2AA77 /* FramboiseEngineTests.swift in Sources */,
 				5A1725D2EAD5FC515C5326B4 /* SafeTargetCalculatorTests.swift in Sources */,
+				D1E2F3A4B5C6D7E801020304 /* ReadinessModifierTests.swift in Sources */,
 				EA1EEE590D98ECC58149601F /* CardiacGuardrailTests.swift in Sources */,
 				6C236D97ED440DE5060AD662 /* LiveCoachEngineTests.swift in Sources */,
 				3084B43A8A063F61F6C1EA35 /* CoachingEngineDataTests.swift in Sources */,

@@ -329,16 +329,8 @@ struct DrillsLibraryView: View {
     }
 
     private func handleStartDrill(plan: WorkoutPlan, dto: DrillPrescriptionDTO) {
-        let drillId = dto.preRunDrillId.flatMap { PreRunDrillId(rawValue: $0) } ?? .strides
-        let duration = dto.durationMinutes.flatMap { DrillDuration(rawValue: $0) } ?? .fifteenMinutes
-        let readout = DrillReadout.readout(
-            for: drillId,
-            customTitle: dto.title,
-            targetCadence: dto.targetCadence,
-            previousCadence: dto.previousCadence,
-            customDuration: duration
-        )
-        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        activeReadoutItem = ActiveDrillReadoutItem.adaptive(dto: dto, readiness: readiness)
     }
 
     private func scheduleDrillToWatch(dto: DrillPrescriptionDTO) {

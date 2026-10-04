@@ -678,7 +678,7 @@ actor FramboiseEngine {
 
     // MARK: - Tags
 
-    func generateFramboiseTags(cv: Double, slope: Double, deadStopsCount: Int) -> [String] {
+    func generateFramboiseTags(cv: Double, slope: Double, deadStopsCount: Int, buckets: [BucketData] = []) -> [String] {
         var tags = [String]()
 
         if deadStopsCount > 5 {
@@ -694,6 +694,51 @@ actor FramboiseEngine {
             tags.append("highVolatility")
         }
 
+        // Biomechanical telemetry readiness markers
+        if detectCadenceFade(buckets: buckets) {
+            tags.append("cadenceFade")
+        }
+        if detectCardiacDrift(buckets: buckets, paceSlope: slope) {
+            tags.append("cardiacDrift")
+        }
+
         return tags
+    }
+
+    /// Detects progressive cadence turnover decay (>= 4 SPM drop in the final third of a run).
+    func detectCadenceFade(buckets: [BucketData]) -> Bool {
+        let running = buckets.filter { $0.meanCadence >= 135.0 && $0.meanPaceSecPerKm > 0 }
+        guard running.count >= 8 else { return false }
+        let splitIndex = (running.count * 2) / 3
+        let firstTwoThirds = running[0..<splitIndex]
+        let finalThird = running[splitIndex...]
+        guard !firstTwoThirds.isEmpty && !finalThird.isEmpty else { return false }
+
+        let earlyCadence = firstTwoThirds.map(\.meanCadence).reduce(0, +) / Double(firstTwoThirds.count)
+        let lateCadence = finalThird.map(\.meanCadence).reduce(0, +) / Double(finalThird.count)
+
+        return (earlyCadence - lateCadence) >= 4.0
+    }
+
+    /// Detects cardiac drift (HR upward decoupling at steady pace or high positive pace/HR drift).
+    func detectCardiacDrift(buckets: [BucketData], paceSlope: Double) -> Bool {
+        if paceSlope > 0.225 {
+            return true
+        }
+        let running = buckets.filter { $0.meanHR > 60.0 && $0.meanPaceSecPerKm > 0 }
+        guard running.count >= 8 else { return false }
+        let splitIndex = running.count / 3
+        let firstThird = running[0..<splitIndex]
+        let lastThird = running[(running.count - splitIndex)...]
+        guard !firstThird.isEmpty && !lastThird.isEmpty else { return false }
+
+        let earlyHR = firstThird.map(\.meanHR).reduce(0, +) / Double(firstThird.count)
+        let lateHR = lastThird.map(\.meanHR).reduce(0, +) / Double(lastThird.count)
+        let earlyPace = firstThird.map(\.meanPaceSecPerKm).reduce(0, +) / Double(firstThird.count)
+        let latePace = lastThird.map(\.meanPaceSecPerKm).reduce(0, +) / Double(lastThird.count)
+
+        let paceRatio = earlyPace > 0 ? (latePace / earlyPace) : 1.0
+        // HR increased by >= 6 BPM while pace stayed roughly steady (within 8%)
+        return (lateHR - earlyHR) >= 6.0 && paceRatio >= 0.92 && paceRatio <= 1.08
     }
 }

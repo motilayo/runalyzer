@@ -631,11 +631,20 @@ struct DashboardView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
+            let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+            let adaptedTarget = ReadinessModifier.adaptTarget(computedTarget, baselineCadence: baseCadence, drillId: primerId, state: readiness.state)
+            let primerDrill = PreRunDrill(
+                id: primerId,
+                previousCadence: baseCadence,
+                targetCadence: adaptedTarget.targetCadence,
+                readinessState: readiness.state
+            )
+
             HStack(spacing: 16) {
-                Label(template.defaultWork, systemImage: "repeat")
+                Label(primerDrill.defaultWorkString, systemImage: "repeat")
                     .font(.caption.bold())
                     .foregroundColor(.primary)
-                Label(template.defaultRecovery, systemImage: "moon.zzz")
+                Label(primerDrill.defaultRecoveryString, systemImage: "moon.zzz")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Label(template.defaultEffort, systemImage: "bolt.fill")
@@ -643,7 +652,7 @@ struct DashboardView: View {
                     .foregroundColor(.secondary)
             }
 
-            let cue = template.generateInstructionalCue(computedTarget)
+            let cue = template.generateInstructionalCue(adaptedTarget.targetCadence)
             if !cue.isEmpty {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "lightbulb.fill")
@@ -703,10 +712,16 @@ struct DashboardView: View {
                     Image(systemName: "target")
                         .foregroundColor(.orange)
                         .font(.caption.bold())
-                    if let target = computedTarget, let base = baseCadence {
-                        Text("Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    if let target = adaptedTarget.targetCadence, let base = baseCadence {
+                        if adaptedTarget.isCadenceRelaxed, let std = adaptedTarget.standardTargetCadence {
+                            Text("Target: \(target) SPM (Relaxed from \(std))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     } else {
                         Text("Target: Dynamic cadence")
                             .font(.caption)
@@ -725,7 +740,6 @@ struct DashboardView: View {
                 }
             }
 
-            let primerDrill = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget)
             WorkoutPhaseTimelineView(phases: primerDrill.generatePhases())
 
             HStack(spacing: 12) {
@@ -794,24 +808,16 @@ struct DashboardView: View {
     }
 
     private func openDrillReadout(primerId: PreRunDrillId, template: DrillTemplate, computedTarget: String?, baseCadence: Int?) {
-        let primerDrill = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget)
-        let plan = primerDrill.buildWorkoutPlan()
-        let dto = DrillPrescriptionDTO(
+        let standardDTO = DrillPrescriptionDTO(
             title: template.title,
             preRunDrillId: primerId.rawValue,
             purpose: template.defaultPurpose,
             targetCadence: computedTarget,
             previousCadence: baseCadence,
-            durationMinutes: primerDrill.duration.rawValue
+            durationMinutes: PreRunDrill(id: primerId).duration.rawValue
         )
-        let readout = DrillReadout.readout(
-            for: primerId,
-            customTitle: template.title,
-            targetCadence: computedTarget,
-            previousCadence: baseCadence,
-            customDuration: primerDrill.duration
-        )
-        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        activeReadoutItem = ActiveDrillReadoutItem.adaptive(dto: standardDTO, readiness: readiness)
     }
 
     private func scheduleDashboardDrillToWatch(dto: DrillPrescriptionDTO) {

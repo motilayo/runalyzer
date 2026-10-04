@@ -632,7 +632,7 @@ struct RunBaselineData: Sendable {
                 averageHR: currentHR
             )
         }
-        var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
+        var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count, buckets: trimmed)
         if let matchedDrill = matchedDrillIntent {
             WorkoutBridge.markIntentMatched(workoutID: workout.uuid, drillTitle: matchedDrill.drillTitle, workoutDate: workout.startDate)
 

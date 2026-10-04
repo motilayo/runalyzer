@@ -24,6 +24,23 @@ struct DrillReadout: Sendable, Identifiable {
     let targetCadence: String?
     let targetZone: String?
 
+    // MARK: Readiness Modifier (ACWR)
+    /// Acute readiness state applied to this prescription.
+    var readinessState: ReadinessState = .productive
+    /// The standard 30-day personalized target before readiness modulation.
+    var standardTargetCadence: String?
+    /// Standard vs adapted work/recovery labels (e.g. "6 x 20 sec strides" -> "3 x 20 sec strides").
+    var standardWork: String?
+    var adaptedWork: String?
+    var standardRecovery: String?
+    var adaptedRecovery: String?
+    /// Deterministic coach explanation of why today's drill was adapted.
+    var readinessContext: String?
+
+    var isReadinessAdjusted: Bool {
+        readinessState != .productive && readinessContext != nil
+    }
+
     /// Generates a standardized, conversational readout for any pre-run drill.
     static func readout(
         for drillId: PreRunDrillId,
@@ -427,4 +444,161 @@ struct ActiveDrillReadoutItem: Identifiable, Sendable {
     let readout: DrillReadout
     let plan: WorkoutPlan
     let dto: DrillPrescriptionDTO
+}
+
+// MARK: - Readiness-Adaptive Prescription
+
+extension ActiveDrillReadoutItem {
+    /// Builds the readout, Apple Watch plan, and DTO from a single readiness-adapted `PreRunDrill`,
+    /// guaranteeing the half-sheet, the visual timeline, and the WorkoutKit session all agree.
+    static func adaptive(
+        dto standardDTO: DrillPrescriptionDTO,
+        readiness: ReadinessAssessment,
+        customCoachingTip: String? = nil
+    ) -> ActiveDrillReadoutItem {
+        let drillId = standardDTO.preRunDrillId.flatMap(PreRunDrillId.init(rawValue:)) ?? .strides
+        let duration = standardDTO.durationMinutes.flatMap(DrillDuration.init(rawValue:)) ?? drillId.defaultDuration
+        let haptic = HapticFeedbackMode(rawValue: standardDTO.hapticMode ?? "") ?? .on
+
+        let adaptedDTO = ReadinessModifier.adaptedDTO(standardDTO, readiness: readiness)
+        let state = ReadinessState(rawValue: adaptedDTO.readinessState ?? "") ?? .productive
+
+        let standardDrill = PreRunDrill(
+            id: drillId,
+            previousCadence: standardDTO.previousCadence,
+            targetCadence: standardDTO.targetCadence,
+            duration: duration,
+            hapticMode: haptic
+        )
+        let adaptedDrill = PreRunDrill(
+            id: drillId,
+            previousCadence: adaptedDTO.previousCadence,
+            targetCadence: adaptedDTO.targetCadence,
+            duration: duration,
+            hapticMode: haptic,
+            readinessState: state
+        )
+
+        var readout = DrillReadout.readout(
+            for: drillId,
+            customTitle: standardDTO.title,
+            targetCadence: adaptedDTO.targetCadence,
+            previousCadence: adaptedDTO.previousCadence,
+            customDuration: duration,
+            customCoachingTip: customCoachingTip
+        )
+
+        if state != .productive {
+            let target = AdaptiveDrillTarget(
+                standardTargetCadence: standardDTO.targetCadence,
+                targetCadence: adaptedDTO.targetCadence
+            )
+            readout = readout.applyingReadiness(
+                assessment: readiness,
+                target: target,
+                standardDrill: standardDrill,
+                adaptedDrill: adaptedDrill
+            )
+        }
+
+        return ActiveDrillReadoutItem(
+            readout: readout,
+            plan: adaptedDrill.buildWorkoutPlan(),
+            dto: adaptedDTO
+        )
+    }
+}
+
+extension DrillReadout {
+    /// Returns a copy of this readout reflecting a readiness-adapted prescription.
+    func applyingReadiness(
+        assessment: ReadinessAssessment,
+        target: AdaptiveDrillTarget,
+        standardDrill: PreRunDrill,
+        adaptedDrill: PreRunDrill
+    ) -> DrillReadout {
+        var copy = self
+        let adaptedSpec = adaptedDrill.readinessAdjustedIntervalSpec
+        let phases = adaptedDrill.generatePhases()
+
+        copy.readinessState = adaptedDrill.readinessState
+        copy.standardTargetCadence = target.standardTargetCadence.map { $0.contains("SPM") ? $0 : "\($0) SPM" }
+        copy.standardWork = standardDrill.defaultWorkString
+        copy.adaptedWork = adaptedDrill.defaultWorkString
+        copy.standardRecovery = standardDrill.defaultRecoveryString
+        copy.adaptedRecovery = adaptedDrill.defaultRecoveryString
+        copy.readinessContext = ReadinessModifier.coachContext(
+            assessment: assessment,
+            target: target,
+            baselineCadence: adaptedDrill.previousCadence,
+            standardSpec: adaptedSpec == nil ? nil : standardDrill.standardIntervalSpec,
+            adaptedSpec: adaptedSpec
+        )
+
+        if adaptedSpec != nil {
+            let totalSeconds = phases.map(\.durationSeconds).reduce(0, +)
+            let adaptedMinutes = Int((Double(totalSeconds) / 60.0).rounded(.up))
+            copy = DrillReadout(
+                drillId: drillId,
+                title: title,
+                subtitle: subtitle.replacingOccurrences(of: "\(durationMinutes) min", with: "\(adaptedMinutes) min"),
+                overview: overview,
+                breakdown: Self.readinessBreakdown(phases: phases, drillId: drillId),
+                coachingTip: coachingTip,
+                phases: phases,
+                durationMinutes: durationMinutes,
+                targetCadence: targetCadence,
+                targetZone: targetZone,
+                readinessState: copy.readinessState,
+                standardTargetCadence: copy.standardTargetCadence,
+                standardWork: copy.standardWork,
+                adaptedWork: copy.adaptedWork,
+                standardRecovery: copy.standardRecovery,
+                adaptedRecovery: copy.adaptedRecovery,
+                readinessContext: copy.readinessContext
+            )
+        }
+        return copy
+    }
+
+    /// Plain-English breakdown generated from the adapted phase geometry so text and timeline never diverge.
+    static func readinessBreakdown(phases: [WorkoutPhase], drillId: PreRunDrillId) -> String {
+        var sentences: [String] = []
+        if let warmup = phases.first(where: { $0.kind == .warmup }) {
+            sentences.append("You’ll start with a \(adjectiveDuration(warmup.durationSeconds)) easy warm-up jog.")
+        }
+        let work = phases.filter { $0.kind == .work }
+        let recovery = phases.first { if case .recovery = $0.kind { return true } else { return false } }
+        if let firstWork = work.first {
+            let label: String = {
+                switch drillId {
+                case .strides: return "strides"
+                case .hillBounds: return "uphill bounds"
+                case .fartlekPrimer: return "pick-ups"
+                default: return "intervals"
+                }
+            }()
+            var sentence = "This is followed by \(work.count) sets of \(adjectiveDuration(firstWork.durationSeconds)) \(label)"
+            if let recovery, case .recovery(let isWalk) = recovery.kind {
+                sentence += ", each paired with \(nounDuration(recovery.durationSeconds)) of \(isWalk ? "walk" : "easy jog") recovery"
+            }
+            sentences.append(sentence + ".")
+        }
+        if let cooldown = phases.first(where: { $0.kind == .cooldown }) {
+            sentences.append("You’ll finish with a \(adjectiveDuration(cooldown.durationSeconds)) cool-down.")
+        }
+        return sentences.joined(separator: " ")
+    }
+
+    private static func adjectiveDuration(_ seconds: Int) -> String {
+        if seconds >= 60 && seconds % 60 == 0 { return "\(seconds / 60)-minute" }
+        if seconds > 60 && seconds % 30 == 0 { return "\(String(format: "%.1f", Double(seconds) / 60.0))-minute" }
+        return "\(seconds)-second"
+    }
+
+    private static func nounDuration(_ seconds: Int) -> String {
+        if seconds == 60 { return "1 minute" }
+        if seconds >= 120 && seconds % 60 == 0 { return "\(seconds / 60) minutes" }
+        return "\(seconds) seconds"
+    }
 }

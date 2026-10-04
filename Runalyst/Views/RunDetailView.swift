@@ -868,6 +868,7 @@ private struct DrillCardView: View {
     let drillIndex: Int
     let totalDrills: Int
     @Binding var activeCardIndex: Int
+    @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var isShowingWorkoutPreview = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
@@ -1146,7 +1147,6 @@ private struct DrillCardView: View {
         let currentPreRunId = resolvedPreRunId
         let currentTargetCadence = targetCadenceString
         let currentDrill = preRunDrill
-        let plan = currentDrill.buildWorkoutPlan()
         let dto = DrillPrescriptionDTO(
             title: displayTitle,
             preRunDrillId: currentPreRunId.rawValue,
@@ -1155,15 +1155,12 @@ private struct DrillCardView: View {
             previousCadence: drill.previousCadence,
             durationMinutes: currentDrill.duration.rawValue
         )
-        let readout = DrillReadout.readout(
-            for: currentPreRunId,
-            customTitle: displayTitle,
-            targetCadence: currentTargetCadence,
-            previousCadence: drill.previousCadence,
-            customDuration: currentDrill.duration,
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        activeReadoutItem = ActiveDrillReadoutItem.adaptive(
+            dto: dto,
+            readiness: readiness,
             customCoachingTip: coachingCue
         )
-        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
     }
 
     private func scheduleToWatch(dto: DrillPrescriptionDTO) {

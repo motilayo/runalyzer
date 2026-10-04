@@ -11,6 +11,7 @@ struct DrillInterstitialReadoutView: View {
     var onCommitToWatch: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var showingReadinessInfo = false
 
     var body: some View {
         NavigationStack {
@@ -66,6 +67,11 @@ struct DrillInterstitialReadoutView: View {
                         }
                     }
                     .padding(.bottom, 2)
+
+                    // 0. Readiness Modifier (ACWR) — only when today's prescription was adapted
+                    if readout.isReadinessAdjusted {
+                        readinessCard
+                    }
 
                     // 1. The Overview
                     VStack(alignment: .leading, spacing: 6) {
@@ -193,6 +199,125 @@ struct DrillInterstitialReadoutView: View {
         let tipBody = AttributedString(readout.coachingTip)
         str.append(tipBody)
         return str
+    }
+
+    // MARK: - Readiness Card
+
+    private var readinessTint: Color {
+        readout.readinessState == .deload ? .teal : .pink
+    }
+
+    private var readinessIcon: String {
+        readout.readinessState == .deload ? "leaf.fill" : "battery.25percent"
+    }
+
+    @ViewBuilder
+    private var readinessCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: readinessIcon)
+                    .font(.caption.bold())
+                    .foregroundColor(readinessTint)
+                Text("Readiness Adjusted")
+                    .font(.caption.bold())
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Text(readout.readinessState.displayName)
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(readinessTint.opacity(0.15))
+                    .foregroundColor(readinessTint)
+                    .cornerRadius(6)
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showingReadinessInfo = true }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if let target = readout.targetCadence {
+                    readinessRow(
+                        icon: "target",
+                        label: "Target",
+                        value: target,
+                        detail: targetDetailText
+                    )
+                }
+                if let adapted = readout.adaptedWork, let standard = readout.standardWork, adapted != standard {
+                    readinessRow(icon: "repeat", label: "Volume", value: adapted, detail: "Reduced from \(standard)")
+                }
+                if let adapted = readout.adaptedRecovery, let standard = readout.standardRecovery, adapted != standard {
+                    readinessRow(icon: "moon.zzz", label: "Recovery", value: adapted, detail: "Extended from \(standard)")
+                }
+            }
+
+            if let context = readout.readinessContext {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Coach Context")
+                        .font(.caption2.bold())
+                        .foregroundColor(readinessTint)
+                    Text("“\(context)”")
+                        .font(.footnote)
+                        .italic()
+                        .foregroundColor(.primary)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(readinessTint.opacity(0.08))
+                .cornerRadius(10)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(readinessTint.opacity(0.35), lineWidth: 1)
+        )
+        .cornerRadius(12)
+        .alert("Readiness Modifier", isPresented: $showingReadinessInfo) {
+            Button("Got it", role: .cancel) {}
+        } message: {
+            Text("Your drill targets come from your 30-day baseline (chronic load). Runalyst compares your last 7 days (acute load) against your 4-week average. A spike above 1.5×, back-to-back hard days, late-run cadence fade, or heart-rate drift relaxes turnover and trims reps. A 25%+ mileage drop at easy intensity is treated as a deload: intensity is held while reps are halved and recovery extended.")
+        }
+    }
+
+    private var targetDetailText: String? {
+        guard let standard = readout.standardTargetCadence else { return nil }
+        if let current = readout.targetCadence, current != standard {
+            return "Adjusted from your standard \(standard) target"
+        }
+        return readout.readinessState == .deload ? "Intensity held to keep your legs sharp" : nil
+    }
+
+    private func readinessRow(icon: String, label: String, value: String, detail: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption.bold())
+                .foregroundColor(readinessTint)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text("\(label):")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                    Text(value)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                }
+                if let detail {
+                    Text("(\(detail))")
+                        .font(.caption)
+                        .italic()
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
 
     private func commitAndStart() {
