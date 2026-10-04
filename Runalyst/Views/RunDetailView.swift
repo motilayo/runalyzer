@@ -8,6 +8,7 @@ struct RunDetailView: View {
     @AppStorage("useMetricSystem") private var useMetricSystem: Bool = Locale.current.measurementSystem == .metric
     @Environment(\.modelContext) private var modelContext
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var existingRuns: [RunRecord]
 
     @State private var showRawMetrics: Bool = false
@@ -151,6 +152,84 @@ struct RunDetailView: View {
                 tag == "prescribedDrill" || tag.hasPrefix("drill:")
             }
             try? modelContext.save()
+        }
+    }
+
+    @ViewBuilder
+    private var aiRunAnalysisCard: some View {
+        let hasBiometrics = runRecord.workingAvgCadence > 0 || runRecord.workingAvgHeartRate > 0
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(hasBiometrics ? .purple : .secondary)
+                Text(hasBiometrics ? "AI Run Analysis" : "Sensor Data Limited")
+                    .font(.subheadline.bold())
+                    .foregroundColor(hasBiometrics ? .purple : .secondary)
+            }
+
+            if !hasBiometrics {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Biometric Analysis Unavailable")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                    Text("This workout was recorded without an Apple Watch and has no cadence or heart rate sensor data. Runalyst requires continuous biometric telemetry to analyze form, cadence rhythm, and cardiac strain without hallucinating.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineSpacing(2)
+                }
+                .padding(.vertical, 2)
+            } else if let insight = runRecord.insight {
+                if !insight.longitudinalObservation.isEmpty {
+                    Text(insight.longitudinalObservation)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                } else if !insight.headline.isEmpty {
+                    Text(insight.headline)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                }
+            } else if isGeneratingInsight {
+                AnimatedLoadingView(
+                    text: "Generating AI insight...",
+                    isHorizontal: true,
+                    imageSize: 14,
+                    textFont: .body,
+                    spacing: 8
+                )
+                .foregroundColor(.secondary)
+                .padding(.vertical, 8)
+            } else {
+                Text("AI insight not available for this run.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
+
+            if hasBiometrics {
+                aiDisclaimerFooter
+            }
+        }
+        .frame(minHeight: 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+        .task {
+            if !hasBiometrics, let oldInsight = runRecord.insight {
+                modelContext.delete(oldInsight)
+                runRecord.insight = nil
+                try? modelContext.save()
+            } else if hasBiometrics && runRecord.insight == nil {
+                isGeneratingInsight = true
+                if #available(iOS 26.0, *) {
+                    await CoachingEngine.shared.requestAnalysis(for: runRecord)
+                    isGeneratingInsight = false
+                } else {
+                    isGeneratingInsight = false
+                }
+            }
         }
     }
 
@@ -328,87 +407,23 @@ struct RunDetailView: View {
                     Text("Link this workout to a drill (like Cadence Pyramids, Strides, or Zone 2 Run) to track your form adherence against coaching targets in Drill Performance.")
                 }
 
-                // MARK: Drill Scorecard
+                // MARK: Drill Scorecard & AI Run Analysis
                 if let drillName = prescribedDrillName, let drillId = PreRunDrillId.allCases.first(where: { $0.title == drillName || $0.rawValue == drillName }) {
-                    DrillExecutionScorecard(runRecord: runRecord, drillId: drillId, baselineCadence: baselineCadence, baselineOscillation: baselineOscillation)
+                    if horizontalSizeClass == .regular {
+                        HStack(alignment: .top, spacing: 16) {
+                            DrillExecutionScorecard(runRecord: runRecord, drillId: drillId, baselineCadence: baselineCadence, baselineOscillation: baselineOscillation)
+                            aiRunAnalysisCard
+                        }
                         .padding(.horizontal)
-                }
-
-                let hasBiometrics = runRecord.workingAvgCadence > 0 || runRecord.workingAvgHeartRate > 0
-
-                // MARK: AI Run Analysis
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(hasBiometrics ? .purple : .secondary)
-                        Text(hasBiometrics ? "AI Run Analysis" : "Sensor Data Limited")
-                            .font(.subheadline.bold())
-                            .foregroundColor(hasBiometrics ? .purple : .secondary)
-                    }
-
-                    if !hasBiometrics {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Biometric Analysis Unavailable")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.primary)
-                            Text("This workout was recorded without an Apple Watch and has no cadence or heart rate sensor data. Runalyst requires continuous biometric telemetry to analyze form, cadence rhythm, and cardiac strain without hallucinating.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineSpacing(2)
-                        }
-                        .padding(.vertical, 2)
-                    } else if let insight = runRecord.insight {
-                        if !insight.longitudinalObservation.isEmpty {
-                            Text(insight.longitudinalObservation)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                        } else if !insight.headline.isEmpty {
-                            Text(insight.headline)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                        }
-                    } else if isGeneratingInsight {
-                        AnimatedLoadingView(
-                            text: "Generating AI insight...",
-                            isHorizontal: true,
-                            imageSize: 14,
-                            textFont: .body,
-                            spacing: 8
-                        )
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 8)
                     } else {
-                        Text("AI insight not available for this run.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .italic()
+                        DrillExecutionScorecard(runRecord: runRecord, drillId: drillId, baselineCadence: baselineCadence, baselineOscillation: baselineOscillation)
+                            .padding(.horizontal)
+                        aiRunAnalysisCard
+                            .padding(.horizontal)
                     }
-
-                    if hasBiometrics {
-                        aiDisclaimerFooter
-                    }
-                }
-                .frame(minHeight: 1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-                .padding(.horizontal)
-                .task {
-                    if !hasBiometrics, let oldInsight = runRecord.insight {
-                        modelContext.delete(oldInsight)
-                        runRecord.insight = nil
-                        try? modelContext.save()
-                    } else if hasBiometrics && runRecord.insight == nil {
-                        isGeneratingInsight = true
-                        if #available(iOS 26.0, *) {
-                            await CoachingEngine.shared.requestAnalysis(for: runRecord)
-                            isGeneratingInsight = false
-                        } else {
-                            isGeneratingInsight = false
-                        }
-                    }
+                } else {
+                    aiRunAnalysisCard
+                        .padding(.horizontal)
                 }
 
                 // MARK: Data Toggle
@@ -435,9 +450,20 @@ struct RunDetailView: View {
                 }
 
                 // MARK: Metrics Grid
-                let columns = verticalSizeClass == .regular
-                    ? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
-                    : [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                let columns: [GridItem] = {
+                    if horizontalSizeClass == .regular {
+                        return [
+                            GridItem(.flexible(), spacing: 16),
+                            GridItem(.flexible(), spacing: 16),
+                            GridItem(.flexible(), spacing: 16),
+                            GridItem(.flexible(), spacing: 16)
+                        ]
+                    } else if verticalSizeClass == .regular {
+                        return [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                    } else {
+                        return [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                    }
+                }()
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     let activeDistanceMeters = showRawMetrics ? runRecord.totalDistanceMeters : runRecord.effectiveWorkingDistanceMeters

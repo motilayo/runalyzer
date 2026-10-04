@@ -48,7 +48,7 @@ def create_gradient_bg(color1, color2, glow_color, glow_center, w=WIDTH, h=HEIGH
     img = Image.alpha_composite(img, glow)
     return img
 
-def frame_device(screen_path, target_width=1120, corner_radius=68):
+def frame_device(screen_path, target_width=1560, corner_radius=52):
     src = Image.open(screen_path).convert("RGBA")
     sw, sh = src.size
     scale = target_width / sw
@@ -69,35 +69,35 @@ def frame_device(screen_path, target_width=1120, corner_radius=68):
     border_draw.rounded_rectangle([2, 2, target_width - 2, target_height - 2], radius=corner_radius - 2, outline=(0, 0, 0, 160), width=3)
     
     # Deep ambient drop shadow
-    pad = 120
+    pad = 80
     sw_canvas = target_width + pad * 2
     sh_canvas = target_height + pad * 2
     shadow_img = Image.new("RGBA", (sw_canvas, sh_canvas), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(shadow_img)
     s_draw.rounded_rectangle(
-        [pad + 16, pad + 36, pad + target_width - 16, pad + target_height + 36],
+        [pad + 16, pad + 32, pad + target_width - 16, pad + target_height + 32],
         radius=corner_radius,
         fill=(0, 0, 0, 210)
     )
-    shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(56))
+    shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(52))
     shadow_img.paste(framed, (pad, pad), mask=framed)
     return shadow_img
 
 def render_ipad_card(title, subtitle, tag, screen_path, output_filename, glow_color, bg_gradient):
-    bg = create_gradient_bg(bg_gradient[0], bg_gradient[1], glow_color, (WIDTH // 2, 850))
+    bg = create_gradient_bg(bg_gradient[0], bg_gradient[1], glow_color, (WIDTH // 2, 750))
     draw = ImageDraw.Draw(bg)
     
     # 1. Tag pill
-    font_tag = get_font(38, bold=True)
+    font_tag = get_font(36, bold=True)
     tag_text = tag.upper()
     tb = draw.textbbox((0, 0), tag_text, font=font_tag)
     tw = tb[2] - tb[0]
     th = tb[3] - tb[1]
     
-    pill_w = tw + 56
-    pill_h = th + 28
+    pill_w = tw + 52
+    pill_h = th + 26
     pill_x = (WIDTH - pill_w) // 2
-    pill_y = 150
+    pill_y = 110
     
     draw.rounded_rectangle(
         [pill_x, pill_y, pill_x + pill_w, pill_y + pill_h],
@@ -106,29 +106,29 @@ def render_ipad_card(title, subtitle, tag, screen_path, output_filename, glow_co
         outline=(255, 255, 255, 65),
         width=2
     )
-    draw.text((pill_x + 28, pill_y + 12), tag_text, fill=(0, 230, 200, 255), font=font_tag)
+    draw.text((pill_x + 26, pill_y + 11), tag_text, fill=(0, 230, 200, 255), font=font_tag)
     
     # 2. Main Title
-    font_title = get_font(92, bold=True)
+    font_title = get_font(88, bold=True)
     tb_title = draw.textbbox((0, 0), title, font=font_title)
     title_w = tb_title[2] - tb_title[0]
     title_x = (WIDTH - title_w) // 2
-    title_y = pill_y + pill_h + 40
+    title_y = pill_y + pill_h + 34
     draw.text((title_x, title_y), title, fill=(255, 255, 255, 255), font=font_title)
     
     # 3. Subtitle
-    font_sub = get_font(46, bold=False)
+    font_sub = get_font(44, bold=False)
     tb_sub = draw.textbbox((0, 0), subtitle, font=font_sub)
     sub_w = tb_sub[2] - tb_sub[0]
     sub_x = (WIDTH - sub_w) // 2
-    sub_y = title_y + 115
+    sub_y = title_y + 104
     draw.text((sub_x, sub_y), subtitle, fill=(185, 195, 215, 230), font=font_sub)
     
     # 4. Framed Screen
-    framed = frame_device(screen_path, target_width=1120, corner_radius=68)
+    framed = frame_device(screen_path, target_width=1560, corner_radius=52)
     fw, fh = framed.size
     fx = (WIDTH - fw) // 2
-    fy = sub_y + 100
+    fy = sub_y + 70
     
     bg.paste(framed, (fx, fy), mask=framed)
     

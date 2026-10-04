@@ -278,6 +278,14 @@ class HealthKitSeeder {
 
     /// Fallback seeding mechanism that writes directly to SwiftData when HealthKit is unavailable or denied
     func seedDirectToSwiftData(context: ModelContext) {
+        let descriptor = FetchDescriptor<RunRecord>()
+        if let existing = try? context.fetch(descriptor) {
+            for run in existing {
+                context.delete(run)
+            }
+            try? context.save()
+        }
+
         let calendar = Calendar.current
         let today = Date()
         let totalRuns = Self.totalProgressionRuns
@@ -337,7 +345,15 @@ class HealthKitSeeder {
                 default: return 0.0
                 }
             }()
-            let workingCadence = min(186.0, max(142.0, baseCadence + profileCadenceOffset + Double.random(in: -1.5...1.5)))
+            let workingCadence: Double = {
+                if index == 37 {
+                    return 180.0
+                }
+                if index == 26 {
+                    return 174.0
+                }
+                return min(186.0, max(142.0, baseCadence + profileCadenceOffset + Double.random(in: -1.5...1.5)))
+            }()
             // Raw cadence is total steps over the entire elapsed duration
             let rawCadence = (workingCadence * (workingSec / 60.0)) / (rawDurationSec / 60.0)
 
@@ -351,7 +367,12 @@ class HealthKitSeeder {
                 default: return 0.0
                 }
             }()
-            let vertOsc = max(7.2, baseOsc + profileOscOffset + Double.random(in: -0.2...0.2))
+            let vertOsc: Double = {
+                if index == 37 {
+                    return 7.4
+                }
+                return max(7.2, baseOsc + profileOscOffset + Double.random(in: -0.2...0.2))
+            }()
             // Vertical oscillation is only recorded when actively running, so working and raw are identical
             let rawOsc = vertOsc
 
@@ -424,33 +445,36 @@ class HealthKitSeeder {
             let prescribed = Self.prescribedDrill(forIndex: index, profile: profile, progress: progress)
             let drillId = prescribed ?? Self.recommendedDrillId(for: profile, progress: progress)
             let template = DrillTemplate.template(for: drillId)
-            let targetCadenceInt = template.calculateTargetCadence(Int(workingCadence))
+            let targetCadenceString = template.calculateTargetCadence(Int(baseCadence))
 
             let drill = DrillRecommendation(
                 drillTitle: template.title,
                 preRunDrillId: template.id.rawValue,
                 drillPurpose: template.defaultPurpose,
                 drillWork: template.defaultWork,
-                drillCues: template.generateInstructionalCue(targetCadenceInt),
+                drillCues: template.generateInstructionalCue(targetCadenceString),
                 drillEffort: template.defaultEffort,
                 drillRecovery: template.defaultRecovery,
-                targetCadence: "\(targetCadenceInt) SPM",
-                previousCadence: Int(workingCadence),
+                targetCadence: "\(targetCadenceString) SPM",
+                previousCadence: Int(baseCadence),
                 isCompleted: prescribed != nil
             )
 
-            // Dynamic Coaching Insight tailored to the runner's 3-month progression
+            // Dynamic Coaching Insight tailored to the runner's 3-month progression (Zero Numbers rule)
             let headline: String
             let observation: String
-            if progress < 0.33 {
-                headline = "Low Cadence Turnover & High Ground Impact"
-                observation = "Early baseline shows average cadence at \(Int(workingCadence)) SPM with vertical oscillation at \(String(format: "%.1f", vertOsc)) cm. Focus on quick, light foot strikes to protect knees and ankles."
+            if index == 37 {
+                headline = "Dynamic Cadence Turnover"
+                observation = "Your turnover held a crisp rhythm through every surge while maintaining quiet, compact foot strikes. Your aerobic efficiency is climbing—cadence adapted seamlessly to pace changes without triggering excess vertical bounce or cardiac strain."
+            } else if progress < 0.33 {
+                headline = "Cadence Rhythm Foundation"
+                observation = "Early baseline indicates room to quicken your turnover and soften your foot strike. Focus on light, agile strides beneath your hips to protect knees and build consistency."
             } else if progress < 0.67 {
-                headline = "Aerobic Base Stabilizing with Improved Rhythm"
-                observation = "Cadence has progressed to \(Int(workingCadence)) SPM and vertical oscillation has reduced to \(String(format: "%.1f", vertOsc)) cm. Heart rate stability demonstrates growing aerobic efficiency."
+                headline = "Steady Aerobic Base"
+                observation = "Your rhythm is stabilizing nicely across varying terrain and effort levels. Cardiac drift remains contained, reflecting steady improvements in your aerobic efficiency."
             } else {
-                headline = "Efficient Biomechanics & Strong Tempo Stability"
-                observation = "Turnover is well-stabilized at \(Int(workingCadence)) SPM with a compact vertical oscillation of \(String(format: "%.1f", vertOsc)) cm. Form remains resilient through varying paces."
+                headline = "Efficient Biomechanics"
+                observation = "Your turnover is well-stabilized with minimal vertical bounce. Form remains resilient through varying paces and sustains fluid forward momentum."
             }
 
             let insight = CoachingInsight(

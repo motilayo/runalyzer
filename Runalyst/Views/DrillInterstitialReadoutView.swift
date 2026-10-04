@@ -140,6 +140,8 @@ struct DrillInterstitialReadoutView: View {
                         .cornerRadius(12)
                     }
                 }
+                .frame(maxWidth: 860)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
@@ -161,8 +163,10 @@ struct DrillInterstitialReadoutView: View {
                     .cornerRadius(12)
                     .shadow(color: Color.green.opacity(0.25), radius: 6, x: 0, y: 3)
                 }
+                .frame(maxWidth: 860)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
                 .background(.ultraThinMaterial)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
