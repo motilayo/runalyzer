@@ -28,19 +28,15 @@ Meets all [Apple App Store Preview Specifications](https://developer.apple.com/a
 6. **`Runalyst_AppPreview_2688x1242.mp4`** (1.6 MB)
    * **Target:** iPhone 6.5" Super Retina Display landscape slot (`2688 × 1242 px`, 19.5:9, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
 
-### iPad App Previews (Portrait & Landscape):
+### iPad App Previews (Accepted & Device Resolutions, 4:3 Aspect Ratio):
 7. **`Runalyst_AppPreview_iPad_1200x1600.mp4`** (1.3 MB)
    * **Target:** iPad Accepted Resolution portrait slot (`1200 × 1600 px`, 3:4, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
 8. **`Runalyst_AppPreview_iPad_1600x1200.mp4`** (1.0 MB)
    * **Target:** iPad Accepted Resolution landscape slot (`1600 × 1200 px`, 4:3, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
-9. **`Runalyst_AppPreview_iPad_2048x2732.mp4`** (2.7 MB)
-   * **Target:** iPad Pro 12.9" portrait slot (`2048 × 2732 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
-10. **`Runalyst_AppPreview_iPad_2732x2048.mp4`** (1.8 MB)
-    * **Target:** iPad Pro 12.9" landscape slot (`2732 × 2048 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
-11. **`Runalyst_AppPreview_iPad_2064x2752.mp4`** (2.2 MB)
-    * **Target:** iPad Pro 13" portrait slot (`2064 × 2752 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
-12. **`Runalyst_AppPreview_iPad_2752x2064.mp4`** (1.7 MB)
-    * **Target:** iPad Pro 13" landscape slot (`2752 × 2064 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+9. **`Runalyst_AppPreview_iPad_2732x2048.mp4`** (1.8 MB)
+   * **Target:** iPad Pro 12.9" Device Resolution landscape slot (`2732 × 2048 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
+10. **`Runalyst_AppPreview_iPad_2752x2064.mp4`** (1.7 MB)
+    * **Target:** iPad Pro 13" Device Resolution landscape slot (`2752 × 2064 px`, Level 4.2 High Profile, 30 fps CFR, stereo AAC)
 
 ---
 
@@ -66,12 +62,12 @@ Designed for social launches, landing page hero backgrounds, Product Hunt, and a
 
 ---
 
-## 3. App Store Presentation Screenshot Carousel
-Location: `Media/Screenshots/AppStore/` (and `Media/Screenshots/AppStore_1242x2688/`)
-
-Meets Apple App Store Connect specifications for 6.7" and 6.5" displays:
-* Primary Target (**1284 × 2778**): `Media/Screenshots/AppStore/`
-* Alternative Target (**1242 × 2688**): `Media/Screenshots/AppStore_1242x2688/`
+## 3. iPhone App Store Presentation Screenshot Carousels
+Locations:
+* `Media/Screenshots/AppStore/` (6.7" portrait: **1284 × 2778 px**)
+* `Media/Screenshots/AppStore_2778x1284/` (6.7" landscape: **2778 × 1284 px**)
+* `Media/Screenshots/AppStore_1242x2688/` (6.5" portrait: **1242 × 2688 px**)
+* `Media/Screenshots/AppStore_2688x1242/` (6.5" landscape: **2688 × 1242 px**)
 
 Ready for direct App Store Connect product page upload:
 1. **`01_Intelligent_Biometrics.png`**
@@ -98,12 +94,14 @@ Ready for direct App Store Connect product page upload:
 
 ---
 
-## 4. iPad App Store Presentation Screenshot Carousel (12.9" & 13")
-Location:
-* `Media/Screenshots/iPad_2048x2732/` (Standard 12.9" iPad Pro specification: **2048 × 2732 px**)
-* `Media/Screenshots/iPad_2064x2752/` (13" iPad Pro M4 specification: **2064 × 2752 px**)
+## 4. iPad App Store Presentation Screenshot Carousels
+Locations:
+* `Media/Screenshots/iPad_2048x2732/` (12.9" portrait: **2048 × 2732 px**)
+* `Media/Screenshots/iPad_2732x2048/` (12.9" landscape: **2732 × 2048 px**)
+* `Media/Screenshots/iPad_2064x2752/` (13" portrait: **2064 × 2752 px**)
+* `Media/Screenshots/iPad_2752x2064/` (13" landscape: **2752 × 2064 px**)
 
-Features high-resolution tablet presentation cards framing the app UI with category badges, bold typography, and ambient lighting. Ready for direct upload to the App Store Connect iPad 12.9" / 13" display slots:
+Features high-resolution tablet presentation cards framing the app UI with category badges, bold typography, and ambient lighting. Ready for direct upload to App Store Connect iPad slots:
 1. `01_Intelligent_Biometrics.png`
 2. `02_AI_Coaching.png`
 3. `03_Targeted_Drills.png`

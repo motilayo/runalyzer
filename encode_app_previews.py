@@ -63,7 +63,7 @@ TARGETS = [
         "width": 2688,
         "height": 1242,
     },
-    # iPad Portrait & Landscape
+    # iPad Accepted & Device Resolutions (4:3 aspect ratio)
     {
         "name": "Runalyst_AppPreview_iPad_1200x1600.mp4",
         "raw": RAW_IPAD,
@@ -81,28 +81,12 @@ TARGETS = [
         "height": 1200,
     },
     {
-        "name": "Runalyst_AppPreview_iPad_2048x2732.mp4",
-        "raw": RAW_IPAD,
-        "start": IPAD_START,
-        "vf": "scale=2048:2732,setsar=1",
-        "width": 2048,
-        "height": 2732,
-    },
-    {
         "name": "Runalyst_AppPreview_iPad_2732x2048.mp4",
         "raw": RAW_IPAD,
         "start": IPAD_START,
         "vf": "scale=-2:2048,pad=2732:2048:(ow-iw)/2:0:black,setsar=1",
         "width": 2732,
         "height": 2048,
-    },
-    {
-        "name": "Runalyst_AppPreview_iPad_2064x2752.mp4",
-        "raw": RAW_IPAD,
-        "start": IPAD_START,
-        "vf": "scale=2064:2752,setsar=1",
-        "width": 2064,
-        "height": 2752,
     },
     {
         "name": "Runalyst_AppPreview_iPad_2752x2064.mp4",
@@ -173,11 +157,17 @@ def encode_video(item):
 def main():
     os.makedirs(PREVIEWS_DIR, exist_ok=True)
 
-    # 1. Prune outdated or unwanted files
-    outdated_file = os.path.join(PREVIEWS_DIR, "Runalyst_AppPreview_1290x2796.mp4")
-    if os.path.exists(outdated_file):
-        os.remove(outdated_file)
-        print("Removed outdated Runalyst_AppPreview_1290x2796.mp4")
+    # 1. Prune outdated or non-spec files
+    prune_files = [
+        "Runalyst_AppPreview_1290x2796.mp4",
+        "Runalyst_AppPreview_iPad_2048x2732.mp4",
+        "Runalyst_AppPreview_iPad_2064x2752.mp4"
+    ]
+    for pf in prune_files:
+        p_path = os.path.join(PREVIEWS_DIR, pf)
+        if os.path.exists(p_path):
+            os.remove(p_path)
+            print(f"Removed non-spec/outdated {pf}")
 
     # 2. Encode all targets
     for item in TARGETS:
