@@ -196,6 +196,7 @@ class AnalystChatEngine: ObservableObject {
         Respond in \(language).
         """
 
+        let isFirstTurn = (modelSession == nil)
         let session: LanguageModelSession
         if let existing = modelSession as? LanguageModelSession {
             session = existing
@@ -284,17 +285,64 @@ class AnalystChatEngine: ObservableObject {
             telemetryLines.append("Target Drill for Next Run: \(drill.drillTitle) (\(purpose))")
         }
 
-        let fullPrompt = """
-        Runner's workout data:
-        \(telemetryLines.joined(separator: "\n"))
+        let promptToSend: String
+        if isFirstTurn {
+            promptToSend = """
+            Runner's workout data:
+            \(telemetryLines.joined(separator: "\n"))
 
-        Runner's question: "\(userQuestion)"
+            Runner's question: "\(userQuestion)"
 
-        (Instruction: Embody the mind of an analyst and voice of a coach. Answer directly and decisively in 2 to 3 conversational sentences using everyday runner language informed by their data. Strictly follow the NEXT SESSION DIRECTIVE.)
-        """
+            (Instruction: Embody the mind of an analyst and voice of a coach. Answer directly and decisively in 2 to 3 conversational sentences using everyday runner language informed by their data. Strictly follow the NEXT SESSION DIRECTIVE.)
+            """
+        } else {
+            promptToSend = """
+            \(nextSessionDirective)
+            Runner's follow-up question: "\(userQuestion)"
 
-        let response = try await session.respond(to: fullPrompt)
-        return response.content
+            (Instruction: Embody the mind of an analyst and voice of a coach. Answer directly and decisively in 2 to 3 conversational sentences using everyday runner language. Strictly follow the NEXT SESSION DIRECTIVE.)
+            """
+        }
+
+        do {
+            let response = try await session.respond(to: promptToSend)
+            return response.content
+        } catch {
+            let isContextExceeded: Bool = {
+                if #available(iOS 27.0, *) {
+                    if let lmError = error as? LanguageModelError {
+                        switch lmError {
+                        case .contextSizeExceeded: return true
+                        default: return false
+                        }
+                    }
+                }
+                let errorDesc = "\(error)".lowercased()
+                return errorDesc.contains("context") || errorDesc.contains("token") || errorDesc.contains("limit")
+            }()
+
+            if isContextExceeded {
+                // Apple FoundationModels: Managing the Context Window (4,096-token budget).
+                // When multiturn context exceeds 4096 tokens, discard bloated session and restart
+                // with a clean session seeded with the essential telemetry and current query.
+                let freshSession = LanguageModelSession(
+                    model: SystemLanguageModel.default,
+                    instructions: systemInstructions
+                )
+                self.modelSession = freshSession
+                let recoveryPrompt = """
+                Runner's workout data:
+                \(telemetryLines.joined(separator: "\n"))
+
+                Runner's question: "\(userQuestion)"
+
+                (Instruction: Embody the mind of an analyst and voice of a coach. Answer directly and decisively in 2 to 3 conversational sentences using everyday runner language informed by their data. Strictly follow the NEXT SESSION DIRECTIVE.)
+                """
+                let retryResponse = try await freshSession.respond(to: recoveryPrompt)
+                return retryResponse.content
+            }
+            throw error
+        }
     }
     #endif
 
