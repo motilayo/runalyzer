@@ -1164,8 +1164,6 @@ private struct DrillCardView: View {
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeReadoutItem: ActiveDrillReadoutItem?
-    @State private var showingTargetExplainer = false
-    @State private var showingReadinessMath = false
     @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
@@ -1301,23 +1299,17 @@ private struct DrillCardView: View {
             }
 
             if let cue = cue, !cue.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(cue)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                DrillCoachingCueBox(cue: cue)
             }
 
             let isZone1 = preRunId == .aerobicFlush || preRunId == .recoveryJog
             let isZone2 = preRunId == .zone2Run
+            let targetExplainerTitle: String? = {
+                if isZone1 { return "Zone 1 Heart Rate" }
+                if isZone2 { return "Zone 2 Heart Rate" }
+                if drill.targetCadence?.isEmpty == false { return "Target Cadence" }
+                return nil
+            }()
             let targetText: String? = {
                 if isZone1 {
                     return "Target: Zone 1 HR"
@@ -1336,36 +1328,11 @@ private struct DrillCardView: View {
                 return nil
             }()
 
-            if let targetString = targetText {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-
-                    Text(targetString)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    showingTargetExplainer = true
-                }
-                .sheet(isPresented: $showingTargetExplainer) {
-                    let explainerTitle: String = {
-                        if isZone1 { return "Zone 1 Heart Rate" }
-                        if isZone2 { return "Zone 2 Heart Rate" }
-                        return "Target Cadence"
-                    }()
-                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
-                    MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
-                }
-            }
-
-            TrainingLoadStatusBar(runRecords: runRecords)
+            DrillPrescriptionPanel(
+                targetText: targetText,
+                targetExplainerTitle: targetExplainerTitle,
+                runRecords: runRecords
+            )
 
             WorkoutPhaseTimelineView(phases: preRunDrill.generatePhases())
 

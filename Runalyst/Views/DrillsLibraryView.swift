@@ -399,7 +399,6 @@ struct DrillPrimerCardView: View {
     @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var selectedDuration: DrillDuration
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
-    @State private var showingTargetExplainer = false
 
     init(
         drillId: PreRunDrillId,
@@ -502,54 +501,21 @@ struct DrillPrimerCardView: View {
 
             // Cue
             if !cue.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(cue)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                DrillCoachingCueBox(cue: cue)
             }
 
-            // Target
-            if let targetText = displayTargetText, !targetText.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    Text(targetText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if hasCadenceTarget || isZone1 || isZone2 {
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if hasCadenceTarget || isZone1 || isZone2 {
-                        showingTargetExplainer = true
-                    }
-                }
-                .sheet(isPresented: $showingTargetExplainer) {
-                    let explainerTitle: String = {
-                        if isZone1 { return "Zone 1 Heart Rate" }
-                        if isZone2 { return "Zone 2 Heart Rate" }
-                        return "Target Cadence"
-                    }()
-                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
-                    MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
-                }
-            }
+            let targetExplainerTitle: String? = {
+                if isZone1 { return "Zone 1 Heart Rate" }
+                if isZone2 { return "Zone 2 Heart Rate" }
+                if hasCadenceTarget { return "Target Cadence" }
+                return nil
+            }()
 
-            TrainingLoadStatusBar(runRecords: runRecords)
+            DrillPrescriptionPanel(
+                targetText: displayTargetText,
+                targetExplainerTitle: targetExplainerTitle,
+                runRecords: runRecords
+            )
 
             // Duration Selector
             VStack(alignment: .leading, spacing: 6) {

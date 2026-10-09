@@ -655,93 +655,39 @@ struct DashboardView: View {
 
             let cue = template.generateInstructionalCue(adaptedTarget.targetCadence)
             if !cue.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(cue)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                DrillCoachingCueBox(cue: cue)
             }
 
-            if primerId == .aerobicFlush || primerId == .recoveryJog {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    Text("Target: Zone 1 HR")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
+            let isZone1 = primerId == .aerobicFlush || primerId == .recoveryJog
+            let isZone2 = primerId == .zone2Run
+            let targetExplainerTitle: String? = {
+                if isZone1 { return "Zone 1 Heart Rate" }
+                if isZone2 { return "Zone 2 Heart Rate" }
+                return "Target Cadence"
+            }()
+            let targetText: String? = {
+                if isZone1 {
+                    return "Target: Zone 1 HR"
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Zone 1 Heart Rate", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
+                if isZone2 {
+                    return "Target: Zone 2 HR"
                 }
-            } else if primerId == .zone2Run {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    Text("Target: Zone 2 HR")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Zone 2 Heart Rate", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    if let target = adaptedTarget.targetCadence, let base = baseCadence {
-                        if adaptedTarget.isCadenceRelaxed, let std = adaptedTarget.standardTargetCadence {
-                            Text("Target: \(target) SPM (Relaxed from \(std))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                if let target = adaptedTarget.targetCadence, let base = baseCadence {
+                    if adaptedTarget.isCadenceRelaxed, let std = adaptedTarget.standardTargetCadence {
+                        return "Target: \(target) SPM (Relaxed from \(std))"
                     } else {
-                        Text("Target: Dynamic cadence")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        return "Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)"
                     }
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
+                } else {
+                    return "Target: Dynamic cadence"
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
-            }
+            }()
 
-            TrainingLoadStatusBar(runRecords: runRecords)
+            DrillPrescriptionPanel(
+                targetText: targetText,
+                targetExplainerTitle: targetExplainerTitle,
+                runRecords: runRecords
+            )
 
             WorkoutPhaseTimelineView(phases: primerDrill.generatePhases())
 
