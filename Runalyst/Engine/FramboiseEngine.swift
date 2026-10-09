@@ -220,6 +220,182 @@ actor FramboiseEngine {
         return slope
     }
 
+    /// Calculates the linear regression slope of cadence over time (least-squares).
+    func calculateCadenceSlope(bucketCadences: [Double]) -> Double {
+        guard bucketCadences.count > 1 else { return 0 }
+        let validCadences = bucketCadences.filter { $0 > 0 && $0.isFinite }
+        let n = Double(validCadences.count)
+        guard n > 1 else { return 0 }
+
+        var sumX: Double = 0
+        var sumY: Double = 0
+        var sumXY: Double = 0
+        var sumX2: Double = 0
+
+        for (i, y) in validCadences.enumerated() {
+            let x = Double(i)
+            sumX += x
+            sumY += y
+            sumXY += x * y
+            sumX2 += x * x
+        }
+
+        let denominator = (n * sumX2) - (sumX * sumX)
+        guard denominator != 0 else { return 0 }
+
+        return ((n * sumXY) - (sumX * sumY)) / denominator
+    }
+
+    /// Calculates the Coefficient of Variation (CV = sigma / mu) for heart rate across buckets.
+    func calculateHRCV(bucketHRs: [Double]) -> Double {
+        guard bucketHRs.count > 1 else { return 0 }
+        let validHRs = bucketHRs.filter { $0 >= 40 && $0.isFinite }
+        guard validHRs.count > 1 else { return 0 }
+
+        let mu = validHRs.reduce(0, +) / Double(validHRs.count)
+        guard mu > 0 else { return 0 }
+
+        let sumSquaredDiff = validHRs.reduce(0) { $0 + pow($1 - mu, 2) }
+        let variance = sumSquaredDiff / Double(validHRs.count - 1)
+        let sigma = sqrt(variance)
+
+        return sigma / mu
+    }
+
+    /// Defensive treadmill heuristics for wrist accelerometer guesswork:
+    /// Applies rolling median filtering to pace and clamps wild outlier spikes (> 25% away from median).
+    func applyIndoorWristPaceSmoothing(buckets: [BucketData]) -> [BucketData] {
+        guard buckets.count >= 3 else { return buckets }
+        let validPaces = buckets.map(\.meanPaceSecPerKm).filter { $0 > 0 }.sorted()
+        guard !validPaces.isEmpty else { return buckets }
+        let overallMedianPace = validPaces[validPaces.count / 2]
+
+        let minAllowedPace = overallMedianPace * 0.75
+        let maxAllowedPace = overallMedianPace * 1.25
+
+        var smoothedBuckets: [BucketData] = []
+        smoothedBuckets.reserveCapacity(buckets.count)
+
+        for i in 0..<buckets.count {
+            let start = max(0, i - 1)
+            let end = min(buckets.count - 1, i + 1)
+            let window = Array(buckets[start...end])
+            let windowPaces = window.map(\.meanPaceSecPerKm).sorted()
+            var medianWindowPace = windowPaces[windowPaces.count / 2]
+
+            // Clamp outliers exceeding 25% from overall median
+            if medianWindowPace < minAllowedPace {
+                medianWindowPace = minAllowedPace
+            } else if medianWindowPace > maxAllowedPace {
+                medianWindowPace = maxAllowedPace
+            }
+
+            let original = buckets[i]
+            smoothedBuckets.append(BucketData(
+                startTime: original.startTime,
+                distanceMeters: original.distanceMeters,
+                durationSeconds: original.durationSeconds,
+                meanPaceSecPerKm: medianWindowPace,
+                meanCadence: original.meanCadence,
+                meanHR: original.meanHR,
+                meanVerticalOscillation: original.meanVerticalOscillation,
+                meanStrideLength: original.meanStrideLength,
+                elevationGainMeters: original.elevationGainMeters
+            ))
+        }
+
+        return smoothedBuckets
+    }
+
+    /// Segments continuous buckets into Work, Recovery, Steady, or Walking windows for the Variance Map.
+    func generatePhaseSegments(from buckets: [BucketData], cadenceFloor: Double = 150.0) -> [PhaseSegment] {
+        guard !buckets.isEmpty else { return [] }
+
+        // Find baseline pace and cadence medians
+        let movingBuckets = buckets.filter { $0.meanCadence >= 120 }
+        let medianCadence: Double
+        let medianPace: Double
+        if !movingBuckets.isEmpty {
+            let sortedCad = movingBuckets.map(\.meanCadence).sorted()
+            let sortedPace = movingBuckets.map(\.meanPaceSecPerKm).filter { $0 > 0 }.sorted()
+            medianCadence = sortedCad[sortedCad.count / 2]
+            medianPace = sortedPace.isEmpty ? 300 : sortedPace[sortedPace.count / 2]
+        } else {
+            medianCadence = 160
+            medianPace = 300
+        }
+
+        var segments: [PhaseSegment] = []
+        var currentKind = ""
+        var segStart: Double = 0
+        var segPaces: [Double] = []
+        var segCads: [Double] = []
+        var segHRs: [Double] = []
+
+        var elapsedSeconds: Double = 0
+
+        for bucket in buckets {
+            let kind: String
+            if bucket.meanCadence < cadenceFloor && bucket.meanCadence < 135 {
+                kind = "walking"
+            } else if bucket.meanCadence > medianCadence + 4 || (bucket.meanPaceSecPerKm > 0 && bucket.meanPaceSecPerKm < medianPace - 15) {
+                kind = "work"
+            } else if bucket.meanCadence < medianCadence - 4 || (bucket.meanPaceSecPerKm > 0 && bucket.meanPaceSecPerKm > medianPace + 20) {
+                kind = "recovery"
+            } else {
+                kind = "steady"
+            }
+
+            if currentKind.isEmpty {
+                currentKind = kind
+                segStart = elapsedSeconds
+            } else if currentKind != kind && (elapsedSeconds - segStart) >= 30 {
+                // Finalize segment
+                let avgPace = segPaces.isEmpty ? 0 : segPaces.reduce(0, +) / Double(segPaces.count)
+                let avgCad = segCads.isEmpty ? 0 : segCads.reduce(0, +) / Double(segCads.count)
+                let avgHR = segHRs.isEmpty ? 0 : segHRs.reduce(0, +) / Double(segHRs.count)
+
+                segments.append(PhaseSegment(
+                    startSeconds: segStart,
+                    endSeconds: elapsedSeconds,
+                    kind: currentKind,
+                    avgPace: avgPace,
+                    avgCadence: avgCad,
+                    avgHR: avgHR
+                ))
+
+                currentKind = kind
+                segStart = elapsedSeconds
+                segPaces = []
+                segCads = []
+                segHRs = []
+            }
+
+            segPaces.append(bucket.meanPaceSecPerKm)
+            segCads.append(bucket.meanCadence)
+            if bucket.meanHR > 0 { segHRs.append(bucket.meanHR) }
+
+            elapsedSeconds += bucket.durationSeconds
+        }
+
+        if !currentKind.isEmpty && elapsedSeconds > segStart {
+            let avgPace = segPaces.isEmpty ? 0 : segPaces.reduce(0, +) / Double(segPaces.count)
+            let avgCad = segCads.isEmpty ? 0 : segCads.reduce(0, +) / Double(segCads.count)
+            let avgHR = segHRs.isEmpty ? 0 : segHRs.reduce(0, +) / Double(segHRs.count)
+
+            segments.append(PhaseSegment(
+                startSeconds: segStart,
+                endSeconds: elapsedSeconds,
+                kind: currentKind,
+                avgPace: avgPace,
+                avgCadence: avgCad,
+                avgHR: avgHR
+            ))
+        }
+
+        return segments
+    }
+
     /// Calculates the fraction of time spent in Zone 4 (or higher).
     func calculatePercentZone4(bucketHRs: [Double], maxHR: Double) -> Double {
         guard maxHR > 0, !bucketHRs.isEmpty else { return 0 }

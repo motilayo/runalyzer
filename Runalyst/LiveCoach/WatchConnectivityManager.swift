@@ -59,6 +59,7 @@ public class WatchConnectivityManager: NSObject, WCSessionDelegate, @unchecked S
             rawAvgVerticalOscillation: dto.verticalOscillation,
             rawAvgStrideLength: dto.strideLength > 0 ? dto.strideLength : nil,
             workingAvgStrideLength: dto.strideLength > 0 ? dto.strideLength : nil,
+            isIndoor: false,
             paceCV: 0,
             paceSlope: 0,
             percentZone4: 0,

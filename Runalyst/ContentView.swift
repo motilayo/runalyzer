@@ -76,6 +76,33 @@ struct ContentView: View {
                     } else {
                         DashboardView(onSync: nil)
                     }
+                case "DRILL_CARD":
+                    if let run = existingRuns.first, let drills = run.insight?.drillRecommendations, !drills.isEmpty {
+                        NavigationStack {
+                            ScrollView {
+                                DrillDeckView(drills: drills)
+                                    .padding(.top, 20)
+                            }
+                            .navigationTitle("Recommended Drill")
+                        }
+                        .onAppear {
+                            if MacroProfile.load() == nil {
+                                let profile = MacroProfile(
+                                    acwr: 1.02,
+                                    acuteLoad: 310,
+                                    chronicWeeklyLoad: 304,
+                                    baselinePace: 330,
+                                    baselineHR: 148,
+                                    baselineCadence: 168,
+                                    baselineEfficiencyFactor: 1.45,
+                                    updatedAt: Date()
+                                )
+                                profile.save()
+                            }
+                        }
+                    } else {
+                        DashboardView(onSync: nil)
+                    }
                 case "DRILLS":
                     NavigationStack {
                         DrillsLibraryView()
@@ -98,8 +125,50 @@ struct ContentView: View {
                         }
                         .navigationTitle("Cadence Progression")
                     }
+                case "ANALYST", "ANALYST_ACTIVE", "ANALYST_READ", "ANALYST_EFFORT", "ANALYST_IMPROVE", "ANALYST_MULTI":
+                    if let run = existingRuns.first {
+                        AnalystChatView(runRecord: run)
+                    } else {
+                        DashboardView(onSync: nil)
+                    }
+                case "READINESS":
+                    ReadinessMathModal(acuteLoad: 168.5, chronicWeeklyLoad: 165.2, acwr: 1.02)
+                case "DETAIL":
+                    if let run = existingRuns.first {
+                        NavigationStack {
+                            RunDetailView(runRecord: run)
+                        }
+                    } else {
+                        DashboardView(onSync: nil)
+                    }
+                case "VARIANCE_MAP":
+                    let sampleSegments: [PhaseSegment] = [
+                        PhaseSegment(startSeconds: 0, endSeconds: 300, kind: "steady", avgPace: 330, avgCadence: 160, avgHR: 138),
+                        PhaseSegment(startSeconds: 300, endSeconds: 600, kind: "work", avgPace: 270, avgCadence: 174, avgHR: 168),
+                        PhaseSegment(startSeconds: 600, endSeconds: 780, kind: "recovery", avgPace: 360, avgCadence: 154, avgHR: 142),
+                        PhaseSegment(startSeconds: 780, endSeconds: 1080, kind: "work", avgPace: 265, avgCadence: 176, avgHR: 172),
+                        PhaseSegment(startSeconds: 1080, endSeconds: 1260, kind: "recovery", avgPace: 365, avgCadence: 152, avgHR: 145),
+                        PhaseSegment(startSeconds: 1260, endSeconds: 1560, kind: "work", avgPace: 260, avgCadence: 178, avgHR: 175),
+                        PhaseSegment(startSeconds: 1560, endSeconds: 1800, kind: "steady", avgPace: 340, avgCadence: 158, avgHR: 140)
+                    ]
+                    let run = existingRuns.first
+                    let segments = run?.signature?.phaseSegments ?? sampleSegments
+                    NavigationStack {
+                        ScrollView {
+                            RunVarianceMapView(
+                                phaseSegments: segments.isEmpty ? sampleSegments : segments,
+                                cadenceFloor: run?.signature?.cadenceFloor ?? 152.0,
+                                averageCadence: run?.workingAvgCadence ?? 164.0,
+                                workoutDuration: run?.duration ?? 1800.0
+                            )
+                            .padding()
+                        }
+                        .navigationTitle("Workout Rhythm")
+                    }
                 case "AUTO_TOUR":
                     AppStoreTourView(existingRuns: existingRuns)
+                case "DASHBOARD":
+                    DashboardView(onSync: nil)
                 default:
                     DashboardView(onSync: nil)
                 }
@@ -205,7 +274,14 @@ struct ContentView: View {
             }
         }
         .task {
-            if ProcessInfo.processInfo.environment["RUNALYST_FORCE_SEED"] == "true" || (existingRuns.count < 30 && previewScreen != nil) {
+            if ProcessInfo.processInfo.environment["RUNALYST_FORCE_SEED"] == "true" {
+                logger.info("Force-seeding 38 mock runs (clearing previous)...")
+                for run in existingRuns {
+                    modelContext.delete(run)
+                }
+                try? modelContext.save()
+                HealthKitSeeder.shared.seedDirectToSwiftData(context: modelContext)
+            } else if existingRuns.count < 30 && previewScreen != nil {
                 logger.info("Auto-seeding 38 mock runs for preview/video recording...")
                 HealthKitSeeder.shared.seedDirectToSwiftData(context: modelContext)
             }
@@ -242,6 +318,33 @@ struct ContentView: View {
             let existingWorkoutIDs = Set(currentExistingRuns.map(\.hkWorkoutID))
             let newWorkouts = workouts.filter { workout in
                 !existingWorkoutIDs.contains(workout.uuid)
+            }
+
+            // Check for post-workout distance calibration mutations on existing indoor runs
+            let workoutDict = Dictionary(uniqueKeysWithValues: workouts.map { ($0.uuid, $0) })
+            var didResolveLegacy = false
+            for existingRun in currentExistingRuns {
+                if existingRun.isIndoor == nil {
+                    existingRun.isIndoor = (existingRun.dataSourceRaw == "gymkit") ? true : false
+                    didResolveLegacy = true
+                }
+                if existingRun.detectedTypeRaw.isEmpty {
+                    existingRun.detectedTypeRaw = "Steady Effort"
+                    didResolveLegacy = true
+                }
+            }
+            if didResolveLegacy {
+                try? modelContext.save()
+            }
+
+            for existingRun in currentExistingRuns where (existingRun.isIndoor == true) {
+                if let authenticWorkout = workoutDict[existingRun.hkWorkoutID] {
+                    let hkDistance = authenticWorkout.totalDistance?.doubleValue(for: .meter()) ?? 0
+                    if abs(hkDistance - existingRun.totalDistanceMeters) > 5.0 || abs(authenticWorkout.duration - existingRun.duration) > 2.0 {
+                        logger.info("Detected post-workout treadmill calibration mutation on \(existingRun.date). Recalculating sliding windows.")
+                        try? await healthKitManager.refreshWorkoutMetrics(for: existingRun, in: modelContext)
+                    }
+                }
             }
 
             let engine = FramboiseEngine()
@@ -288,11 +391,19 @@ struct ContentView: View {
                             workingAvgStrideLength: dto.workingAvgStrideLength,
                             workingDistanceMeters: dto.workingDistanceMeters,
                             workingDurationSeconds: dto.workingDurationSeconds,
+                            isIndoor: dto.isIndoor ?? false,
                             paceCV: dto.paceCV,
                             paceSlope: dto.paceSlope,
                             percentZone4: dto.percentZone4,
-                            detectedTypeRaw: dto.detectedTypeRaw,
-                            framboiseTags: dto.framboiseTags
+                            detectedTypeRaw: dto.detectedTypeRaw.isEmpty ? "Steady Effort" : dto.detectedTypeRaw,
+                            framboiseTags: dto.framboiseTags,
+                            dataSourceRaw: dto.dataSourceRaw,
+                            classificationConfidence: dto.classificationConfidence,
+                            classificationProbabilitiesData: dto.classificationProbabilitiesData,
+                            hrCV: dto.hrCV,
+                            cadenceSlope: dto.cadenceSlope,
+                            needsInclineReview: dto.needsInclineReview,
+                            runSignatureData: dto.runSignatureData
                         )
                         modelContext.insert(newRun)
 
@@ -386,6 +497,32 @@ struct ContentView: View {
                     // Throttle sequentially to avoid on-device model rate limits and thermal overload
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                 }
+
+                // 5. Update MacroProfile (compute once, persist locally for RAG Analyst Chat)
+                let readiness = ReadinessEvaluator.assess(runRecords: allRuns)
+                let recentValidPaces = allRuns.prefix(15).map(\.workingAvgPace).filter { $0 > 0 }
+                let basePace = recentValidPaces.isEmpty ? nil : (recentValidPaces.reduce(0, +) / Double(recentValidPaces.count))
+
+                let recentValidHRs = allRuns.prefix(15).map(\.workingAvgHeartRate).filter { $0 > 0 }
+                let baseHR = recentValidHRs.isEmpty ? nil : (recentValidHRs.reduce(0, +) / Double(recentValidHRs.count))
+
+                let recentValidCads = allRuns.prefix(15).map(\.workingAvgCadence).filter { $0 > 0 }
+                let baseCad = recentValidCads.isEmpty ? nil : (recentValidCads.reduce(0, +) / Double(recentValidCads.count))
+
+                let validEFs = allRuns.prefix(15).compactMap(\.efficiencyFactor)
+                let baseEF = validEFs.isEmpty ? nil : (validEFs.reduce(0, +) / Double(validEFs.count))
+
+                let profile = MacroProfile(
+                    acwr: readiness.acwr,
+                    acuteLoad: readiness.acuteLoad,
+                    chronicWeeklyLoad: readiness.chronicWeeklyLoad,
+                    baselinePace: basePace,
+                    baselineHR: baseHR,
+                    baselineCadence: baseCad,
+                    baselineEfficiencyFactor: baseEF,
+                    updatedAt: Date()
+                )
+                profile.save()
             }
 
         } catch is CancellationError {

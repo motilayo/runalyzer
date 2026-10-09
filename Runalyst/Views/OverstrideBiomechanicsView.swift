@@ -9,7 +9,7 @@ struct BiomechanicalCardView: View {
             // Header Badge
             HStack {
                 Label(
-                    isOverstride ? "Overstriding (Braking Force)" : "Good Stride (Spring Elasticity)",
+                    isOverstride ? "Overstriding (Reaching Too Far)" : "Good Stride (Landing Under Hips)",
                     systemImage: isOverstride ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"
                 )
                 .font(.subheadline.bold())
@@ -129,7 +129,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
                     Text("How Apple Watch Detects This")
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
-                    Text("Translating wrist inertial sensors into foot-strike mechanics")
+                    Text("How your watch tracks your stride from your wrist")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -137,7 +137,7 @@ struct AppleWatchBiomechanicsBridgeView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 TelemetryComparisonRow(
-                    metricName: "Vertical Oscillation",
+                    metricName: "Bounce (Vertical Motion)",
                     goodRange: "6.0 – 9.0 cm",
                     overstrideRange: "> 10.0 cm",
                     explanation: "Landing on a stiff leg sends impact straight up, creating excess vertical bounce instead of forward speed."
@@ -332,7 +332,7 @@ struct OverstrideBiomechanicsSheet: View {
                 }
             }
             .background(Color(UIColor.systemGroupedBackground))
-            .navigationTitle("Running Biomechanics")
+            .navigationTitle("Running Form & Stride")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
