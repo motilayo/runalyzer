@@ -411,6 +411,251 @@ final class IndoorIntelligenceTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testAnalystChatGradePerformanceDirectlyWithoutUnsolicitedPrescription() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.72
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Grade my performance for this run")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("grade") || response.localizedCaseInsensitiveContains("solid") || response.localizedCaseInsensitiveContains("B+") || response.localizedCaseInsensitiveContains("A-"),
+            "Should directly provide a performance grade/evaluation"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("NEXT SESSION DIRECTIVE"), "Must never leak internal prompt headers")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("Coaching Context"), "Must never leak context labels")
+    }
+
+    @MainActor
+    func testAnalystChatCalorieInquiryAnswersMetabolismDirectly() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("That feels very low calorie though")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("calorie") || response.localizedCaseInsensitiveContains("fat") || response.localizedCaseInsensitiveContains("glycogen") || response.localizedCaseInsensitiveContains("energy"),
+            "Should directly answer how recovery and Zone 2 relate to caloric expenditure and metabolism"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("NEXT SESSION DIRECTIVE"), "Must never leak internal prompt headers")
+    }
+
+    @MainActor
+    func testAnalystChatAdrenalineAndHardPushValidation() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("But I like those hard pushes, it's exhilarating")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("drive") || response.localizedCaseInsensitiveContains("burn") || response.localizedCaseInsensitiveContains("adapts") || response.localizedCaseInsensitiveContains("rest") || response.localizedCaseInsensitiveContains("recovery"),
+            "Should validate runner enthusiasm while explaining supercompensation and recovery"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("NEXT SESSION DIRECTIVE"), "Must never leak internal prompt headers")
+    }
+
+    @MainActor
+    func testAnalystChatBaseBuildingAndRaceTransitionDirectAnswerWithoutGrade() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.workingAvgCadence = 161
+        runRecord.workingAvgPace = 362
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Have I built a strong base? Can I shift gears to 5k and 10k training?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("Grade:"), "Must not assign an unsolicited letter grade")
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("base") || response.localizedCaseInsensitiveContains("5k") || response.localizedCaseInsensitiveContains("solid"),
+            "Should directly answer base building readiness"
+        )
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("161") || response.localizedCaseInsensitiveContains("cadence") || response.localizedCaseInsensitiveContains("speed"),
+            "Should ground answer in runner's cadence or pacing consistency"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatCrossTrainingBikingEndorsementWithoutRunningCadence() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.workingAvgCadence = 156
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Ill just bike today")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("bike") || response.localizedCaseInsensitiveContains("recovery") || response.localizedCaseInsensitiveContains("impact"),
+            "Should endorse biking as a low-impact active recovery option"
+        )
+        XCTAssertFalse(
+            response.localizedCaseInsensitiveContains("SPM"),
+            "Must never cite running cadence (SPM) when discussing biking or cross-training"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatRestDayEndorsement() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("I'll take a rest day today")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("rest") || response.localizedCaseInsensitiveContains("recovery") || response.localizedCaseInsensitiveContains("repair"),
+            "Should endorse taking a rest day after a hard workout"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatDistanceInquiryTomorrowRecognizesCapAndRejectsExcessVolume() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Am I good for a 10k run tomorrow?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("too long") || response.localizedCaseInsensitiveContains("cap"),
+            "Must explain that 10k exceeds the recovery cap"
+        )
+        XCTAssertFalse(
+            response.localizedCaseInsensitiveContains("10k tomorrow is feasible") || response.localizedCaseInsensitiveContains("10k is doable tomorrow"),
+            "Must not contradict recovery by greenlighting a 10k during acute fatigue"
+        )
+        XCTAssertFalse(
+            response.localizedCaseInsensitiveContains("today's easy run"),
+            "Must not hallucinate that the runner already did an easy run today"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatClarificationDidNotRunTodayDefusesHallucination() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("I didn’t do an easy run today????")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("haven't run today") || response.localizedCaseInsensitiveContains("rest"),
+            "Must acknowledge the runner hasn't run today and support rest"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatFocusDayTomorrowSaturdayAnswersSpecifically() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Don’t worry about Sunday. Im focused on tomorrow, Saturday")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("Saturday") || response.localizedCaseInsensitiveContains("tomorrow"),
+            "Must address Saturday specifically"
+        )
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("light") || response.localizedCaseInsensitiveContains("easy") || response.localizedCaseInsensitiveContains("rest"),
+            "Must advise light effort or rest for Saturday"
+        )
+        XCTAssertFalse(
+            response.localizedCaseInsensitiveContains("heart rate today"),
+            "Must not hallucinate workout telemetry today"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatFocusOnDistanceAfterRecoveryClearanceProvidesStrategyWithoutContradiction() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("How soon can I attempt a 10k run?")
+        let response1 = chatEngine.messages.last?.text ?? ""
+        XCTAssertTrue(
+            response1.localizedCaseInsensitiveContains("too long") || response1.localizedCaseInsensitiveContains("cap"),
+            "First turn should advise saving 10k for recovery clearance: \(response1)"
+        )
+
+        await chatEngine.sendMessage("If I do run 10k on Sunday, what should I focus on?")
+        let response2 = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertFalse(
+            response2.localizedCaseInsensitiveContains("too long for Sunday") || response2.localizedCaseInsensitiveContains("30–40-minute") || response2.localizedCaseInsensitiveContains("30-40-minute"),
+            "Must not contradict recovery clearance by imposing a 30-40 min recovery cap on Sunday: \(response2)"
+        )
+        XCTAssertTrue(
+            response2.localizedCaseInsensitiveContains("rhythm") || response2.localizedCaseInsensitiveContains("pacing") || response2.localizedCaseInsensitiveContains("cadence") || response2.localizedCaseInsensitiveContains("10k"),
+            "Must provide coaching focus on rhythm/pacing/cadence for the 10k: \(response2)"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatCurrentDayInquiriesAnswersDirectlyWithCorrectWeekday() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("What day is it today?")
+        let response1 = chatEngine.messages.last?.text ?? ""
+        let todayName = RecoveryTimeline.weekday(Date())
+        XCTAssertTrue(
+            response1.localizedCaseInsensitiveContains("Today is \(todayName)"),
+            "Must state current day directly: \(response1)"
+        )
+
+        await chatEngine.sendMessage("What day is it tomorrow?")
+        let response2 = chatEngine.messages.last?.text ?? ""
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        let tomorrowName = RecoveryTimeline.weekday(tomorrow)
+        XCTAssertTrue(
+            response2.localizedCaseInsensitiveContains("Tomorrow is \(tomorrowName)"),
+            "Must state tomorrow directly: \(response2)"
+        )
+    }
+
+    @MainActor
+    func testAnalystChatNegativeMultiDayPlanningSelectsAffirmativeTargetDay() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.date = Date().addingTimeInterval(-24 * 3600)
+        runRecord.detectedTypeRaw = "Intervals"
+        runRecord.percentZone4 = 0.73
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("What if I don't run today or tomorrow? Can I still go for 10k on Sunday?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("Yes") || response.localizedCaseInsensitiveContains("good for a 10k") || response.localizedCaseInsensitiveContains("good to"),
+            "Must affirmative answer for Sunday: \(response)"
+        )
+        XCTAssertFalse(
+            response.localizedCaseInsensitiveContains("A 10k is too long for Sunday"),
+            "Must not contradict recovery clearance by saying 10k is too long for Sunday: \(response)"
+        )
+    }
+
     // MARK: - 5. RAG Payloads
 
     func testRunSignatureAndMacroProfileCompactRAGSummary() {

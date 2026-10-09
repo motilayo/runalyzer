@@ -50,6 +50,7 @@ struct ReadinessMathModal: View {
                             .foregroundColor(.secondary)
                     }
                     .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(UIColor.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
@@ -87,6 +88,7 @@ struct ReadinessMathModal: View {
                         }
                     }
                     .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(UIColor.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
@@ -128,6 +130,7 @@ struct ReadinessMathModal: View {
                         )
                     }
                     .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(UIColor.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
@@ -144,6 +147,7 @@ struct ReadinessMathModal: View {
                         bandLegendRow(color: .red, range: "> 1.50", label: "High Fatigue (Time for an easy day or rest)")
                     }
                     .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(UIColor.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
