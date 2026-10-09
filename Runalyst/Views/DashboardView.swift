@@ -39,6 +39,7 @@ struct DashboardView: View {
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
     @State private var activeReadoutItem: ActiveDrillReadoutItem?
+    @State private var showingAnalystChat = false
 
     private var timeRangeRuns: [RunRecord] {
         let now = Date()
@@ -740,6 +741,8 @@ struct DashboardView: View {
                 }
             }
 
+            TrainingLoadStatusBar(runRecords: runRecords)
+
             WorkoutPhaseTimelineView(phases: primerDrill.generatePhases())
 
             HStack(spacing: 12) {
@@ -1360,6 +1363,43 @@ struct DashboardView: View {
                 cachedBodyAllTime = ""
                 fetchInsight()
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 80) {
+                if let latestRun = runRecords.first {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showingAnalystChat = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .font(.headline)
+                                Text("AI Analyst")
+                                    .font(.subheadline.bold())
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.indigo],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(Capsule())
+                            .shadow(color: Color.purple.opacity(0.35), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 8)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAnalystChat) {
+                if let latestRun = runRecords.first {
+                    AnalystChatView(runRecord: latestRun)
+                }
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)

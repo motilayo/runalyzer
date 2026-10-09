@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Modal sheet explicitly exposing the mathematical formulas and ACWR calculation behind adaptive targets.
@@ -209,5 +210,82 @@ struct ReadinessMathModal: View {
         if ratio > 1.30 { return "Elevated Fatigue" }
         if ratio >= 0.80 { return "Sweet Spot" }
         return "Below Normal"
+    }
+}
+
+// MARK: - Training Load Status Bar
+
+/// Shared color-coded status bar displaying the athlete's ACWR ratio and status, with tap-to-inspect readiness math.
+struct TrainingLoadStatusBar: View {
+    let acwr: Double?
+    let acuteLoad: Double
+    let chronicWeeklyLoad: Double
+    @State private var showingReadinessMath = false
+
+    init(acwr: Double?, acuteLoad: Double = 0, chronicWeeklyLoad: Double = 0) {
+        self.acwr = acwr
+        self.acuteLoad = acuteLoad
+        self.chronicWeeklyLoad = chronicWeeklyLoad
+    }
+
+    init(runRecords: [RunRecord]) {
+        let profile = MacroProfile.load()
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        self.acwr = profile?.acwr ?? readiness.acwr
+        self.acuteLoad = profile?.acuteLoad ?? readiness.acuteLoad
+        self.chronicWeeklyLoad = profile?.chronicWeeklyLoad ?? readiness.chronicWeeklyLoad
+    }
+
+    var body: some View {
+        let status = Self.status(for: acwr)
+        Button {
+            showingReadinessMath = true
+        } label: {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(status.color)
+                    .frame(width: 8, height: 8)
+
+                Text("Training Load:")
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.secondary)
+
+                Text(status.displayText)
+                    .font(.caption.bold())
+                    .foregroundColor(status.color)
+
+                Spacer()
+
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.6))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(status.color.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(status.color.opacity(0.22), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showingReadinessMath) {
+            ReadinessMathModal(
+                acuteLoad: acuteLoad,
+                chronicWeeklyLoad: chronicWeeklyLoad,
+                acwr: acwr
+            )
+        }
+    }
+
+    static func status(for ratio: Double?) -> (displayText: String, color: Color) {
+        guard let ratio = ratio else {
+            return ("Building Base", .blue)
+        }
+        if ratio > 1.50 { return ("Spike Risk (\(String(format: "%.2f", ratio)))", .red) }
+        if ratio > 1.30 { return ("Elevated (\(String(format: "%.2f", ratio)))", .orange) }
+        if ratio >= 0.80 { return ("Optimal (\(String(format: "%.2f", ratio)))", .green) }
+        return ("Building Base (\(String(format: "%.2f", ratio)))", .blue)
     }
 }

@@ -396,6 +396,7 @@ struct DrillPrimerCardView: View {
     let baselineCadence: Int?
     var onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
+    @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var selectedDuration: DrillDuration
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
     @State private var showingTargetExplainer = false
@@ -547,6 +548,8 @@ struct DrillPrimerCardView: View {
                     MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
                 }
             }
+
+            TrainingLoadStatusBar(runRecords: runRecords)
 
             // Duration Selector
             VStack(alignment: .leading, spacing: 6) {
