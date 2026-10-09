@@ -337,6 +337,59 @@ final class IndoorIntelligenceTests: XCTestCase {
         XCTAssertFalse(response.localizedCaseInsensitiveContains("subtle fatigue crept in"), "Should avoid canned clichés")
     }
 
+    @MainActor
+    func testAnalystChatCanIRunTodayInformedByReadiness() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Can i go for a 45min treadmill run today?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(response.hasPrefix("Yes"), "Must answer directly in the first sentence")
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("Zone 1") || response.localizedCaseInsensitiveContains("Zone 2") || response.localizedCaseInsensitiveContains("easy") || response.localizedCaseInsensitiveContains("light") || response.localizedCaseInsensitiveContains("conversational"),
+            "Should prescribe an easy aerobic recovery session after hard intervals"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("heart rate is climbing"), "Must not hallucinate present continuous climbing heart rate")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("5:20"), "Must not recommend aggressive fast paces after intervals")
+    }
+
+    @MainActor
+    func testAnalystChatHowHardToPushInformedByReadiness() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("How hard should I push?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("do not push hard") || response.localizedCaseInsensitiveContains("keep your effort very light") || response.localizedCaseInsensitiveContains("active recovery"),
+            "Should directly advise against pushing hard after intervals"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("around 5:20/km feels right"), "Must not recommend hard tempo paces")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("heart rate is climbing"), "Must not hallucinate real-time heart rate spikes")
+    }
+
+    @MainActor
+    func testAnalystChatReadinessAdjustmentExplanation() async {
+        let runRecord = makeTestRunRecord(isIndoor: false)
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("If training load is optimal, why was readiness adjusted?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("ACWR") || response.localizedCaseInsensitiveContains("training load"),
+            "Should mention ACWR or training load"
+        )
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("readiness") && (response.localizedCaseInsensitiveContains("immediate") || response.localizedCaseInsensitiveContains("recovery") || response.localizedCaseInsensitiveContains("acute")),
+            "Should explain difference between monthly load balance and acute recovery/triggers"
+        )
+    }
+
     // MARK: - 5. RAG Payloads
 
     func testRunSignatureAndMacroProfileCompactRAGSummary() {
