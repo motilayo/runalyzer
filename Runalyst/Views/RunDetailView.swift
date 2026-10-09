@@ -250,7 +250,11 @@ struct RunDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         .task {
             if !hasBiometrics, let oldInsight = runRecord.insight {
@@ -843,7 +847,12 @@ struct RunDetailView: View {
                         }
                         .padding()
                         .background(Color(UIColor.secondarySystemGroupedBackground))
-                        .cornerRadius(20)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+                        )
+                        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
@@ -1051,7 +1060,12 @@ struct StatBox: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
         .contentShape(Rectangle())
         .onTapGesture { showingInfo = true }
         .sheet(isPresented: $showingInfo) {
@@ -1390,14 +1404,15 @@ private struct DrillCardView: View {
             }
             .padding(.top, 4)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            openDrillReadout(displayTitle: displayTitle, coachingCue: cue)
-        }
         .frame(maxWidth: .infinity, minHeight: 1)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(20)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         .sheet(item: $activeReadoutItem) { item in
             DrillInterstitialReadoutView(
                 readout: item.readout,
@@ -1914,13 +1929,14 @@ struct DrillExecutionScorecard: View {
             .background(tier.tintColor.opacity(0.08))
             .cornerRadius(8)
         }
-        .padding(14)
+        .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(drillId.iconColor.opacity(0.2), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
     }
 
     @ViewBuilder

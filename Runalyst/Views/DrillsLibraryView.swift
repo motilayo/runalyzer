@@ -575,25 +575,24 @@ struct DrillPrimerCardView: View {
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "play.fill")
-                        .foregroundColor(.white)
                     Text("Start Drill")
-                        .foregroundColor(.white)
                 }
                 .font(.subheadline.bold())
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.green)
-                .cornerRadius(12)
+                .background(Color.accentColor)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .padding(.top, 2)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            startDrill(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
-        }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 
