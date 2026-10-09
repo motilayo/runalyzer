@@ -538,11 +538,15 @@ extension DrillReadout {
         if adaptedSpec != nil {
             let totalSeconds = phases.map(\.durationSeconds).reduce(0, +)
             let adaptedMinutes = Int((Double(totalSeconds) / 60.0).rounded(.up))
+            let adaptedOverview = overview
+                .replacingOccurrences(of: "\(durationMinutes)-minute", with: "\(adaptedMinutes)-minute")
+                .replacingOccurrences(of: "\(durationMinutes) minute", with: "\(adaptedMinutes) minute")
+                .replacingOccurrences(of: "\(durationMinutes)-min", with: "\(adaptedMinutes)-min")
             copy = DrillReadout(
                 drillId: drillId,
                 title: title,
                 subtitle: subtitle.replacingOccurrences(of: "\(durationMinutes) min", with: "\(adaptedMinutes) min"),
-                overview: overview,
+                overview: adaptedOverview,
                 breakdown: Self.readinessBreakdown(phases: phases, drillId: drillId),
                 coachingTip: coachingTip,
                 phases: phases,

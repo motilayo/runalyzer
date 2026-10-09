@@ -1192,23 +1192,42 @@ private struct DrillCardView: View {
         return drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
     }
 
-    private var preRunDrill: PreRunDrill {
-        PreRunDrill(id: resolvedPreRunId, previousCadence: drill.previousCadence, targetCadence: targetCadenceString)
+    private var readinessAssessment: ReadinessAssessment {
+        ReadinessEvaluator.assess(runRecords: runRecords)
+    }
+
+    private var effectivePreRunDrill: PreRunDrill {
+        let readiness = readinessAssessment
+        let adapted = ReadinessModifier.adaptTarget(
+            targetCadenceString,
+            baselineCadence: drill.previousCadence,
+            drillId: resolvedPreRunId,
+            state: readiness.state
+        )
+        return PreRunDrill(
+            id: resolvedPreRunId,
+            previousCadence: drill.previousCadence,
+            targetCadence: adapted.targetCadence,
+            readinessState: readiness.state
+        )
     }
 
     var body: some View {
+        let readiness = readinessAssessment
         let preRunId = resolvedPreRunId
         let template = DrillTemplate.template(for: preRunId)
         let displayTitle = drill.formattedTitle.isEmpty ? template.title : drill.formattedTitle
-        let work = (drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork
-        let recovery = (drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery
+        let currentDrill = effectivePreRunDrill
+        let isAdapted = readiness.state.applies(to: preRunId)
+        let work = isAdapted ? currentDrill.defaultWorkString : ((drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork)
+        let recovery = (isAdapted && readiness.state == .deload) ? currentDrill.defaultRecoveryString : ((drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery)
         let effort = (drill.drillEffort?.isEmpty == false ? drill.drillEffort : nil) ?? template.defaultEffort
         let purpose = (drill.drillPurpose?.isEmpty == false ? drill.drillPurpose : nil) ?? template.defaultPurpose
         let cue: String? = {
             if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
                 return cueText
             }
-            let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+            let targetInt = currentDrill.computedCadence ?? drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
             let generated = template.generateInstructionalCue(targetInt)
             return generated.isEmpty ? nil : generated
         }()
@@ -1264,8 +1283,7 @@ private struct DrillCardView: View {
                     Text(displayTitle)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    let drillId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
-                    Text("\(PreRunDrill(id: drillId).duration.title) drill")
+                    Text("\(currentDrill.duration.title) drill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -1317,10 +1335,11 @@ private struct DrillCardView: View {
                 if isZone2 {
                     return "Target: Zone 2 HR"
                 }
-                if let target = drill.targetCadence, !target.isEmpty {
-                    let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+                let targetCadenceValue = currentDrill.computedCadence ?? drill.targetCadence ?? ""
+                if !targetCadenceValue.isEmpty {
+                    let formattedTarget = targetCadenceValue.contains("SPM") ? targetCadenceValue : "\(targetCadenceValue) SPM"
                     if let prev = drill.previousCadence {
-                        return "Target: \(formattedTarget) (Previous: \(prev) SPM)"
+                        return isAdapted ? "Target: \(formattedTarget) (Adapted)" : "Target: \(formattedTarget) (Previous: \(prev) SPM)"
                     } else {
                         return "Target: \(formattedTarget)"
                     }
@@ -1334,7 +1353,7 @@ private struct DrillCardView: View {
                 runRecords: runRecords
             )
 
-            WorkoutPhaseTimelineView(phases: preRunDrill.generatePhases())
+            WorkoutPhaseTimelineView(phases: currentDrill.generatePhases())
 
             HStack(spacing: 12) {
                 Button(action: {
@@ -1407,7 +1426,7 @@ private struct DrillCardView: View {
     private func openDrillReadout(displayTitle: String, coachingCue: String?) {
         let currentPreRunId = resolvedPreRunId
         let currentTargetCadence = targetCadenceString
-        let currentDrill = preRunDrill
+        let currentDrill = effectivePreRunDrill
         let dto = DrillPrescriptionDTO(
             title: displayTitle,
             preRunDrillId: currentPreRunId.rawValue,

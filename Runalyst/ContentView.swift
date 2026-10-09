@@ -141,6 +141,53 @@ struct ContentView: View {
                     } else {
                         DashboardView(onSync: nil)
                     }
+                case "DRILL_EXPLAINER":
+                    let readiness = ReadinessEvaluator.assess(runRecords: existingRuns)
+                    let dto = DrillPrescriptionDTO(
+                        title: "Cadence Pyramids",
+                        preRunDrillId: PreRunDrillId.cadencePyramids.rawValue,
+                        purpose: "This pattern sharpens your cadence control and supports your aerobic foundation.",
+                        targetCadence: "160-166 SPM",
+                        previousCadence: 156,
+                        durationMinutes: 10
+                    )
+                    let item = ActiveDrillReadoutItem.adaptive(
+                        dto: dto,
+                        readiness: readiness,
+                        customCoachingTip: "Focus on steady, measured movement and release tension through your shoulders."
+                    )
+                    DrillInterstitialReadoutView(
+                        readout: item.readout,
+                        workoutPlan: item.plan,
+                        prescriptionDTO: item.dto
+                    )
+                case "DRILL_EXPLAINER_ADAPTED":
+                    let assessment = ReadinessAssessment(
+                        state: .acuteFatigue,
+                        triggers: [.consecutiveHardDays],
+                        acuteLoad: 168.0,
+                        chronicWeeklyLoad: 145.0,
+                        acwr: 1.16,
+                        mileageDropFraction: nil
+                    )
+                    let dto = DrillPrescriptionDTO(
+                        title: "Cadence Pyramids",
+                        preRunDrillId: PreRunDrillId.cadencePyramids.rawValue,
+                        purpose: "This pattern sharpens your cadence control and supports your aerobic foundation.",
+                        targetCadence: "160-166 SPM",
+                        previousCadence: 156,
+                        durationMinutes: 10
+                    )
+                    let item = ActiveDrillReadoutItem.adaptive(
+                        dto: dto,
+                        readiness: assessment,
+                        customCoachingTip: "Focus on steady, measured movement and release tension through your shoulders."
+                    )
+                    DrillInterstitialReadoutView(
+                        readout: item.readout,
+                        workoutPlan: item.plan,
+                        prescriptionDTO: item.dto
+                    )
                 case "VARIANCE_MAP":
                     let sampleSegments: [PhaseSegment] = [
                         PhaseSegment(startSeconds: 0, endSeconds: 300, kind: "steady", avgPace: 330, avgCadence: 160, avgHR: 138),

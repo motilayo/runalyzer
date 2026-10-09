@@ -242,9 +242,9 @@ struct TrainingLoadStatusBar: View {
             showingReadinessMath = true
         } label: {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(status.color)
-                    .frame(width: 8, height: 8)
+                Image(systemName: "gauge.with.needle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(status.color)
 
                 Text("Training Load:")
                     .font(.caption.weight(.medium))
@@ -400,9 +400,9 @@ struct DrillPrescriptionPanel: View {
                 showingReadinessMath = true
             } label: {
                 HStack(spacing: 8) {
-                    Circle()
-                        .fill(status.color)
-                        .frame(width: 8, height: 8)
+                    Image(systemName: "gauge.with.needle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(status.color)
 
                     Text("Training Load:")
                         .font(.caption.weight(.medium))

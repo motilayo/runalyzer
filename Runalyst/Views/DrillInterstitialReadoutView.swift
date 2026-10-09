@@ -73,13 +73,13 @@ struct DrillInterstitialReadoutView: View {
                         readinessCard
                     }
 
-                    // 1. The Overview
+                    // 1. Overview
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
-                            Image(systemName: "flag.fill")
+                            Image(systemName: "doc.text.fill")
                                 .font(.caption.bold())
-                                .foregroundColor(.accentColor)
-                            Text("The Overview")
+                                .foregroundColor(.secondary)
+                            Text("Overview")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
@@ -89,19 +89,19 @@ struct DrillInterstitialReadoutView: View {
                             .font(.subheadline)
                             .foregroundColor(.primary)
                             .lineSpacing(3)
-                            .padding(12)
+                            .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
 
-                    // 2. The Breakdown with the Horizontal Timeline UI right below it
+                    // 2. Workout Structure with Timeline
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 5) {
-                            Image(systemName: "list.bullet.clipboard.fill")
+                            Image(systemName: "chart.bar.fill")
                                 .font(.caption.bold())
-                                .foregroundColor(.accentColor)
-                            Text("The Breakdown")
+                                .foregroundColor(.secondary)
+                            Text("Workout Structure")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
@@ -111,39 +111,27 @@ struct DrillInterstitialReadoutView: View {
                             .font(.subheadline)
                             .foregroundColor(.primary)
                             .lineSpacing(3)
-                            .padding(12)
+                            .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                        // Horizontally scrolling timeline UI right below the "Breakdown" text
                         WorkoutPhaseTimelineView(phases: readout.phases, showHeader: false)
                     }
 
-                    // 3. The Coaching Tip
+                    // 3. Coaching Cue
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.caption.bold())
                                 .foregroundColor(.orange)
-                            Text("The Coaching Tip")
+                            Text("Coaching Cue")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
                         }
 
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("💡")
-                                .font(.body)
-                            Text(coachingTipFormattedText)
-                                .font(.footnote)
-                                .foregroundColor(.primary)
-                                .lineSpacing(2)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.orange.opacity(0.12))
-                        .cornerRadius(12)
+                        DrillCoachingCueBox(cue: readout.coachingTip)
                     }
                 }
                 .frame(maxWidth: 860)
@@ -193,27 +181,19 @@ struct DrillInterstitialReadoutView: View {
         .presentationDragIndicator(.visible)
     }
 
-    private var coachingTipFormattedText: AttributedString {
-        var str = AttributedString("Tip: ")
-        str.font = .footnote.bold()
-        let tipBody = AttributedString(readout.coachingTip)
-        str.append(tipBody)
-        return str
-    }
-
     // MARK: - Readiness Card
 
     private var readinessTint: Color {
-        readout.readinessState == .deload ? .teal : .pink
+        readout.readinessState == .deload ? .teal : .orange
     }
 
     private var readinessIcon: String {
-        readout.readinessState == .deload ? "leaf.fill" : "battery.25percent"
+        readout.readinessState == .deload ? "leaf.fill" : "gauge.with.needle"
     }
 
     @ViewBuilder
     private var readinessCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
                 Image(systemName: readinessIcon)
                     .font(.caption.bold())
@@ -229,7 +209,7 @@ struct DrillInterstitialReadoutView: View {
                     .padding(.vertical, 3)
                     .background(readinessTint.opacity(0.15))
                     .foregroundColor(readinessTint)
-                    .cornerRadius(6)
+                    .clipShape(Capsule())
                 Image(systemName: "info.circle")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -255,31 +235,36 @@ struct DrillInterstitialReadoutView: View {
             }
 
             if let context = readout.readinessContext {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Coach Context")
-                        .font(.caption2.bold())
-                        .foregroundColor(readinessTint)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "quote.opening")
+                            .font(.caption2.bold())
+                            .foregroundColor(readinessTint)
+                        Text("Coach Context")
+                            .font(.caption.bold())
+                            .foregroundColor(readinessTint)
+                    }
                     Text("“\(context)”")
                         .font(.footnote)
                         .italic()
-                        .foregroundColor(.primary)
-                        .lineSpacing(2)
+                        .foregroundColor(.primary.opacity(0.9))
+                        .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(10)
+                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(readinessTint.opacity(0.08))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(readinessTint.opacity(0.35), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(readinessTint.opacity(0.22), lineWidth: 1)
         )
-        .cornerRadius(12)
         .alert("Readiness Modifier", isPresented: $showingReadinessInfo) {
             Button("Got it", role: .cancel) {}
         } message: {
