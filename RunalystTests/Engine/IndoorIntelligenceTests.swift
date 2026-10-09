@@ -303,6 +303,40 @@ final class IndoorIntelligenceTests: XCTestCase {
         XCTAssertNotEqual(tip1, tip2, "Sequential tips across conversation turns must offer distinct cues rather than repeating verbatim")
     }
 
+    @MainActor
+    func testAnalystChatConceptualQuestionAnswersDirectlyWithoutJargon() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("How does arm drive help?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("metronome") || response.localizedCaseInsensitiveContains("elbow") || response.localizedCaseInsensitiveContains("swing") || response.localizedCaseInsensitiveContains("arm"),
+            "Should directly answer how arm drive works mechanically"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("thoracic alignment"), "Should not use stiff clinical jargon")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("tactical composure"), "Should not use unnatural tactical composure jargon")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("blunt that strain"), "Should not use canned blunt that strain phrase")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("turnover stability"), "Should avoid awkward redundant turnover stability phrasing")
+    }
+
+    @MainActor
+    func testAnalystChatPerformanceDegradationInquiry() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Did you notice any degradation in my performance towards the end of my run?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("pace") || response.localizedCaseInsensitiveContains("heart rate") || response.localizedCaseInsensitiveContains("drift") || response.localizedCaseInsensitiveContains("fatigue"),
+            "Should answer performance degradation directly"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("tactical composure"), "Should not use canned tactical composure jargon")
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("subtle fatigue crept in"), "Should avoid canned clichés")
+    }
+
     // MARK: - 5. RAG Payloads
 
     func testRunSignatureAndMacroProfileCompactRAGSummary() {

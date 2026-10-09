@@ -181,6 +181,21 @@ struct AnalystChatView: View {
                     await engine.sendMessage("Which part of my form should I focus on improving in my next run?")
                     try? await Task.sleep(nanoseconds: 300_000_000)
                     dismissKeyboard()
+                } else if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == "ANALYST_ARM_DRIVE" {
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    await engine.sendMessage("How does arm drive help?")
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    dismissKeyboard()
+                } else if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == "ANALYST_DEGRADATION" {
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    await engine.sendMessage("Did you notice any degradation in my performance towards the end of my run?")
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    dismissKeyboard()
+                } else if ProcessInfo.processInfo.environment["RUNALYST_PREVIEW_SCREEN"] == "ANALYST_WEAKNESS" {
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    await engine.sendMessage("What's my weak point?")
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    dismissKeyboard()
                 }
             }
         }
