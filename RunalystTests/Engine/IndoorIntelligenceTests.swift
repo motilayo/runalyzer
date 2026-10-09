@@ -343,16 +343,37 @@ final class IndoorIntelligenceTests: XCTestCase {
         runRecord.detectedTypeRaw = "Intervals"
         let chatEngine = AnalystChatEngine(runRecord: runRecord)
 
-        await chatEngine.sendMessage("Can i go for a 45min treadmill run today?")
+        await chatEngine.sendMessage("Can i go for a 45min session today?")
         let response = chatEngine.messages.last?.text ?? ""
 
-        XCTAssertTrue(response.hasPrefix("Yes"), "Must answer directly in the first sentence")
         XCTAssertTrue(
-            response.localizedCaseInsensitiveContains("Zone 1") || response.localizedCaseInsensitiveContains("Zone 2") || response.localizedCaseInsensitiveContains("easy") || response.localizedCaseInsensitiveContains("light") || response.localizedCaseInsensitiveContains("conversational"),
-            "Should prescribe an easy aerobic recovery session after hard intervals"
+            response.localizedCaseInsensitiveContains("too long") || response.localizedCaseInsensitiveContains("20") || response.localizedCaseInsensitiveContains("recovery"),
+            "Should clarify that 45 minutes is too long for recovery"
         )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("You're not running"), "Must not use harsh scolding tone")
         XCTAssertFalse(response.localizedCaseInsensitiveContains("heart rate is climbing"), "Must not hallucinate present continuous climbing heart rate")
         XCTAssertFalse(response.localizedCaseInsensitiveContains("5:20"), "Must not recommend aggressive fast paces after intervals")
+    }
+
+    @MainActor
+    func testAnalystChatZone2DurationFollowUpRespectsRecovery() async {
+        let runRecord = makeTestRunRecord(isIndoor: true)
+        runRecord.detectedTypeRaw = "Intervals"
+        let chatEngine = AnalystChatEngine(runRecord: runRecord)
+
+        await chatEngine.sendMessage("Can i go for a 45min session today?")
+        await chatEngine.sendMessage("What if i did 45mins zone 2?")
+        let response = chatEngine.messages.last?.text ?? ""
+
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("Zone 2") && response.localizedCaseInsensitiveContains("too long"),
+            "Should acknowledge Zone 2 intensity while explaining 45 min is too long for recovery"
+        )
+        XCTAssertFalse(response.localizedCaseInsensitiveContains("You're not doing a 45-minute Zone 2"), "Must not use contradictory scolding phrasing")
+        XCTAssertTrue(
+            response.localizedCaseInsensitiveContains("20") || response.localizedCaseInsensitiveContains("25") || response.localizedCaseInsensitiveContains("walk"),
+            "Should recommend capping at 20-25 min or walking"
+        )
     }
 
     @MainActor

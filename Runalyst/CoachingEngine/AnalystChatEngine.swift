@@ -162,7 +162,7 @@ class AnalystChatEngine: ObservableObject {
         let readiness = readinessAssessment
         if isHeavySession || readiness.state == .acuteFatigue {
             let reason = isHeavySession ? "recent demanding \(runRecord.detectedTypeRaw) session" : "acute training fatigue"
-            return "NEXT SESSION DIRECTIVE: Due to \(reason), if the runner asks about running today or how hard to push, recommend strictly an EASY RECOVERY session (Zone 1/2, conversational effort, HR below 140 BPM, pace around 6:30–6:45/km or slower). Forbid hard pushes, fast intervals, or aggressive speeds (like 5:20/km) today."
+            return "NEXT SESSION DIRECTIVE: Due to \(reason), if the runner asks about running today, intensity, or workout duration, recommend strictly a SHORT EASY RECOVERY session (cap duration at 20–25 minutes in Zone 1 or easy Zone 2, conversational effort, HR below 140 BPM). If they propose running 40+ minutes (even in Zone 2), validate that Zone 2 effort is the right intensity, but explain that 45 minutes is too long for recovery and will accumulate fatigue; advise capping it at 20–25 minutes or walking instead. Forbid hard pushes, fast intervals, or long sessions today."
         } else if readiness.state == .deload {
             return "NEXT SESSION DIRECTIVE: In a scheduled mileage deload week. Prescribe a light recovery jog to let the body adapt."
         } else {
@@ -180,13 +180,15 @@ class AnalystChatEngine: ObservableObject {
         Always speak directly using "you" and "your".
 
         Core Coaching Principles:
-        1. The Voice of a Coach (Direct & Decisive):
-           - Answer the runner's question directly in the very first sentence. Never evade, waffle, or give boilerplate filler.
-           - When asked "Can I run today?", "How hard should I push?", or "What should I do next?", give an immediate clear answer (e.g. "Yes, but keep it strictly an easy recovery run in Zone 1 or Zone 2" or "Keep your effort very light today—do not push hard").
+        1. The Voice of a Coach (Encouraging, Empathetic & Constructive):
+           - Answer the runner's question directly and constructively in the very first sentence.
+           - Speak warmly and respectfully as a trusted coach—never scold, sound bossy, or use abrasive phrases like "You're not doing X today—".
+           - When asked about doing a long session (e.g. 45 min) during recovery: validate their intent, distinguish duration from intensity, and give a clear recommendation (e.g. "Zone 2 is the right intensity, but 45 minutes is too long for recovery today—cap it at 20 to 25 minutes so your body can rebuild"). Never contradict yourself by telling them not to do Zone 2 and then telling them to do Zone 2 in the same breath.
+           - Vary phrasing naturally across turns: do not repeat the exact same stock paragraph of pace and heart rate metrics turn after turn.
            - Plain, Simple, Human Speech: Speak like a real human coach in 2 to 3 fluid sentences. Never use robotic clichés, corporate buzzwords, or clinical jargon ("thoracic alignment", "tactical composure", "blunt that strain", "turnover stability").
         2. The Mind of an Analyst (Grounded in Authentic Data):
            - All recommendations must be strictly informed by the provided workout and readiness data.
-           - Obey the NEXT SESSION DIRECTIVE strictly: If the previous workout was an intense session or acute fatigue is present, prescribe ONLY an easy recovery jog (Zone 1/2, conversational effort, low heart rate). NEVER recommend a fast push or harder pace (such as 5:20/km).
+           - Obey the NEXT SESSION DIRECTIVE strictly: If the previous workout was an intense session or acute fatigue is present, prescribe ONLY an easy, short recovery jog (Zone 1/2, conversational effort, low heart rate, capped at 20–25 min). NEVER recommend a fast push, tempo pace (such as 5:20/km), or long endurance session.
            - Post-Workout Context: You are chatting with the runner after their workout. NEVER say "Right now, your heart rate is climbing" or speak in the present continuous about real-time biometrics.
            - Readiness vs Training Load: If asked why readiness was adjusted when training load is optimal, explain that 4-week training load (ACWR) measures monthly balance, while readiness accounts for acute fatigue from recent hard efforts (such as back-to-back hard days or cardiac drift).
         3. Cadence & Form:
@@ -357,10 +359,18 @@ class AnalystChatEngine: ObservableObject {
         let workSegments = signature?.phaseSegments.filter { $0.kind == "work" } ?? []
         let recoverySegments = signature?.phaseSegments.filter { $0.kind == "recovery" } ?? []
 
-        // 1. Can I run today / Go for a run today / Next workout timing
-        if lower.contains("run today") || lower.contains("can i run") || lower.contains("should i run") || lower.contains("go for a") || lower.contains("another run") {
+        // 1. Can I run today / Go for a run today / Next workout timing / Duration inquiry
+        if lower.contains("run today") || lower.contains("can i run") || lower.contains("should i run") || lower.contains("go for a") || lower.contains("another run") || lower.contains("session today") || (lower.contains("what if") && (lower.contains("zone 2") || lower.contains("zone2") || lower.contains("run") || lower.contains("min"))) {
             if isHeavySession || readinessAssessment.state == .acuteFatigue {
-                return "Yes, you can do a run today, but keep the effort very light—strictly in Zone 1 or Zone 2. Since your recent session was a demanding \(type) workout, your legs are carrying acute fatigue. Keep your pace relaxed (around 6:30–6:45/km), hold a conversational effort where you can speak in full sentences, and avoid any fast intervals or hard surges."
+                let asksLong = lower.contains("45") || lower.contains("hour") || lower.contains("60") || lower.contains("long")
+                let mentionsZone2 = lower.contains("zone 2") || lower.contains("zone2")
+                if mentionsZone2 && asksLong {
+                    return "Zone 2 is the right intensity, but 45 minutes is too long for recovery right now. After your demanding \(type) workout, 45 minutes adds unnecessary training load when your muscles are trying to repair. If you want to get moving, cap it at 20 to 25 minutes of easy jogging or a brisk walk to flush your legs without building deeper fatigue."
+                } else if asksLong {
+                    return "45 minutes is too long for today—keep it to a short 20 to 25-minute recovery flush instead. Since your recent \(type) workout was high-intensity and left acute fatigue, your body needs active recovery in Zone 1 or easy Zone 2. Keep your pace relaxed (around 6:30–6:45/km), keep your effort conversational, and let your legs rebuild."
+                } else {
+                    return "Yes, you can do a run today, but keep it short (20 to 25 minutes) and very light—strictly in Zone 1 or Zone 2. Since your recent session was a demanding \(type) workout, your legs are carrying acute fatigue. Keep your pace relaxed (around 6:30–6:45/km), hold a conversational effort where you can speak in full sentences, and avoid any fast intervals or hard surges."
+                }
             } else if readinessAssessment.state == .deload {
                 return "Yes, you can run today, but keep it to a light aerobic flush. You are in a recovery deload week, so keep your effort relaxed and your steps soft without pushing the pace."
             } else {
