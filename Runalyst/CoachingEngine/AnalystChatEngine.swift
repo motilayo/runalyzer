@@ -310,18 +310,8 @@ class AnalystChatEngine: ObservableObject {
             let response = try await session.respond(to: promptToSend)
             return response.content
         } catch {
-            let isContextExceeded: Bool = {
-                if #available(iOS 27.0, *) {
-                    if let lmError = error as? LanguageModelError {
-                        switch lmError {
-                        case .contextSizeExceeded: return true
-                        default: return false
-                        }
-                    }
-                }
-                let errorDesc = "\(error)".lowercased()
-                return errorDesc.contains("context") || errorDesc.contains("token") || errorDesc.contains("limit")
-            }()
+            let errorDesc = "\(error)".lowercased()
+            let isContextExceeded = errorDesc.contains("context") || errorDesc.contains("token") || errorDesc.contains("limit")
 
             if isContextExceeded {
                 // Apple FoundationModels: Managing the Context Window (4,096-token budget).
