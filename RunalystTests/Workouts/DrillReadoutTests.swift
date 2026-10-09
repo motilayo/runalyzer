@@ -190,4 +190,39 @@ final class DrillReadoutTests: XCTestCase {
             }
         }
     }
+
+    func testCadencePyramidsReadinessAdaptationDurationCohesion() {
+        let dto = DrillPrescriptionDTO(
+            title: "Cadence Pyramids",
+            preRunDrillId: PreRunDrillId.cadencePyramids.rawValue,
+            purpose: "Rhythm and turnover",
+            targetCadence: "163-169 SPM",
+            previousCadence: 159,
+            durationMinutes: 10
+        )
+        let fatigueAssessment = ReadinessAssessment(
+            state: .acuteFatigue,
+            triggers: [.consecutiveHardDays],
+            acuteLoad: 350.0,
+            chronicWeeklyLoad: 200.0,
+            acwr: 1.75,
+            mileageDropFraction: nil
+        )
+
+        let activeItem = ActiveDrillReadoutItem.adaptive(
+            dto: dto,
+            readiness: fatigueAssessment
+        )
+
+        let readout = activeItem.readout
+        // Phase math: 2m warm-up (120s) + 2 x (30s work + 45s walk = 150s) + 3m cool-down (180s) = 450s = 7m 30s
+        XCTAssertEqual(readout.totalDurationSeconds, 450)
+        XCTAssertEqual(readout.formattedDuration, "7m 30s")
+
+        // Must display mathematically exact 7m 30s, NEVER rounding up to 8 min
+        XCTAssertTrue(readout.subtitle.contains("7m 30s"), "Subtitle must contain 7m 30s")
+        XCTAssertFalse(readout.subtitle.contains("8 min"), "Subtitle must never display rounded-up 8 min")
+        XCTAssertTrue(readout.overview.contains("7m 30s"), "Overview must contain 7m 30s")
+        XCTAssertFalse(readout.overview.contains("8-minute"), "Overview must never display rounded-up 8-minute")
+    }
 }

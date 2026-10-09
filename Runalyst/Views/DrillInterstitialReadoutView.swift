@@ -232,6 +232,14 @@ struct DrillInterstitialReadoutView: View {
                 if let adapted = readout.adaptedRecovery, let standard = readout.standardRecovery, adapted != standard {
                     readinessRow(icon: "moon.zzz", label: "Recovery", value: adapted, detail: "Extended from \(standard)")
                 }
+                if readout.totalDurationSeconds != (readout.durationMinutes * 60) {
+                    readinessRow(
+                        icon: "clock",
+                        label: "Duration",
+                        value: readout.formattedDuration,
+                        detail: "Trimmed from \(readout.durationMinutes) min"
+                    )
+                }
             }
 
             if let context = readout.readinessContext {

@@ -41,6 +41,21 @@ struct DrillReadout: Sendable, Identifiable {
         readinessState != .productive && readinessContext != nil
     }
 
+    var totalDurationSeconds: Int {
+        phases.map(\.durationSeconds).reduce(0, +)
+    }
+
+    var formattedDuration: String {
+        let total = totalDurationSeconds
+        let mins = total / 60
+        let secs = total % 60
+        if secs == 0 {
+            return "\(mins) min"
+        } else {
+            return "\(mins)m \(secs)s"
+        }
+    }
+
     /// Generates a standardized, conversational readout for any pre-run drill.
     static func readout(
         for drillId: PreRunDrillId,
@@ -537,15 +552,32 @@ extension DrillReadout {
 
         if adaptedSpec != nil {
             let totalSeconds = phases.map(\.durationSeconds).reduce(0, +)
-            let adaptedMinutes = Int((Double(totalSeconds) / 60.0).rounded(.up))
+            let formattedTotal: String = {
+                let mins = totalSeconds / 60
+                let secs = totalSeconds % 60
+                if secs == 0 {
+                    return "\(mins) min"
+                } else {
+                    return "\(mins)m \(secs)s"
+                }
+            }()
+            let adjectiveTotal: String = {
+                let mins = totalSeconds / 60
+                let secs = totalSeconds % 60
+                if secs == 0 {
+                    return "\(mins)-minute"
+                } else {
+                    return "\(mins)m \(secs)s"
+                }
+            }()
             let adaptedOverview = overview
-                .replacingOccurrences(of: "\(durationMinutes)-minute", with: "\(adaptedMinutes)-minute")
-                .replacingOccurrences(of: "\(durationMinutes) minute", with: "\(adaptedMinutes) minute")
-                .replacingOccurrences(of: "\(durationMinutes)-min", with: "\(adaptedMinutes)-min")
+                .replacingOccurrences(of: "\(durationMinutes)-minute", with: adjectiveTotal)
+                .replacingOccurrences(of: "\(durationMinutes) minute", with: formattedTotal)
+                .replacingOccurrences(of: "\(durationMinutes)-min", with: formattedTotal)
             copy = DrillReadout(
                 drillId: drillId,
                 title: title,
-                subtitle: subtitle.replacingOccurrences(of: "\(durationMinutes) min", with: "\(adaptedMinutes) min"),
+                subtitle: subtitle.replacingOccurrences(of: "\(durationMinutes) min", with: formattedTotal),
                 overview: adaptedOverview,
                 breakdown: Self.readinessBreakdown(phases: phases, drillId: drillId),
                 coachingTip: coachingTip,
