@@ -90,6 +90,28 @@ final class RunRecord {
     /// Fraction of time spent in Zone 4
     var percentZone4: Double
 
+    // MARK: - Indoor & Ingestion Source
+    /// Source of the run telemetry ("wrist", "gymkit", "footpod")
+    var dataSourceRaw: String?
+
+    /// Confidence score from ML classifier (0.0 to 1.0)
+    var classificationConfidence: Double?
+
+    /// Encoded dictionary of classification probabilities [String: Double]
+    var classificationProbabilitiesData: Data?
+
+    /// Coefficient of variation for heart rate (sigma / mu)
+    var hrCV: Double?
+
+    /// Linear regression slope of cadence over time
+    var cadenceSlope: Double?
+
+    /// Whether the run was flagged for potential incline/hill intervals requiring user confirmation
+    var needsInclineReview: Bool?
+
+    /// Persisted RunSignature for RAG coaching and variance map visualization
+    var runSignatureData: Data?
+
     // MARK: - Classification & Tags
     /// The deterministic or CoreML predicted run type
     var detectedTypeRaw: String
@@ -101,6 +123,26 @@ final class RunRecord {
     /// Retained from v1.1 for structured drill display in V2 UI.
     @Relationship(deleteRule: .cascade, inverse: \CoachingInsight.runRecord)
     var insight: CoachingInsight?
+
+    var classificationProbabilities: [String: Double]? {
+        get {
+            guard let data = classificationProbabilitiesData else { return nil }
+            return try? JSONDecoder().decode([String: Double].self, from: data)
+        }
+        set {
+            classificationProbabilitiesData = try? JSONEncoder().encode(newValue)
+        }
+    }
+
+    var signature: RunSignature? {
+        get {
+            guard let data = runSignatureData else { return nil }
+            return try? JSONDecoder().decode(RunSignature.self, from: data)
+        }
+        set {
+            runSignatureData = try? JSONEncoder().encode(newValue)
+        }
+    }
 
     init(
         id: UUID = UUID(),
@@ -126,7 +168,14 @@ final class RunRecord {
         percentZone4: Double,
         detectedTypeRaw: String,
         framboiseTags: [String] = [],
-        insight: CoachingInsight? = nil
+        insight: CoachingInsight? = nil,
+        dataSourceRaw: String? = nil,
+        classificationConfidence: Double? = nil,
+        classificationProbabilitiesData: Data? = nil,
+        hrCV: Double? = nil,
+        cadenceSlope: Double? = nil,
+        needsInclineReview: Bool? = nil,
+        runSignatureData: Data? = nil
     ) {
         self.id = id
         self.hkWorkoutID = hkWorkoutID
@@ -146,6 +195,13 @@ final class RunRecord {
         self.workingDistanceMeters = workingDistanceMeters
         self.workingDurationSeconds = workingDurationSeconds
         self.isIndoor = isIndoor
+        self.dataSourceRaw = dataSourceRaw
+        self.classificationConfidence = classificationConfidence
+        self.classificationProbabilitiesData = classificationProbabilitiesData
+        self.hrCV = hrCV
+        self.cadenceSlope = cadenceSlope
+        self.needsInclineReview = needsInclineReview
+        self.runSignatureData = runSignatureData
         self.paceCV = paceCV
         self.paceSlope = paceSlope
         self.percentZone4 = percentZone4

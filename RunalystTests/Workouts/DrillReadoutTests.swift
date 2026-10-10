@@ -11,7 +11,7 @@ final class DrillReadoutTests: XCTestCase {
         XCTAssertEqual(readout.subtitle, "Tempo Pre-Run • 10 min")
         XCTAssertEqual(
             readout.overview,
-            "In this drill, you will complete a 10-minute mechanical reset before your main run."
+            "In this drill, you will complete a mechanical reset before your main run."
         )
         XCTAssertEqual(
             readout.breakdown,
@@ -53,7 +53,7 @@ final class DrillReadoutTests: XCTestCase {
         XCTAssertEqual(readout.subtitle, "Interval Pre-Run • 15 min")
         XCTAssertEqual(
             readout.overview,
-            "In this drill, you will complete a 15-minute neuromuscular wake-up to prime your fast-twitch fibers."
+            "In this drill, you will complete a neuromuscular wake-up to prime your fast-twitch fibers."
         )
         XCTAssertEqual(
             readout.breakdown,
@@ -95,7 +95,7 @@ final class DrillReadoutTests: XCTestCase {
         XCTAssertEqual(readout.subtitle, "Long Run / Zone 2 Pre-Run • 5 min")
         XCTAssertEqual(
             readout.overview,
-            "In this drill, you will complete a 5-minute continuous warm-up to lubricate your joints without burning vital glycogen."
+            "In this drill, you will complete a continuous warm-up to lubricate your joints without burning vital glycogen."
         )
         XCTAssertEqual(
             readout.breakdown,
@@ -146,8 +146,12 @@ final class DrillReadoutTests: XCTestCase {
         for duration in DrillDuration.allCases {
             let readout = DrillReadout.readout(for: .rhythmIntervals, customDuration: duration)
             XCTAssertTrue(
-                readout.overview.contains("\(duration.rawValue)-minute"),
-                "Overview should mention \(duration.rawValue)-minute"
+                readout.subtitle.contains("\(duration.rawValue) min"),
+                "Subtitle should mention \(duration.rawValue) min"
+            )
+            XCTAssertEqual(
+                readout.overview,
+                "In this drill, you will complete a rhythmic tempo tune-up to establish a consistent, economical cadence."
             )
             XCTAssertEqual(readout.durationMinutes, duration.rawValue)
             let totalSeconds = readout.phases.reduce(0) { $0 + $1.durationSeconds }
@@ -163,8 +167,12 @@ final class DrillReadoutTests: XCTestCase {
         for duration in DrillDuration.allCases {
             let readout = DrillReadout.readout(for: .neuromuscularPrimer, customDuration: duration)
             XCTAssertTrue(
-                readout.overview.contains("\(duration.rawValue)-minute"),
-                "Overview should mention \(duration.rawValue)-minute"
+                readout.subtitle.contains("\(duration.rawValue) min"),
+                "Subtitle should mention \(duration.rawValue) min"
+            )
+            XCTAssertEqual(
+                readout.overview,
+                "In this drill, you will complete a quick-step activation to sharpen muscle reaction time and prime your nervous system."
             )
             XCTAssertEqual(readout.durationMinutes, duration.rawValue)
             let totalSeconds = readout.phases.reduce(0) { $0 + $1.durationSeconds }
@@ -189,5 +197,45 @@ final class DrillReadoutTests: XCTestCase {
                 )
             }
         }
+    }
+
+    func testCadencePyramidsReadinessAdaptationDurationCohesion() {
+        let dto = DrillPrescriptionDTO(
+            title: "Cadence Pyramids",
+            preRunDrillId: PreRunDrillId.cadencePyramids.rawValue,
+            purpose: "Rhythm and turnover",
+            targetCadence: "163-169 SPM",
+            previousCadence: 159,
+            durationMinutes: 10
+        )
+        let fatigueAssessment = ReadinessAssessment(
+            state: .acuteFatigue,
+            triggers: [.consecutiveHardDays],
+            acuteLoad: 350.0,
+            chronicWeeklyLoad: 200.0,
+            acwr: 1.75,
+            mileageDropFraction: nil
+        )
+
+        let activeItem = ActiveDrillReadoutItem.adaptive(
+            dto: dto,
+            readiness: fatigueAssessment
+        )
+
+        let readout = activeItem.readout
+        // Phase math: 2m warm-up (120s) + 2 x (30s work + 45s walk = 150s) + 3m cool-down (180s) = 450s = 7m 30s
+        XCTAssertEqual(readout.totalDurationSeconds, 450)
+        XCTAssertEqual(readout.formattedDuration, "7m 30s")
+
+        // Must display mathematically exact 7m 30s in subtitle, NEVER rounding up to 8 min
+        XCTAssertTrue(readout.subtitle.contains("7m 30s"), "Subtitle must contain 7m 30s")
+        XCTAssertFalse(readout.subtitle.contains("8 min"), "Subtitle must never display rounded-up 8 min")
+        // Overview states the drill purpose without redundant duration
+        XCTAssertEqual(
+            readout.overview,
+            "In this drill, you will complete a cadence progression to eliminate overstriding and protect your knees."
+        )
+        XCTAssertFalse(readout.overview.contains("7m 30s"), "Overview must not contain duration")
+        XCTAssertFalse(readout.overview.contains("10-minute"), "Overview must not contain duration")
     }
 }

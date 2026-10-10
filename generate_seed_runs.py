@@ -56,6 +56,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(-5, 2)
             duration_mins = random.gauss(30, 5)
             cadence_cv = random.gauss(0.01, 0.002)
+            hr_cv = random.gauss(0.015, 0.004)
             workout_class = "Recovery Run"
             
         elif archetype == "Easy":
@@ -67,6 +68,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(-2, 2)
             duration_mins = random.gauss(40, 10)
             cadence_cv = random.gauss(0.012, 0.003)
+            hr_cv = random.gauss(0.022, 0.005)
             workout_class = "Easy Run"
             
         elif archetype == "Steady":
@@ -81,6 +83,7 @@ def generate_smooth_seed_data(num_samples=15000):
                 pace_slope = random.gauss(-0.02, 0.04)
                 duration_mins = random.gauss(40, 12)
                 cadence_cv = max(0.005, min(0.022, random.gauss(0.013, 0.003)))  # Rock-solid cadence
+                hr_cv = random.gauss(0.055, 0.008)
             elif steady_mode == "fade":
                 pace_delta = random.gauss(0, 15)
                 hr_delta = random.gauss(5, 5)
@@ -90,6 +93,7 @@ def generate_smooth_seed_data(num_samples=15000):
                 pace_slope = random.gauss(0.375, 0.075)
                 duration_mins = random.gauss(45, 15)
                 cadence_cv = max(0.005, min(0.024, random.gauss(0.015, 0.003)))
+                hr_cv = random.gauss(0.045, 0.008)
             else:
                 pace_delta = random.gauss(0, 12)           # Anchor: baseline pace
                 hr_delta = random.gauss(0, 5)              # Anchor: baseline HR
@@ -99,6 +103,7 @@ def generate_smooth_seed_data(num_samples=15000):
                 pace_slope = random.gauss(0.0, 0.038)
                 duration_mins = random.gauss(45, 15)
                 cadence_cv = max(0.005, min(0.022, random.gauss(0.013, 0.003)))
+                hr_cv = random.gauss(0.028, 0.006)
             workout_class = "Steady Effort"
             
         elif archetype == "Progression":
@@ -110,6 +115,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(5, 2)
             duration_mins = random.gauss(50, 15)
             cadence_cv = max(0.008, min(0.024, random.gauss(0.016, 0.004)))
+            hr_cv = random.gauss(0.065, 0.010)
             workout_class = "Progression Run"
             
         elif archetype == "Tempo":
@@ -121,6 +127,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(10, 2)
             duration_mins = random.gauss(45, 10)       # Tempo runs are sustained, 30-60 min
             cadence_cv = max(0.008, min(0.024, random.gauss(0.014, 0.003)))
+            hr_cv = random.gauss(0.040, 0.008)
             workout_class = "Tempo Run"
             
         elif archetype == "Fartlek":
@@ -132,6 +139,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(6, 3)
             duration_mins = random.gauss(35, 10)
             cadence_cv = max(0.030, min(0.080, random.gauss(0.042, 0.008)))  # Clear cadence variation
+            hr_cv = random.gauss(0.075, 0.012)
             workout_class = "Fartlek"
             
         elif archetype == "Intervals":
@@ -143,6 +151,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(15, 3)
             duration_mins = random.gauss(25, 8)
             cadence_cv = max(0.035, min(0.090, random.gauss(0.048, 0.010)))
+            hr_cv = random.gauss(0.115, 0.018)
             workout_class = "Intervals"
             
         elif archetype == "Progressive Intervals":
@@ -154,6 +163,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(14, 3)
             duration_mins = random.gauss(30, 8)
             cadence_cv = max(0.035, min(0.090, random.gauss(0.048, 0.010)))
+            hr_cv = random.gauss(0.115, 0.018)
             workout_class = "Intervals"
             
         elif archetype == "Rhythm Intervals":
@@ -165,6 +175,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(12, 3)
             duration_mins = random.gauss(15, 4)        # Short drill (10-20 min)
             cadence_cv = max(0.035, min(0.090, random.gauss(0.048, 0.010)))
+            hr_cv = random.gauss(0.110, 0.015)
             workout_class = "Intervals"
             
         elif archetype == "Cadence Pyramids":
@@ -176,6 +187,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(15, 2)        # Extremely high cadence delta
             duration_mins = random.gauss(18, 4)        # Short drill
             cadence_cv = max(0.035, min(0.090, random.gauss(0.052, 0.010)))
+            hr_cv = random.gauss(0.095, 0.015)
             workout_class = "Pyramids"
 
         elif archetype == "Hill Repeats":
@@ -188,6 +200,7 @@ def generate_smooth_seed_data(num_samples=15000):
             duration_mins = random.gauss(22, 6)
             osc = float(max(9.5, min(14.0, random.gauss(base_osc + 2.0, 0.8)))) # High vertical oscillation
             cadence_cv = max(0.020, min(0.060, random.gauss(0.035, 0.008)))
+            hr_cv = random.gauss(0.120, 0.018)
             workout_class = "Hill Repeats"
 
         elif archetype == "Long Run":
@@ -199,6 +212,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(-1, 2)
             duration_mins = random.gauss(105, 15)      # >= 90 mins
             cadence_cv = max(0.008, min(0.022, random.gauss(0.014, 0.003)))
+            hr_cv = random.gauss(0.035, 0.008)
             workout_class = "Long Run"
 
         elif archetype == "Urban Traffic":
@@ -210,6 +224,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(-5, 3)
             duration_mins = random.gauss(35, 10)
             cadence_cv = max(0.045, min(0.120, random.gauss(0.065, 0.015)))
+            hr_cv = random.gauss(0.060, 0.012)
             workout_class = "Urban Traffic"
             
         elif archetype == "Tempo Surges":
@@ -221,6 +236,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(8, 2)
             duration_mins = random.gauss(20, 5)        # Short-medium drill
             cadence_cv = max(0.018, min(0.030, random.gauss(0.024, 0.003)))
+            hr_cv = random.gauss(0.070, 0.012)
             workout_class = "Tempo Run"
             
         elif archetype == "Strides":
@@ -232,6 +248,7 @@ def generate_smooth_seed_data(num_samples=15000):
             cadence_delta = random.gauss(2, 2)
             duration_mins = random.gauss(12, 3)        # Very short drill
             cadence_cv = max(0.040, min(0.100, random.gauss(0.062, 0.012)))
+            hr_cv = random.gauss(0.085, 0.015)
             workout_class = "Intervals"
 
         # Clamp values to realistic human bounds for deltas
@@ -244,6 +261,7 @@ def generate_smooth_seed_data(num_samples=15000):
 
         duration_mins = float(max(5.0, min(180.0, duration_mins)))
         cadence_cv = float(max(0.0, min(0.20, cadence_cv)))
+        hr_cv = float(max(0.005, min(0.25, hr_cv)))
 
         runs.append({
             "paceDelta": pace_delta,
@@ -256,6 +274,7 @@ def generate_smooth_seed_data(num_samples=15000):
             "runnerStage": runner_stage,
             "durationMinutes": duration_mins,
             "cadenceCV": cadence_cv,
+            "hrCV": hr_cv,
             "targetClass": workout_class
         })
 
@@ -271,14 +290,14 @@ def export_v6_dataset():
         df_train.to_csv("CoreML_Training_Data_v6.csv", index=False)
         df_test.to_csv("CoreML_Testing_Data_v6.csv", index=False)
     else:
-        fieldnames = ["paceDelta", "hrDelta", "percentZone4", "cadenceDelta", "verticalOscillation", "cv", "paceSlope", "runnerStage", "durationMinutes", "cadenceCV", "targetClass"]
+        fieldnames = ["paceDelta", "hrDelta", "percentZone4", "cadenceDelta", "verticalOscillation", "cv", "paceSlope", "runnerStage", "durationMinutes", "cadenceCV", "hrCV", "targetClass"]
         for runs, filename in [(train_runs, "CoreML_Training_Data_v6.csv"), (test_runs, "CoreML_Testing_Data_v6.csv")]:
             with open(filename, "w", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(runs)
             
-    print("Generated v6 datasets for all 11 run classifications.")
+    print("Generated v6 datasets with hrCV for all 11 run classifications.")
 
 if __name__ == "__main__":
     export_v6_dataset()

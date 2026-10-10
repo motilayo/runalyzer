@@ -59,15 +59,15 @@ struct MetricDetailExplainer {
 
     static func explainer(for title: String, isWorkoutStats: Bool) -> MetricDetailExplainer {
         switch title.lowercased() {
-        case "vert. osc.", "vertical oscillation":
+        case "bounce", "vert. osc.", "vertical oscillation":
             return MetricDetailExplainer(
-                title: "Vertical Oscillation",
+                title: "Bounce (Vertical Oscillation)",
                 overview: "Measures the upward and downward bounce of your body with each stride, recorded in centimeters.",
                 modeContext: isWorkoutStats
                     ? "Workout Stats: Averages bounce across your whole session from start to finish, including walking pauses."
                     : "Working Stats: Measures bounce only while you are actively running, filtering out pauses and walking to show your true form.",
-                whyItMatters: "Efficiency: Running is about moving forward. Overstriding with an extended knee causes your foot to brake in front of your center of mass, redirecting forward momentum upward into wasted bounce and joint impact.",
-                targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Characteristic of overstriding, increasing braking shock on joints.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
+                whyItMatters: "Efficiency: Running is about moving forward. Reaching your foot too far in front acts like a brake, sending your energy upward into wasted bounce and stress on your joints.",
+                targetRange: "Target Range: Most efficient runners bounce between 6 to 10 cm.\n\n• High Bounce (> 10 cm): Common when reaching too far ahead, increasing impact on knees.\n• Low Bounce (< 6 cm): Can cause fatigue from a flat, shuffling stride, though high bounce is much more common."
             )
         case "avg pace", "pace":
             return MetricDetailExplainer(
@@ -159,15 +159,15 @@ struct MetricDetailExplainer {
                 whyItMatters: "Efficiency: Your stride should open up naturally from pushing behind you, not by reaching your foot too far in front.",
                 targetRange: "Target Range: Usually 1.0 to 1.4 m depending on your height, pace, and cadence.\n\n• Overstriding: Reaching forward acts like a brake and strains your knees.\n• Short Stride: Often means tight hips or not pushing off fully."
             )
-        case "vert. ratio", "vertical ratio":
+        case "bounce ratio", "vert. ratio", "vertical ratio":
             return MetricDetailExplainer(
-                title: "Vertical Ratio",
-                overview: "The percentage of vertical bounce relative to your forward stride length.",
+                title: "Bounce Ratio",
+                overview: "The percentage of upward bounce compared to how far forward you travel with each stride.",
                 modeContext: isWorkoutStats
-                    ? "Workout Stats: Includes walking breaks, which can elevate your vertical ratio."
-                    : "Working Stats: Calculated strictly during active running to benchmark mechanical running economy.",
-                whyItMatters: "Efficiency: Lower is better. A lower vertical ratio means more of your energy propels you forward rather than bouncing up and down.",
-                targetRange: "Target Range: Under 8.0% indicates excellent economy. 8.0%–9.5% is typical. Above 9.5% signals excessive bounce or overstriding."
+                    ? "Workout Stats: Includes walking breaks, which can elevate your bounce ratio."
+                    : "Working Stats: Calculated strictly during active running to check how forward-moving your stride is.",
+                whyItMatters: "Efficiency: Lower is better. A lower percentage means more of your energy pushes you forward instead of bouncing you up and down.",
+                targetRange: "Target Range: Under 8.0% is very efficient. 8.0%–9.5% is typical. Above 9.5% means you are bouncing too high or reaching your foot too far forward."
             )
         case "pace cv", "cv (var)":
             return MetricDetailExplainer(
@@ -305,7 +305,7 @@ struct MetricExplainerSheet: View {
 
     private var isBiomechanicsMetric: Bool {
         let lower = title.lowercased()
-        return lower.contains("osc") || lower.contains("vertical") || lower.contains("stride")
+        return lower.contains("osc") || lower.contains("vertical") || lower.contains("stride") || lower.contains("bounce")
     }
 
     init(title: String, definition: String) {

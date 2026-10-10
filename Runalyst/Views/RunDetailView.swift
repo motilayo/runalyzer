@@ -17,6 +17,23 @@ struct RunDetailView: View {
     @State private var showingClassificationExplainer = false
     @State private var showingDrillExplainer = false
     @State private var isGeneratingInsight = false
+    @State private var showingReadinessMathModal = false
+    @State private var showingAnalystChat = false
+    @State private var showingEnvironmentInfo = false
+
+    private var environmentInfoMessage: String {
+        guard runRecord.isIndoor == true else {
+            return String(localized: "Recorded outdoors with GPS. Pace, distance, and route come directly from your Apple Watch.")
+        }
+        switch runRecord.dataSourceRaw?.lowercased() {
+        case "gymkit":
+            return String(localized: "Recorded on a GymKit-connected treadmill. Speed and distance were synced directly from the machine.")
+        case "footpod":
+            return String(localized: "Recorded on a treadmill with a Bluetooth footpod providing distance and cadence.")
+        default:
+            return String(localized: "Recorded on a treadmill using your Apple Watch wrist sensors. Since the belt sets your speed, coaching focuses on heart rate and cadence rhythm.")
+        }
+    }
 
     private var baselineRuns: [RunRecord] {
         guard let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: runRecord.date) else { return [] }
@@ -105,7 +122,7 @@ struct RunDetailView: View {
     private let classificationOptions = [
         "Steady Effort", "Easy Run", "Tempo Run", "Intervals", "Pyramids",
         "Progression Run", "Recovery Run", "Hill Repeats",
-        "Long Run", "Fartlek", "Urban Traffic"
+        "Long Run", "Fartlek", "Urban Traffic", "Mixed Effort (Review)"
     ]
 
     private var prescribedDrillName: String? {
@@ -208,13 +225,36 @@ struct RunDetailView: View {
 
             if hasBiometrics {
                 aiDisclaimerFooter
+
+                Button {
+                    showingAnalystChat = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                            .font(.caption.bold())
+                        Text("Ask AI Analyst about this run")
+                            .font(.caption.bold())
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.bold())
+                    }
+                    .foregroundColor(.purple)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(8)
+                }
             }
         }
         .frame(minHeight: 1)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         .task {
             if !hasBiometrics, let oldInsight = runRecord.insight {
@@ -327,25 +367,204 @@ struct RunDetailView: View {
                 // Formatted run date header
                 HStack {
                     Text(formattedRunDate)
-                        .font(.subheadline.bold())
-                        .foregroundColor(.primary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.secondary)
 
-                    if let isIndoor = runRecord.isIndoor {
-                        Text(isIndoor ? "Indoor Run" : "Outdoor Run")
-                            .font(.caption2.bold())
-                            .foregroundColor(isIndoor ? .purple : .blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isIndoor ? Color.purple.opacity(0.15) : Color.blue.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
                     Spacer()
+
+                    let isIndoor = runRecord.isIndoor ?? false
+                    HStack(spacing: 4) {
+                        Image(systemName: isIndoor ? "figure.run.square.stack" : "figure.run")
+                            .font(.caption2.bold())
+                        Text(isIndoor ? "Indoor" : "Outdoor")
+                            .font(.caption2.bold())
+                        Image(systemName: "info.circle")
+                            .font(.caption2)
+                            .opacity(0.7)
+                    }
+                    .foregroundColor(isIndoor ? .purple : .blue)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(isIndoor ? Color.purple.opacity(0.12) : Color.blue.opacity(0.12))
+                    .clipShape(Capsule())
+                    .contentShape(Rectangle())
+                    .onTapGesture { showingEnvironmentInfo = true }
+                    .accessibilityAddTraits(.isButton)
+                    .alert(isIndoor ? "Indoor Session" : "Outdoor Session", isPresented: $showingEnvironmentInfo) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text(environmentInfoMessage)
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
 
+                // Incline / Hill Confirmation Banner
+                if runRecord.needsInclineReview == true {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.orange.opacity(0.15))
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: "mountain.2.fill")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.orange)
+                            }
+                            Text("Incline Telemetry Detected")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.primary)
+                        }
+
+                        Text("Cardiovascular strain spiked significantly while pace was flat. Were you running incline intervals on the treadmill?")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: 10) {
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    runRecord.detectedTypeRaw = "Hill Repeats"
+                                    runRecord.needsInclineReview = false
+                                    if !runRecord.framboiseTags.contains("userConfirmedIncline") {
+                                        runRecord.framboiseTags.append("userConfirmedIncline")
+                                    }
+                                    let correction = TrainingCorrection(
+                                        runRecordID: runRecord.id,
+                                        originalLabel: "Steady Effort",
+                                        correctedLabel: "Hill Repeats",
+                                        featureVector: [runRecord.workingAvgPace, runRecord.paceCV, runRecord.paceSlope, runRecord.percentZone4, runRecord.duration / 60.0]
+                                    )
+                                    modelContext.insert(correction)
+                                    try? modelContext.save()
+                                }
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption2.bold())
+                                    Text("Yes, Incline Intervals")
+                                        .font(.caption.bold())
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.orange)
+                                .clipShape(Capsule())
+                            }
+
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    runRecord.needsInclineReview = false
+                                    if !runRecord.framboiseTags.contains("userRejectedIncline") {
+                                        runRecord.framboiseTags.append("userRejectedIncline")
+                                    }
+                                    try? modelContext.save()
+                                }
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "xmark")
+                                        .font(.caption2.bold())
+                                    Text("No, Flat Belt")
+                                        .font(.caption.bold())
+                                }
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color(UIColor.tertiarySystemFill))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(UIColor.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
+                    .padding(.horizontal)
+                }
+
+                // Mixed Effort Review Banner (Only displayed if not already prompting incline)
+                if runRecord.needsInclineReview != true && (runRecord.detectedTypeRaw == "Mixed Effort (Review)" || (runRecord.classificationConfidence ?? 1.0) < 0.75) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.orange.opacity(0.15))
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: "sparkles")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.orange)
+                            }
+                            Text("Classification Needs Review")
+                                .font(.subheadline.bold())
+                            Spacer()
+                            if let conf = runRecord.classificationConfidence {
+                                Text("\(Int(round(conf * 100)))% confidence")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(UIColor.tertiarySystemFill))
+                                    .clipShape(Capsule())
+                            }
+                        }
+
+                        Text("Telemetry showed competing patterns across pace, heart rate, and cadence. Confirm your run style:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        let candidates: [(key: String, value: Double)] = {
+                            if let probs = runRecord.classificationProbabilities, !probs.isEmpty {
+                                return probs.filter { $0.key != "Mixed Effort (Review)" }
+                                    .sorted { $0.value > $1.value }
+                                    .prefix(3)
+                                    .map { (key: $0.key, value: $0.value) }
+                            } else {
+                                return [("Intervals", 0.45), ("Hill Repeats", 0.35), ("Tempo Run", 0.20)]
+                            }
+                        }()
+
+                        HStack(spacing: 8) {
+                            ForEach(candidates, id: \.key) { label, prob in
+                                Button {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                        updateClassification(to: label)
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text(label)
+                                            .font(.caption.bold())
+                                        Text("\(Int(round(prob * 100)))%")
+                                            .font(.caption2)
+                                            .opacity(0.8)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(runRecord.detectedTypeRaw == label ? Color.accentColor : Color(UIColor.tertiarySystemFill))
+                                    .foregroundColor(runRecord.detectedTypeRaw == label ? .white : .primary)
+                                    .clipShape(Capsule())
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(UIColor.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
+                    .padding(.horizontal)
+                }
+
                 // MARK: Run Classification & Drill
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     // Row 1: Classification
                     HStack {
                         HStack(spacing: 5) {
@@ -364,15 +583,35 @@ struct RunDetailView: View {
 
                         Spacer()
 
-                        Picker("Classification", selection: $runRecord.detectedTypeRaw) {
+                        Menu {
                             ForEach(classificationOptions, id: \.self) { option in
-                                Text(option).tag(option)
+                                Button {
+                                    let old = runRecord.detectedTypeRaw
+                                    runRecord.detectedTypeRaw = option
+                                    updateClassification(to: option, from: old)
+                                } label: {
+                                    if option == runRecord.detectedTypeRaw {
+                                        Label(option, systemImage: "checkmark")
+                                    } else {
+                                        Text(option)
+                                    }
+                                }
                             }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(Color(red: 0.05, green: 0.45, blue: 0.5))
-                        .onChange(of: runRecord.detectedTypeRaw) { oldValue, newValue in
-                            updateClassification(to: newValue, from: oldValue)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(runRecord.detectedTypeRaw.isEmpty ? runRecord.normalizedClassification : runRecord.detectedTypeRaw)
+                                    .font(.subheadline.bold())
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.caption2.bold())
+                            }
+                            .foregroundColor(runRecord.detectedTypeRaw == "Mixed Effort (Review)" ? .orange : Color(red: 0.05, green: 0.45, blue: 0.5))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                (runRecord.detectedTypeRaw == "Mixed Effort (Review)" ? Color.orange : Color(red: 0.05, green: 0.45, blue: 0.5))
+                                    .opacity(0.12)
+                            )
+                            .clipShape(Capsule())
                         }
                     }
 
@@ -488,9 +727,22 @@ struct RunDetailView: View {
                     let currentHR = showRawMetrics ? runRecord.rawAvgHeartRate : runRecord.workingAvgHeartRate
                     let currentCadence = showRawMetrics ? runRecord.rawAvgCadence : runRecord.workingAvgCadence
 
-                    StatBox(title: "Avg Pace", value: PaceFormatter.formatPace(secondsPerKilometer: currentPace), unit: "", currentValue: currentPace > 0 ? currentPace : nil, baselineValue: (showRawMetrics || currentPace <= 0) ? nil : baselinePace, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
-                    StatBox(title: "Avg HR", value: currentHR > 0 ? "\(Int(round(currentHR)))" : "--", unit: currentHR > 0 ? "BPM" : "", currentValue: currentHR > 0 ? currentHR : nil, baselineValue: (showRawMetrics || currentHR <= 0) ? nil : baselineHR, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
-                    StatBox(title: "Avg Cadence", value: currentCadence > 0 ? "\(Int(currentCadence))" : "--", unit: currentCadence > 0 ? "SPM" : "", currentValue: currentCadence > 0 ? currentCadence : nil, baselineValue: (showRawMetrics || currentCadence <= 0) ? nil : baselineCadence, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
+                    let paceValue = PaceFormatter.formatPace(secondsPerKilometer: currentPace)
+                    let paceCurrent = currentPace > 0 ? currentPace : nil
+                    let paceBaseline = (showRawMetrics || currentPace <= 0) ? nil : baselinePace
+                    StatBox(title: "Avg Pace", value: paceValue, unit: "", currentValue: paceCurrent, baselineValue: paceBaseline, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+
+                    let hrValue = currentHR > 0 ? "\(Int(round(currentHR)))" : "--"
+                    let hrUnit = currentHR > 0 ? "BPM" : ""
+                    let hrCurrent = currentHR > 0 ? currentHR : nil
+                    let hrBaseline = (showRawMetrics || currentHR <= 0) ? nil : baselineHR
+                    StatBox(title: "Avg HR", value: hrValue, unit: hrUnit, currentValue: hrCurrent, baselineValue: hrBaseline, polarity: .lowerIsBetter, isWorkoutStats: showRawMetrics)
+
+                    let cadValue = currentCadence > 0 ? "\(Int(currentCadence))" : "--"
+                    let cadUnit = currentCadence > 0 ? "SPM" : ""
+                    let cadCurrent = currentCadence > 0 ? currentCadence : nil
+                    let cadBaseline = (showRawMetrics || currentCadence <= 0) ? nil : baselineCadence
+                    StatBox(title: "Avg Cadence", value: cadValue, unit: cadUnit, currentValue: cadCurrent, baselineValue: cadBaseline, polarity: .higherIsBetter, isWorkoutStats: showRawMetrics)
 
                     let currentStride = showRawMetrics ? (runRecord.rawAvgStrideLength ?? runRecord.workingAvgStrideLength) : (runRecord.workingAvgStrideLength ?? runRecord.rawAvgStrideLength)
                     let currentStrideConverted: Double? = {
@@ -501,40 +753,57 @@ struct RunDetailView: View {
                         guard let base = baselineStrideLength, base > 0 else { return nil }
                         return useMetricSystem ? base : (base * 3.28084)
                     }()
-                    StatBox(
-                        title: "Avg Stride",
-                        value: currentStrideConverted.map { String(format: "%.2f", $0) } ?? "--",
-                        unit: currentStride != nil ? (useMetricSystem ? "m" : "ft") : "",
-                        currentValue: currentStrideConverted,
-                        baselineValue: showRawMetrics ? nil : baselineStrideConverted,
-                        polarity: .higherIsBetter,
-                        isWorkoutStats: showRawMetrics
-                    )
+                    if currentStride != nil {
+                        StatBox(
+                            title: "Avg Stride",
+                            value: currentStrideConverted.map { String(format: "%.2f", $0) } ?? "--",
+                            unit: currentStride != nil ? (useMetricSystem ? "m" : "ft") : "",
+                            currentValue: currentStrideConverted,
+                            baselineValue: showRawMetrics ? nil : baselineStrideConverted,
+                            polarity: .higherIsBetter,
+                            isWorkoutStats: showRawMetrics
+                        )
+                    }
 
                     let currentOscillation = showRawMetrics ? (runRecord.rawAvgVerticalOscillation ?? runRecord.workingAvgVerticalOscillation) : (runRecord.workingAvgVerticalOscillation ?? runRecord.rawAvgVerticalOscillation)
-                    StatBox(
-                        title: "Vert. Osc.",
-                        value: currentOscillation.map { String(format: "%.1f", $0) } ?? "--",
-                        unit: currentOscillation != nil ? "cm" : "",
-                        currentValue: currentOscillation,
-                        baselineValue: showRawMetrics ? nil : baselineOscillation,
-                        polarity: .lowerIsBetter,
-                        isWorkoutStats: showRawMetrics
-                    )
+                    if currentOscillation != nil {
+                        StatBox(
+                            title: "Bounce",
+                            value: currentOscillation.map { String(format: "%.1f", $0) } ?? "--",
+                            unit: currentOscillation != nil ? "cm" : "",
+                            currentValue: currentOscillation,
+                            baselineValue: showRawMetrics ? nil : baselineOscillation,
+                            polarity: .lowerIsBetter,
+                            isWorkoutStats: showRawMetrics
+                        )
+                    }
 
                     let currentVR = runRecord.verticalRatio
-                    StatBox(
-                        title: "Vert. Ratio",
-                        value: currentVR.map { String(format: "%.1f", $0) } ?? "--",
-                        unit: currentVR != nil ? "%" : "",
-                        currentValue: currentVR,
-                        baselineValue: showRawMetrics ? nil : baselineVerticalRatio,
-                        polarity: .lowerIsBetter,
-                        isWorkoutStats: showRawMetrics
-                    )
+                    if currentVR != nil {
+                        StatBox(
+                            title: "Bounce Ratio",
+                            value: currentVR.map { String(format: "%.1f", $0) } ?? "--",
+                            unit: currentVR != nil ? "%" : "",
+                            currentValue: currentVR,
+                            baselineValue: showRawMetrics ? nil : baselineVerticalRatio,
+                            polarity: .lowerIsBetter,
+                            isWorkoutStats: showRawMetrics
+                        )
+                    }
                 }
                 .padding(.horizontal)
                 .id("metricsGrid")
+
+                // MARK: Workout Rhythm & Intervals (Working Stats)
+                if !showRawMetrics, let segments = runRecord.signature?.phaseSegments, !segments.isEmpty {
+                    RunVarianceMapView(
+                        phaseSegments: segments,
+                        cadenceFloor: runRecord.signature?.cadenceFloor ?? 150.0,
+                        averageCadence: runRecord.workingAvgCadence,
+                        workoutDuration: runRecord.duration
+                    )
+                    .padding(.horizontal)
+                }
 
                 // MARK: Drills Section
                 let isOlderThan7Days = (Calendar.current.dateComponents([.day], from: runRecord.date, to: Date()).day ?? 0) > 7
@@ -578,7 +847,12 @@ struct RunDetailView: View {
                         }
                         .padding()
                         .background(Color(UIColor.secondarySystemGroupedBackground))
-                        .cornerRadius(20)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+                        )
+                        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
@@ -624,6 +898,16 @@ struct RunDetailView: View {
 
             .task(id: runRecord.id) {
                 guard !runRecord.isDeleted, runRecord.modelContext != nil else { return }
+
+                if runRecord.isIndoor == nil {
+                    runRecord.isIndoor = (runRecord.dataSourceRaw == "gymkit") ? true : false
+                    try? modelContext.save()
+                }
+                if runRecord.detectedTypeRaw.isEmpty {
+                    runRecord.detectedTypeRaw = runRecord.normalizedClassification
+                    try? modelContext.save()
+                }
+
                 // Auto-resolve or reconcile drill recognition against authentic HealthKit workout metadata / scheduled intent
                 // ONLY if the run has NO drill assigned yet and user hasn't manually linked or unlinked one
                 if prescribedDrillName == nil && !runRecord.framboiseTags.contains("userLinkedDrill") && !runRecord.framboiseTags.contains("userUnlinkedDrill") {
@@ -679,6 +963,22 @@ struct RunDetailView: View {
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Run Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingAnalystChat = true
+                } label: {
+                    Label("Ask Coach", systemImage: "bubble.left.and.text.bubble.right.fill")
+                        .foregroundColor(.purple)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAnalystChat) {
+            AnalystChatView(runRecord: runRecord)
+        }
+        .sheet(isPresented: $showingReadinessMathModal) {
+            ReadinessMathModal()
+        }
         .onAppear {
             normalizeDrillClassification()
         }
@@ -760,7 +1060,12 @@ struct StatBox: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
         .contentShape(Rectangle())
         .onTapGesture { showingInfo = true }
         .sheet(isPresented: $showingInfo) {
@@ -868,11 +1173,11 @@ private struct DrillCardView: View {
     let drillIndex: Int
     let totalDrills: Int
     @Binding var activeCardIndex: Int
+    @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var isShowingWorkoutPreview = false
     @State private var activeWorkoutPlan: WorkoutPlan = PreRunDrill(id: .strides).buildWorkoutPlan()
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeReadoutItem: ActiveDrillReadoutItem?
-    @State private var showingTargetExplainer = false
     @AppStorage("lastWatchExportTimestamp") private var lastWatchExportTimestamp: Double = 0
     @AppStorage("lastExportedDrillId") private var lastExportedDrillId: String = ""
 
@@ -901,23 +1206,42 @@ private struct DrillCardView: View {
         return drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
     }
 
-    private var preRunDrill: PreRunDrill {
-        PreRunDrill(id: resolvedPreRunId, previousCadence: drill.previousCadence, targetCadence: targetCadenceString)
+    private var readinessAssessment: ReadinessAssessment {
+        ReadinessEvaluator.assess(runRecords: runRecords)
+    }
+
+    private var effectivePreRunDrill: PreRunDrill {
+        let readiness = readinessAssessment
+        let adapted = ReadinessModifier.adaptTarget(
+            targetCadenceString,
+            baselineCadence: drill.previousCadence,
+            drillId: resolvedPreRunId,
+            state: readiness.state
+        )
+        return PreRunDrill(
+            id: resolvedPreRunId,
+            previousCadence: drill.previousCadence,
+            targetCadence: adapted.targetCadence,
+            readinessState: readiness.state
+        )
     }
 
     var body: some View {
+        let readiness = readinessAssessment
         let preRunId = resolvedPreRunId
         let template = DrillTemplate.template(for: preRunId)
         let displayTitle = drill.formattedTitle.isEmpty ? template.title : drill.formattedTitle
-        let work = (drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork
-        let recovery = (drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery
+        let currentDrill = effectivePreRunDrill
+        let isAdapted = readiness.state.applies(to: preRunId)
+        let work = isAdapted ? currentDrill.defaultWorkString : ((drill.drillWork?.isEmpty == false ? drill.drillWork : nil) ?? template.defaultWork)
+        let recovery = (isAdapted && readiness.state == .deload) ? currentDrill.defaultRecoveryString : ((drill.drillRecovery?.isEmpty == false ? drill.drillRecovery : nil) ?? template.defaultRecovery)
         let effort = (drill.drillEffort?.isEmpty == false ? drill.drillEffort : nil) ?? template.defaultEffort
         let purpose = (drill.drillPurpose?.isEmpty == false ? drill.drillPurpose : nil) ?? template.defaultPurpose
         let cue: String? = {
             if let cueText = drill.drillCues, !cueText.isEmpty, !cueText.localizedCaseInsensitiveContains("spm") {
                 return cueText
             }
-            let targetInt = drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
+            let targetInt = currentDrill.computedCadence ?? drill.targetCadence?.replacingOccurrences(of: " SPM", with: "") ?? template.calculateTargetCadence(drill.previousCadence ?? 155)
             let generated = template.generateInstructionalCue(targetInt)
             return generated.isEmpty ? nil : generated
         }()
@@ -973,8 +1297,7 @@ private struct DrillCardView: View {
                     Text(displayTitle)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    let drillId = PreRunDrillId(rawValue: drill.preRunDrillId ?? "") ?? .strides
-                    Text("\(PreRunDrill(id: drillId).duration.title) drill")
+                    Text("\(currentDrill.duration.title) drill")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -1008,23 +1331,17 @@ private struct DrillCardView: View {
             }
 
             if let cue = cue, !cue.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(cue)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                DrillCoachingCueBox(cue: cue)
             }
 
             let isZone1 = preRunId == .aerobicFlush || preRunId == .recoveryJog
             let isZone2 = preRunId == .zone2Run
+            let targetExplainerTitle: String? = {
+                if isZone1 { return "Zone 1 Heart Rate" }
+                if isZone2 { return "Zone 2 Heart Rate" }
+                if drill.targetCadence?.isEmpty == false { return "Target Cadence" }
+                return nil
+            }()
             let targetText: String? = {
                 if isZone1 {
                     return "Target: Zone 1 HR"
@@ -1032,10 +1349,11 @@ private struct DrillCardView: View {
                 if isZone2 {
                     return "Target: Zone 2 HR"
                 }
-                if let target = drill.targetCadence, !target.isEmpty {
-                    let formattedTarget = target.contains("SPM") ? target : "\(target) SPM"
+                let targetCadenceValue = currentDrill.computedCadence ?? drill.targetCadence ?? ""
+                if !targetCadenceValue.isEmpty {
+                    let formattedTarget = targetCadenceValue.contains("SPM") ? targetCadenceValue : "\(targetCadenceValue) SPM"
                     if let prev = drill.previousCadence {
-                        return "Target: \(formattedTarget) (Previous: \(prev) SPM)"
+                        return isAdapted ? "Target: \(formattedTarget) (Adapted)" : "Target: \(formattedTarget) (Previous: \(prev) SPM)"
                     } else {
                         return "Target: \(formattedTarget)"
                     }
@@ -1043,36 +1361,13 @@ private struct DrillCardView: View {
                 return nil
             }()
 
-            if let targetString = targetText {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
+            DrillPrescriptionPanel(
+                targetText: targetText,
+                targetExplainerTitle: targetExplainerTitle,
+                runRecords: runRecords
+            )
 
-                    Text(targetString)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    showingTargetExplainer = true
-                }
-                .sheet(isPresented: $showingTargetExplainer) {
-                    let explainerTitle: String = {
-                        if isZone1 { return "Zone 1 Heart Rate" }
-                        if isZone2 { return "Zone 2 Heart Rate" }
-                        return "Target Cadence"
-                    }()
-                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
-                    MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
-                }
-            }
-
-            WorkoutPhaseTimelineView(phases: preRunDrill.generatePhases())
+            WorkoutPhaseTimelineView(phases: currentDrill.generatePhases())
 
             HStack(spacing: 12) {
                 Button(action: {
@@ -1109,14 +1404,15 @@ private struct DrillCardView: View {
             }
             .padding(.top, 4)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            openDrillReadout(displayTitle: displayTitle, coachingCue: cue)
-        }
         .frame(maxWidth: .infinity, minHeight: 1)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(20)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         .sheet(item: $activeReadoutItem) { item in
             DrillInterstitialReadoutView(
                 readout: item.readout,
@@ -1145,8 +1441,7 @@ private struct DrillCardView: View {
     private func openDrillReadout(displayTitle: String, coachingCue: String?) {
         let currentPreRunId = resolvedPreRunId
         let currentTargetCadence = targetCadenceString
-        let currentDrill = preRunDrill
-        let plan = currentDrill.buildWorkoutPlan()
+        let currentDrill = effectivePreRunDrill
         let dto = DrillPrescriptionDTO(
             title: displayTitle,
             preRunDrillId: currentPreRunId.rawValue,
@@ -1155,15 +1450,12 @@ private struct DrillCardView: View {
             previousCadence: drill.previousCadence,
             durationMinutes: currentDrill.duration.rawValue
         )
-        let readout = DrillReadout.readout(
-            for: currentPreRunId,
-            customTitle: displayTitle,
-            targetCadence: currentTargetCadence,
-            previousCadence: drill.previousCadence,
-            customDuration: currentDrill.duration,
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        activeReadoutItem = ActiveDrillReadoutItem.adaptive(
+            dto: dto,
+            readiness: readiness,
             customCoachingTip: coachingCue
         )
-        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
     }
 
     private func scheduleToWatch(dto: DrillPrescriptionDTO) {
@@ -1183,6 +1475,7 @@ private struct DrillCardView: View {
             }
         }
     }
+
 }
 
 enum DrillAdherenceTier {
@@ -1200,6 +1493,18 @@ enum DrillAdherenceTier {
         }
     }
 
+    func badgeText(for drillId: PreRunDrillId) -> String {
+        if drillId.isHeartRateTargeted {
+            switch self {
+            case .exceeded: return "Optimal"
+            case .met: return "Target Met"
+            case .partiallyMet: return "Partially Met"
+            case .notMet: return "Not Met"
+            }
+        }
+        return badgeText
+    }
+
     var badgeIcon: String {
         switch self {
         case .exceeded: return "star.fill"
@@ -1207,6 +1512,18 @@ enum DrillAdherenceTier {
         case .partiallyMet: return "minus"
         case .notMet: return "xmark"
         }
+    }
+
+    func badgeIcon(for drillId: PreRunDrillId) -> String {
+        if drillId.isHeartRateTargeted {
+            switch self {
+            case .exceeded: return "checkmark.seal.fill"
+            case .met: return "checkmark"
+            case .partiallyMet: return "minus"
+            case .notMet: return "xmark"
+            }
+        }
+        return badgeIcon
     }
 
     var tintColor: Color {
@@ -1392,9 +1709,9 @@ struct DrillExecutionScorecard: View {
                     .foregroundColor(.primary)
                 Spacer()
                 HStack(spacing: 4) {
-                    Image(systemName: tier.badgeIcon)
+                    Image(systemName: tier.badgeIcon(for: drillId))
                         .font(.caption2.bold())
-                    Text(tier.badgeText)
+                    Text(tier.badgeText(for: drillId))
                         .font(.caption.bold())
                 }
                 .padding(.horizontal, 10)
@@ -1612,13 +1929,14 @@ struct DrillExecutionScorecard: View {
             .background(tier.tintColor.opacity(0.08))
             .cornerRadius(8)
         }
-        .padding(14)
+        .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(14)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(drillId.iconColor.opacity(0.2), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
     }
 
     @ViewBuilder

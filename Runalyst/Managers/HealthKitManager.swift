@@ -44,6 +44,75 @@ struct RunRecordDTO: Sendable {
     let percentZone4: Double
     let detectedTypeRaw: String
     let framboiseTags: [String]
+    let dataSourceRaw: String?
+    let classificationConfidence: Double?
+    let classificationProbabilitiesData: Data?
+    let hrCV: Double?
+    let cadenceSlope: Double?
+    let needsInclineReview: Bool?
+    let runSignatureData: Data?
+
+    init(
+        hkWorkoutID: UUID,
+        date: Date,
+        totalDistanceMeters: Double,
+        duration: TimeInterval,
+        rawAvgPace: Double,
+        rawAvgHeartRate: Double,
+        rawAvgCadence: Double,
+        workingAvgPace: Double,
+        workingAvgCadence: Double,
+        workingAvgHeartRate: Double,
+        rawAvgVerticalOscillation: Double? = nil,
+        workingAvgVerticalOscillation: Double? = nil,
+        rawAvgStrideLength: Double? = nil,
+        workingAvgStrideLength: Double? = nil,
+        workingDistanceMeters: Double? = nil,
+        workingDurationSeconds: Double? = nil,
+        isIndoor: Bool? = nil,
+        paceCV: Double,
+        paceSlope: Double,
+        percentZone4: Double,
+        detectedTypeRaw: String,
+        framboiseTags: [String] = [],
+        dataSourceRaw: String? = nil,
+        classificationConfidence: Double? = nil,
+        classificationProbabilitiesData: Data? = nil,
+        hrCV: Double? = nil,
+        cadenceSlope: Double? = nil,
+        needsInclineReview: Bool? = nil,
+        runSignatureData: Data? = nil
+    ) {
+        self.hkWorkoutID = hkWorkoutID
+        self.date = date
+        self.totalDistanceMeters = totalDistanceMeters
+        self.duration = duration
+        self.rawAvgPace = rawAvgPace
+        self.rawAvgHeartRate = rawAvgHeartRate
+        self.rawAvgCadence = rawAvgCadence
+        self.workingAvgPace = workingAvgPace
+        self.workingAvgCadence = workingAvgCadence
+        self.workingAvgHeartRate = workingAvgHeartRate
+        self.rawAvgVerticalOscillation = rawAvgVerticalOscillation
+        self.workingAvgVerticalOscillation = workingAvgVerticalOscillation
+        self.rawAvgStrideLength = rawAvgStrideLength
+        self.workingAvgStrideLength = workingAvgStrideLength
+        self.workingDistanceMeters = workingDistanceMeters
+        self.workingDurationSeconds = workingDurationSeconds
+        self.isIndoor = isIndoor
+        self.paceCV = paceCV
+        self.paceSlope = paceSlope
+        self.percentZone4 = percentZone4
+        self.detectedTypeRaw = detectedTypeRaw
+        self.framboiseTags = framboiseTags
+        self.dataSourceRaw = dataSourceRaw
+        self.classificationConfidence = classificationConfidence
+        self.classificationProbabilitiesData = classificationProbabilitiesData
+        self.hrCV = hrCV
+        self.cadenceSlope = cadenceSlope
+        self.needsInclineReview = needsInclineReview
+        self.runSignatureData = runSignatureData
+    }
 }
 
 @MainActor
@@ -79,7 +148,8 @@ class HealthKitManager: ObservableObject {
             .runningVerticalOscillation,
             .vo2Max,
             .runningGroundContactTime,
-            .runningStrideLength
+            .runningStrideLength,
+            .runningPower
         ]
         var types: Set<HKObjectType> = [HKObjectType.workoutType()]
         for identifier in quantityIdentifiers {
@@ -440,9 +510,42 @@ struct RunBaselineData: Sendable {
         } else {
             rawAvgStride = nil
         }
-        let isIndoor = workout.metadata?[HKMetadataKeyIndoorWorkout] as? Bool
+        let isIndoorMetadata: Bool? = {
+            if let num = workout.metadata?[HKMetadataKeyIndoorWorkout] as? NSNumber {
+                return num.boolValue
+            }
+            if let b = workout.metadata?[HKMetadataKeyIndoorWorkout] as? Bool {
+                return b
+            }
+            if let num = workout.metadata?["HKIndoorWorkout"] as? NSNumber {
+                return num.boolValue
+            }
+            if let b = workout.metadata?["HKIndoorWorkout"] as? Bool {
+                return b
+            }
+            return nil
+        }()
+        let isGymKitMachine = (workout.metadata?[HKMetadataKeyFitnessMachineDuration] != nil) ||
+            (workout.device?.manufacturer?.localizedCaseInsensitiveContains("GymKit") == true)
+        let isIndoor = isIndoorMetadata ?? (isGymKitMachine ? true : false)
+        let hasFootpod = isIndoor && ((rawAvgStride ?? 0) > 0 || (rawAvgOscillation ?? 0) > 0)
+        let dataSource: String
+        if isGymKitMachine {
+            dataSource = "gymkit"
+        } else if hasFootpod {
+            dataSource = "footpod"
+        } else if isIndoor {
+            dataSource = "wrist"
+        } else {
+            dataSource = "wrist"
+        }
 
-        let buckets = try await fetchBucketedSamples(for: workout)
+        let rawBuckets = try await fetchBucketedSamples(for: workout)
+        // If indoor and uncalibrated wrist accelerometer, apply defensive pace smoothing
+        let buckets = (isIndoor && !isGymKitMachine)
+            ? await engine.applyIndoorWristPaceSmoothing(buckets: rawBuckets)
+            : rawBuckets
+
         let trimmed = await engine.trimDeadStops(buckets: buckets)
         let (workingPace, workingCadence, workingHR, workingOscillation, workingDistance, workingDuration, workingStride) = await engine.calculateWorkingAverages(
             trimmed: trimmed,
@@ -464,6 +567,8 @@ struct RunBaselineData: Sendable {
         let cv = await engine.calculatePaceCV(bucketPaces: paces)
         let slope = await engine.calculatePaceSlope(bucketPaces: paces)
         let cadenceCV = await engine.calculateCadenceCV(bucketCadences: cadences)
+        let hrCV = await engine.calculateHRCV(bucketHRs: hrs)
+        let cadenceSlope = await engine.calculateCadenceSlope(bucketCadences: cadences)
 
         var dynamicZone4Threshold: Double = 161.5
         var dynamicZone2Threshold: Double = 142.0
@@ -566,12 +671,21 @@ struct RunBaselineData: Sendable {
         )
 
         let classification: String
+        var classificationResult: ClassificationResult?
         let modelManager = ModelManager()
 
         if let matchedDrill = matchedDrillIntent {
-            classification = PreRunDrillId.correspondingClassification(for: matchedDrill.drillTitle)
+            let matchedClass = PreRunDrillId.correspondingClassification(for: matchedDrill.drillTitle)
                 ?? PreRunDrillId.correspondingClassification(for: matchedDrill.preRunDrillId ?? "")
                 ?? "Intervals"
+            classification = matchedClass
+            classificationResult = ClassificationResult(
+                targetClass: matchedClass,
+                confidence: 1.0,
+                probabilities: [matchedClass: 1.0],
+                isReviewRequired: false,
+                needsInclineReview: false
+            )
         } else if !validPriorRuns.isEmpty {
             let aerobicPriorRuns = validPriorRuns.filter { !($0.duration < 1200 && $0.isPrescribedDrill) }
 
@@ -606,7 +720,7 @@ struct RunBaselineData: Sendable {
                 calculatedStage = 0
             }
 
-            classification = await modelManager.predictRunType(
+            let result = await modelManager.predictRunTypeResult(
                 buckets: overlappingWindows,
                 paceDelta: currentPace - baselinePace,
                 hrDelta: currentHR - baselineHR,
@@ -618,11 +732,17 @@ struct RunBaselineData: Sendable {
                 slope: slope,
                 durationMinutes: duration / 60.0,
                 cadenceCV: cadenceCV,
+                hrCV: hrCV,
+                cadenceSlope: cadenceSlope,
+                isIndoor: isIndoor,
+                isGymKit: isGymKitMachine,
                 rawAverageHR: currentHR
             )
+            classificationResult = result
+            classification = result.targetClass
         } else {
             let framboise = FramboiseEngine()
-            classification = await framboise.classifyRun(
+            let fallbackClass = await framboise.classifyRun(
                 buckets: overlappingWindows,
                 cv: cv,
                 slope: slope,
@@ -631,8 +751,16 @@ struct RunBaselineData: Sendable {
                 cadenceCV: cadenceCV,
                 averageHR: currentHR
             )
+            classification = fallbackClass
+            classificationResult = ClassificationResult(
+                targetClass: fallbackClass,
+                confidence: 0.85,
+                probabilities: [fallbackClass: 0.85],
+                isReviewRequired: false,
+                needsInclineReview: false
+            )
         }
-        var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count)
+        var tags = await engine.generateFramboiseTags(cv: cv, slope: slope, deadStopsCount: buckets.count - trimmed.count, buckets: trimmed)
         if let matchedDrill = matchedDrillIntent {
             WorkoutBridge.markIntentMatched(workoutID: workout.uuid, drillTitle: matchedDrill.drillTitle, workoutDate: workout.startDate)
 
@@ -677,6 +805,23 @@ struct RunBaselineData: Sendable {
             }
         }
 
+        // Build and persist RunSignature for Workout Rhythm and RAG Analyst Chat
+        let phaseSegments = await engine.generatePhaseSegments(from: trimmed, cadenceFloor: 150.0)
+        let anomalies: [String] = (cv > 0.12 ? ["High Pace Variability"] : []) + (hrCV > 0.10 ? ["High Cardiac Strain"] : [])
+        let signature = RunSignature(
+            classification: classification,
+            confidence: classificationResult?.confidence ?? 0.85,
+            probabilities: classificationResult?.probabilities ?? [classification: 0.85],
+            anomalies: anomalies,
+            cadenceFloor: 150.0,
+            phaseSegments: phaseSegments,
+            dataSource: dataSource,
+            isIndoor: isIndoor,
+            needsInclineReview: classificationResult?.needsInclineReview ?? false
+        )
+        let signatureData = try? JSONEncoder().encode(signature)
+        let probData = classificationResult.flatMap { try? JSONEncoder().encode($0.probabilities) }
+
         return RunRecordDTO(
             hkWorkoutID: workout.uuid,
             date: workout.startDate,
@@ -699,7 +844,14 @@ struct RunBaselineData: Sendable {
             paceSlope: slope,
             percentZone4: zone4,
             detectedTypeRaw: classification,
-            framboiseTags: tags
+            framboiseTags: tags,
+            dataSourceRaw: dataSource,
+            classificationConfidence: classificationResult?.confidence,
+            classificationProbabilitiesData: probData,
+            hrCV: hrCV,
+            cadenceSlope: cadenceSlope,
+            needsInclineReview: classificationResult?.needsInclineReview,
+            runSignatureData: signatureData
         )
     }
 
@@ -757,6 +909,13 @@ struct RunBaselineData: Sendable {
         record.workingDistanceMeters = dto.workingDistanceMeters
         record.workingDurationSeconds = dto.workingDurationSeconds
         record.isIndoor = dto.isIndoor
+        record.dataSourceRaw = dto.dataSourceRaw
+        record.classificationConfidence = dto.classificationConfidence
+        record.classificationProbabilitiesData = dto.classificationProbabilitiesData
+        record.hrCV = dto.hrCV
+        record.cadenceSlope = dto.cadenceSlope
+        record.needsInclineReview = dto.needsInclineReview
+        record.runSignatureData = dto.runSignatureData
         record.rawAvgVerticalOscillation = dto.rawAvgVerticalOscillation
         record.workingAvgVerticalOscillation = dto.workingAvgVerticalOscillation
         record.rawAvgStrideLength = dto.rawAvgStrideLength

@@ -360,12 +360,14 @@ final class WorkoutBridge {
         let preRunId = PreRunDrillId(rawValue: dto.preRunDrillId ?? "") ?? .strides
         let duration = DrillDuration(rawValue: dto.durationMinutes ?? 15) ?? .fifteenMinutes
         let haptic = HapticFeedbackMode(rawValue: dto.hapticMode ?? "") ?? .on
+        let readiness = ReadinessState(rawValue: dto.readinessState ?? "") ?? .productive
         let drill = PreRunDrill(
             id: preRunId,
             previousCadence: dto.previousCadence,
             targetCadence: dto.targetCadence,
             duration: duration,
-            hapticMode: haptic
+            hapticMode: haptic,
+            readinessState: readiness
         )
         let plan = drill.buildWorkoutPlan()
 

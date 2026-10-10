@@ -41,6 +41,7 @@ struct RunDataForAI: Sendable {
     let slopeContext: String
     let intervalCadence: String
     let recoveryCadence: String
+    let isIndoor: Bool
 
     init(
         workoutType: String = "Steady Effort",
@@ -53,7 +54,8 @@ struct RunDataForAI: Sendable {
         cvContext: String,
         slopeContext: String,
         intervalCadence: String,
-        recoveryCadence: String
+        recoveryCadence: String,
+        isIndoor: Bool = false
     ) {
         self.workoutType = workoutType
         self.runnerGoal = runnerGoal
@@ -66,6 +68,7 @@ struct RunDataForAI: Sendable {
         self.slopeContext = slopeContext
         self.intervalCadence = intervalCadence
         self.recoveryCadence = recoveryCadence
+        self.isIndoor = isIndoor
     }
 }
 
@@ -191,14 +194,16 @@ class CoachingEngine {
         let language = Locale.current.language.languageCode?.identifier ?? "en"
 
         let instructions = """
-        You are an encouraging, insightful running coach speaking directly to the athlete using "you" and "your".
+        You possess the Mind of an Analyst and the Voice of a Coach.
+        Objectively analyze telemetry to assess mechanical efficiency and biological cost (The Mind),
+        and translate those findings into conversational, empathetic biomechanical cues speaking directly to the athlete using "you" and "your" (The Voice).
 
-        Your goal is to translate their workout metrics and baseline trends into conversational coaching:
-        1. Commend where they showed improvement or consistency (e.g. cadence rhythm, aerobic efficiency, or pacing control).
-        2. Highlight where there is room for improvement (e.g. cadence drop under fatigue, cardiac strain, or pacing decay).
-        3. Recommend a targeted pre-run drill to help them progress toward their goal.
-
-        Speak naturally and warmly like an experienced human coach. Keep the observation to a fluid, cohesive 2–3 sentences.
+        Strict coaching rules:
+        1. Commend genuine aerobic or mechanical improvements. Follow the DIRECTIVE for cadence: if marked BELOW the 150 SPM floor, NEVER praise turnover or form precision; instead, critique the slow turnover and instruct the runner to lighten their foot strike. If marked above floor, never claim it is below floor.
+        2. Highlight where form or efficiency has room to grow according to the directive and telemetry (e.g. overstriding, high vertical bounce, cardiac drift, or stride collapse).
+        3. Never praise treadmill runners for "perfect pacing consistency" (the belt enforced it); evaluate biological cost and turnover stability instead.
+        4. Recommend a targeted pre-run drill following the directive.
+        5. Speak warmly and naturally like an experienced personal coach in 2–3 cohesive sentences. Zero numbers or digits in the observation.
         Respond entirely in \(language).
         """
 
@@ -215,6 +220,7 @@ class CoachingEngine {
         Speak directly using "you" and "your"
         [RUN_DATA_START]
         WORKOUT_TYPE: {{WORKOUT_TYPE}}
+        ENVIRONMENT: {{ENVIRONMENT}}
         RUNNER_GOAL: {{RUNNER_GOAL}}
         DIRECTIVE: {{DIRECTIVE_CONTEXT}}
         TARGET_DRILL_CADENCES:
@@ -239,6 +245,7 @@ class CoachingEngine {
         """
 
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{WORKOUT_TYPE}}", with: runData.workoutType)
+        promptTemplate = promptTemplate.replacingOccurrences(of: "{{ENVIRONMENT}}", with: runData.isIndoor ? "Indoor Treadmill" : "Outdoor")
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RUNNER_GOAL}}", with: runData.runnerGoal)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{INTERVAL_CADENCE}}", with: runData.intervalCadence)
         promptTemplate = promptTemplate.replacingOccurrences(of: "{{RECOVERY_CADENCE}}", with: runData.recoveryCadence)
@@ -590,9 +597,12 @@ actor RunAnalyzerActor {
 
         if let base = baseline {
             let cadenceDelta = run.workingAvgCadence - base.avgCadence
-            let isCadenceImproved = cadenceDelta >= 0 || run.workingAvgCadence >= 170
+            let isSubFloor = run.workingAvgCadence < 150.0
+            let isCadenceImproved = (cadenceDelta >= 0 || run.workingAvgCadence >= 170) && !isSubFloor
             let cadenceSummary: String
-            if isCadenceImproved {
+            if isSubFloor {
+                cadenceSummary = "Cadence was \(Int(run.workingAvgCadence)) SPM (BELOW the 150 SPM floor). Turnover is slow with prolonged ground contact; DO NOT praise form or turnover precision."
+            } else if isCadenceImproved {
                 if run.workingAvgCadence >= 170 && cadenceDelta < 0 {
                     cadenceSummary = "Cadence averaged an optimal \(Int(run.workingAvgCadence)) SPM, maintaining strong turnover above the 170 SPM efficiency zone despite a slight drop."
                 } else if cadenceDelta > 0 {
@@ -663,7 +673,22 @@ actor RunAnalyzerActor {
             let isTrueOverstriding = (run.workingAvgCadence < 155 && (currentVR ?? 0) > 9.5) ||
                                      ((currentOscVal ?? 0) > 10.0 && strideDeltaPercent > 0.05)
 
-            if paceDiff < 0 && hrDelta > 0 {
+            let isIndoorRun = run.isIndoor ?? false
+
+            if isIndoorRun {
+                // Treadmill Pace Strain vs Efficiency & Cardiac Drift Tolerance:
+                // Belt locks pace. Do not praise pacing consistency. Evaluate biological cost.
+                let indoorDriftTolerance = 8.0 // +8 BPM acceptable thermoregulatory drift without ambient breeze
+                if cadenceDelta < -2 && hrDelta > indoorDriftTolerance {
+                    directiveContext = "Indoor run: Cadence dropped while heart rate spiked. Caution the runner against overstriding or reaching forward to keep pace with the treadmill belt. Prescribe Cadence Pyramids to restore light turnover underneath hips." + goalSuffix
+                } else if abs(cadenceDelta) <= 2 && hrDelta <= indoorDriftTolerance {
+                    directiveContext = "Indoor run: The runner maintained smooth cadence rhythm and cardiovascular stability on the treadmill. Applaud mechanical turnover efficiency without attributing pacing consistency to outdoor effort." + goalSuffix
+                } else if hrDelta > indoorDriftTolerance && abs(cadenceDelta) <= 2 {
+                    directiveContext = "Indoor run: Heart rate drifted upward due to indoor thermoregulation while turnover held steady. Acknowledge thermal drift and prescribe an easy recovery or cadence flush drill." + goalSuffix
+                } else {
+                    directiveContext = "Indoor run: Evaluate treadmill running economy and turnover stability." + goalSuffix
+                }
+            } else if paceDiff < 0 && hrDelta > 0 {
                 // GUARDRAIL: fatigue detected — Swift overrides goal with recovery priority
                 directiveContext = "The runner was slower and had a higher heart rate than baseline, indicating fatigue. PRIORITY: prescribe Easy Aerobic Recovery and HR control. Recovery overrides any race goal."
             } else if abs(cadenceDelta) <= 2 && paceDiff < -15 && strideDeltaPercent < -0.08 {
@@ -671,7 +696,8 @@ actor RunAnalyzerActor {
                 directiveContext = "The runner shows mechanical stride collapse (stride compressed by \(Int(abs(strideDeltaPercent * 100)))% despite steady turnover). Prescribe a Form drill to reinforce hip extension and posture under fatigue." + goalSuffix
             } else if isTrueOverstriding {
                 let vrText = currentVR.map { String(format: "%.1f", $0) } ?? "high"
-                directiveContext = "The runner shows high vertical bounce relative to stride length (VR: \(vrText)%), indicating overstriding and braking forces. Prescribe Cadence Pyramids or Rhythm Intervals to quicken turnover." + goalSuffix
+                let subFloorNote = run.workingAvgCadence < 150 ? " (cadence is \(Int(run.workingAvgCadence)) SPM, below 150 SPM floor; DO NOT praise form precision)" : ""
+                directiveContext = "The runner shows high vertical bounce relative to stride length (VR: \(vrText)%)\(subFloorNote), indicating overstriding and braking forces. Prescribe Cadence Pyramids or Rhythm Intervals to quicken turnover." + goalSuffix
             } else if paceDiff > 0 && hrDelta < 0 {
                 let accelReason: String
                 if cadenceDelta > 4 && strideDelta <= 0.03 {
@@ -684,13 +710,19 @@ actor RunAnalyzerActor {
                 }
                 directiveContext = "The runner was faster with a lower heart rate, indicating strong fitness improvements (\(accelReason)). Praise performance and prescribe an optional Speed or Tempo drill." + goalSuffix
             } else {
-                directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill." + goalSuffix
+                if run.workingAvgCadence < 150 {
+                    directiveContext = "The runner's cadence of \(Int(run.workingAvgCadence)) SPM is below the 150 SPM floor. Caution against heavy ground impact and prescribe Cadence Pyramids or Rhythm Intervals to elevate turnover. DO NOT praise form." + goalSuffix
+                } else {
+                    directiveContext = "The runner is steady. Provide positive reinforcement and prescribe a general maintenance Rhythm drill." + goalSuffix
+                }
             }
         } else {
             let isolatedType = !run.detectedTypeRaw.isEmpty ? run.detectedTypeRaw : "Steady Effort"
-            directiveContext = "Evaluate this isolated \(isolatedType) and provide a basic introductory drill."
             let cadenceFloor = 150
-            let cadenceStatus = Int(run.workingAvgCadence) < cadenceFloor ? "BELOW the \(cadenceFloor) SPM floor" : "ABOVE the \(cadenceFloor) SPM floor"
+            let isSubFloor = Int(run.workingAvgCadence) < cadenceFloor
+            let subFloorWarning = isSubFloor ? " (cadence is below \(cadenceFloor) SPM floor; DO NOT praise form precision)" : ""
+            directiveContext = "Evaluate this isolated \(isolatedType) and provide a basic introductory drill\(subFloorWarning)."
+            let cadenceStatus = isSubFloor ? "BELOW the \(cadenceFloor) SPM floor (slow turnover; do not praise form)" : "ABOVE the \(cadenceFloor) SPM floor"
             cadenceContext = "\(Int(run.workingAvgCadence)) SPM (\(cadenceStatus). No baseline available)."
             paceContext = "\(PaceFormatter.formatPace(secondsPerKilometer: run.workingAvgPace)) (No baseline available)."
             hrContext = "\(Int(run.workingAvgHeartRate)) BPM (No baseline available)."
@@ -775,7 +807,13 @@ actor RunAnalyzerActor {
         let intervalTarget = defaultTemplate.calculateTargetCadence(Int(intervalCadenceBase))
         let recoveryTarget = max(140, thirtyDayCadence)
 
-        let workoutType = !run.detectedTypeRaw.isEmpty ? run.detectedTypeRaw : "Steady Effort"
+        if run.isIndoor == nil {
+            run.isIndoor = (run.dataSourceRaw == "gymkit") ? true : false
+        }
+        if run.detectedTypeRaw.isEmpty {
+            run.detectedTypeRaw = "Steady Effort"
+        }
+        let workoutType = run.detectedTypeRaw
         let currentGoal = UserDefaults.standard.string(forKey: "trainingGoal") ?? "Base Building"
 
         do {
@@ -790,7 +828,8 @@ actor RunAnalyzerActor {
                 cvContext: cvContext,
                 slopeContext: slopeContext,
                 intervalCadence: "\(intervalTarget)",
-                recoveryCadence: "\(recoveryTarget)"
+                recoveryCadence: "\(recoveryTarget)",
+                isIndoor: run.isIndoor ?? false
             )
 
             let payload = try await CoachingEngine.shared.generateInsight(for: runData)

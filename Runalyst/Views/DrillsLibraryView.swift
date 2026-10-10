@@ -329,16 +329,8 @@ struct DrillsLibraryView: View {
     }
 
     private func handleStartDrill(plan: WorkoutPlan, dto: DrillPrescriptionDTO) {
-        let drillId = dto.preRunDrillId.flatMap { PreRunDrillId(rawValue: $0) } ?? .strides
-        let duration = dto.durationMinutes.flatMap { DrillDuration(rawValue: $0) } ?? .fifteenMinutes
-        let readout = DrillReadout.readout(
-            for: drillId,
-            customTitle: dto.title,
-            targetCadence: dto.targetCadence,
-            previousCadence: dto.previousCadence,
-            customDuration: duration
-        )
-        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        activeReadoutItem = ActiveDrillReadoutItem.adaptive(dto: dto, readiness: readiness)
     }
 
     private func scheduleDrillToWatch(dto: DrillPrescriptionDTO) {
@@ -404,9 +396,9 @@ struct DrillPrimerCardView: View {
     let baselineCadence: Int?
     var onStart: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
+    @Query(sort: \RunRecord.date, order: .reverse) private var runRecords: [RunRecord]
     @State private var selectedDuration: DrillDuration
     @AppStorage("drillHapticFeedbackMode") private var selectedHapticModeRaw: String = HapticFeedbackMode.on.rawValue
-    @State private var showingTargetExplainer = false
 
     init(
         drillId: PreRunDrillId,
@@ -509,52 +501,21 @@ struct DrillPrimerCardView: View {
 
             // Cue
             if !cue.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(cue)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                DrillCoachingCueBox(cue: cue)
             }
 
-            // Target
-            if let targetText = displayTargetText, !targetText.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    Text(targetText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if hasCadenceTarget || isZone1 || isZone2 {
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if hasCadenceTarget || isZone1 || isZone2 {
-                        showingTargetExplainer = true
-                    }
-                }
-                .sheet(isPresented: $showingTargetExplainer) {
-                    let explainerTitle: String = {
-                        if isZone1 { return "Zone 1 Heart Rate" }
-                        if isZone2 { return "Zone 2 Heart Rate" }
-                        return "Target Cadence"
-                    }()
-                    let explainer = MetricDetailExplainer.explainer(for: explainerTitle, isWorkoutStats: false)
-                    MetricExplainerSheet(explainer: explainer, mode: "Working Stats")
-                }
-            }
+            let targetExplainerTitle: String? = {
+                if isZone1 { return "Zone 1 Heart Rate" }
+                if isZone2 { return "Zone 2 Heart Rate" }
+                if hasCadenceTarget { return "Target Cadence" }
+                return nil
+            }()
+
+            DrillPrescriptionPanel(
+                targetText: displayTargetText,
+                targetExplainerTitle: targetExplainerTitle,
+                runRecords: runRecords
+            )
 
             // Duration Selector
             VStack(alignment: .leading, spacing: 6) {
@@ -614,25 +575,24 @@ struct DrillPrimerCardView: View {
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "play.fill")
-                        .foregroundColor(.white)
                     Text("Start Drill")
-                        .foregroundColor(.white)
                 }
                 .font(.subheadline.bold())
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.green)
-                .cornerRadius(12)
+                .background(Color.accentColor)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .padding(.top, 2)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            startDrill(title: displayTitle, purpose: purpose, targetCadence: targetCadence)
-        }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
     }
 

@@ -11,6 +11,7 @@ struct DrillInterstitialReadoutView: View {
     var onCommitToWatch: ((WorkoutPlan, DrillPrescriptionDTO) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var showingReadinessInfo = false
 
     var body: some View {
         NavigationStack {
@@ -67,13 +68,18 @@ struct DrillInterstitialReadoutView: View {
                     }
                     .padding(.bottom, 2)
 
-                    // 1. The Overview
+                    // 0. Readiness Modifier (ACWR) — only when today's prescription was adapted
+                    if readout.isReadinessAdjusted {
+                        readinessCard
+                    }
+
+                    // 1. Overview
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
-                            Image(systemName: "flag.fill")
+                            Image(systemName: "doc.text.fill")
                                 .font(.caption.bold())
-                                .foregroundColor(.accentColor)
-                            Text("The Overview")
+                                .foregroundColor(.secondary)
+                            Text("Overview")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
@@ -83,19 +89,19 @@ struct DrillInterstitialReadoutView: View {
                             .font(.subheadline)
                             .foregroundColor(.primary)
                             .lineSpacing(3)
-                            .padding(12)
+                            .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
 
-                    // 2. The Breakdown with the Horizontal Timeline UI right below it
+                    // 2. Workout Structure with Timeline
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 5) {
-                            Image(systemName: "list.bullet.clipboard.fill")
+                            Image(systemName: "chart.bar.fill")
                                 .font(.caption.bold())
-                                .foregroundColor(.accentColor)
-                            Text("The Breakdown")
+                                .foregroundColor(.secondary)
+                            Text("Workout Structure")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
@@ -105,39 +111,27 @@ struct DrillInterstitialReadoutView: View {
                             .font(.subheadline)
                             .foregroundColor(.primary)
                             .lineSpacing(3)
-                            .padding(12)
+                            .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                        // Horizontally scrolling timeline UI right below the "Breakdown" text
                         WorkoutPhaseTimelineView(phases: readout.phases, showHeader: false)
                     }
 
-                    // 3. The Coaching Tip
+                    // 3. Coaching Cue
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.caption.bold())
                                 .foregroundColor(.orange)
-                            Text("The Coaching Tip")
+                            Text("Coaching Cue")
                                 .font(.caption.bold())
                                 .foregroundColor(.secondary)
                                 .textCase(.uppercase)
                         }
 
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("💡")
-                                .font(.body)
-                            Text(coachingTipFormattedText)
-                                .font(.footnote)
-                                .foregroundColor(.primary)
-                                .lineSpacing(2)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.orange.opacity(0.12))
-                        .cornerRadius(12)
+                        DrillCoachingCueBox(cue: readout.coachingTip)
                     }
                 }
                 .frame(maxWidth: 860)
@@ -187,12 +181,136 @@ struct DrillInterstitialReadoutView: View {
         .presentationDragIndicator(.visible)
     }
 
-    private var coachingTipFormattedText: AttributedString {
-        var str = AttributedString("Tip: ")
-        str.font = .footnote.bold()
-        let tipBody = AttributedString(readout.coachingTip)
-        str.append(tipBody)
-        return str
+    // MARK: - Readiness Card
+
+    private var readinessTint: Color {
+        readout.readinessState == .deload ? .teal : .orange
+    }
+
+    private var readinessIcon: String {
+        readout.readinessState == .deload ? "leaf.fill" : "gauge.with.needle"
+    }
+
+    @ViewBuilder
+    private var readinessCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: readinessIcon)
+                    .font(.caption.bold())
+                    .foregroundColor(readinessTint)
+                Text("Readiness Adjusted")
+                    .font(.caption.bold())
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Text(readout.readinessState.displayName)
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(readinessTint.opacity(0.15))
+                    .foregroundColor(readinessTint)
+                    .clipShape(Capsule())
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { showingReadinessInfo = true }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if let target = readout.targetCadence {
+                    readinessRow(
+                        icon: "target",
+                        label: "Target",
+                        value: target,
+                        detail: targetDetailText
+                    )
+                }
+                if let adapted = readout.adaptedWork, let standard = readout.standardWork, adapted != standard {
+                    readinessRow(icon: "repeat", label: "Volume", value: adapted, detail: "Reduced from \(standard)")
+                }
+                if let adapted = readout.adaptedRecovery, let standard = readout.standardRecovery, adapted != standard {
+                    readinessRow(icon: "moon.zzz", label: "Recovery", value: adapted, detail: "Extended from \(standard)")
+                }
+                if readout.totalDurationSeconds != (readout.durationMinutes * 60) {
+                    readinessRow(
+                        icon: "clock",
+                        label: "Duration",
+                        value: readout.formattedDuration,
+                        detail: "Trimmed from \(readout.durationMinutes) min"
+                    )
+                }
+            }
+
+            if let context = readout.readinessContext {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "quote.opening")
+                            .font(.caption2.bold())
+                            .foregroundColor(readinessTint)
+                        Text("Coach Context")
+                            .font(.caption.bold())
+                            .foregroundColor(readinessTint)
+                    }
+                    Text("“\(context)”")
+                        .font(.footnote)
+                        .italic()
+                        .foregroundColor(.primary.opacity(0.9))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(readinessTint.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(readinessTint.opacity(0.22), lineWidth: 1)
+        )
+        .alert("Readiness Modifier", isPresented: $showingReadinessInfo) {
+            Button("Got it", role: .cancel) {}
+        } message: {
+            Text("Your drill targets come from your 30-day baseline (chronic load). Runalyst compares your last 7 days (acute load) against your 4-week average. A spike above 1.5×, back-to-back hard days, late-run cadence fade, or heart-rate drift relaxes turnover and trims reps. A 25%+ mileage drop at easy intensity is treated as a deload: intensity is held while reps are halved and recovery extended.")
+        }
+    }
+
+    private var targetDetailText: String? {
+        guard let standard = readout.standardTargetCadence else { return nil }
+        if let current = readout.targetCadence, current != standard {
+            return "Adjusted from your standard \(standard) target"
+        }
+        return readout.readinessState == .deload ? "Intensity held to keep your legs sharp" : nil
+    }
+
+    private func readinessRow(icon: String, label: String, value: String, detail: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption.bold())
+                .foregroundColor(readinessTint)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text("\(label):")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                    Text(value)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                }
+                if let detail {
+                    Text("(\(detail))")
+                        .font(.caption)
+                        .italic()
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
 
     private func commitAndStart() {

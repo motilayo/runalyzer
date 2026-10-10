@@ -164,10 +164,6 @@ class HealthKitSeeder {
         let calendar = Calendar.current
         let today = Date()
 
-        let configuration = HKWorkoutConfiguration()
-        configuration.activityType = .running
-        configuration.locationType = .outdoor
-
         // Seed 38 runs spanning 3 months (~90 days) showing beginner-to-intermediate progression
         let totalRuns = Self.totalProgressionRuns
         for index in 0..<totalRuns {
@@ -175,6 +171,11 @@ class HealthKitSeeder {
             let progress = Double(index) / Double(max(1, totalRuns - 1))
             let daysAgo = 90.0 - (Double(index) * (89.0 / Double(max(1, totalRuns - 1))))
             guard let workoutStartTime = calendar.date(byAdding: .day, value: -Int(daysAgo), to: today) else { continue }
+
+            let isIndoorWorkout = (index == 37 || index == 36)
+            let configuration = HKWorkoutConfiguration()
+            configuration.activityType = .running
+            configuration.locationType = isIndoorWorkout ? .indoor : .outdoor
 
             let totalMinutes = profile.durationMinutes
             let workoutEndTime = workoutStartTime.addingTimeInterval(TimeInterval(totalMinutes * 60))
@@ -260,7 +261,13 @@ class HealthKitSeeder {
                     end: workoutEndTime
                 )
                 allSamples.append(vo2Sample)
-
+                var metadata: [String: Any] = [
+                    HKMetadataKeyIndoorWorkout: NSNumber(value: isIndoorWorkout)
+                ]
+                if index == 36 {
+                    metadata[HKMetadataKeyFitnessMachineDuration] = NSNumber(value: profile.durationMinutes * 60)
+                }
+                try await builder.addMetadata(metadata)
                 try await builder.addSamples(allSamples)
                 try await builder.endCollection(at: workoutEndTime)
                 let workout = try await builder.finishWorkout()
@@ -484,7 +491,55 @@ class HealthKitSeeder {
                 drillRecommendations: [drill]
             )
 
-            let effectiveClassification = prescribed?.correspondingClassification ?? profile.rawValue
+            let isIndoor: Bool = (index == 37 || index == 36)
+            let dataSource: String = (index == 36) ? "gymkit" : "wrist"
+            let needsInclineReview: Bool = (index == 37)
+            let classificationConfidence: Double = (index == 37) ? 0.72 : 0.94
+            let effectiveType: String = (index == 37) ? "Mixed Effort (Review)" : (prescribed?.correspondingClassification ?? profile.rawValue)
+
+            let seededSignatureData: Data? = {
+                let segments: [PhaseSegment]
+                let floor: Double
+                if index == 37 {
+                    segments = [
+                        PhaseSegment(startSeconds: 0, endSeconds: 300, kind: "steady", avgPace: 330, avgCadence: 160, avgHR: 138),
+                        PhaseSegment(startSeconds: 300, endSeconds: 600, kind: "work", avgPace: 270, avgCadence: 174, avgHR: 168),
+                        PhaseSegment(startSeconds: 600, endSeconds: 780, kind: "recovery", avgPace: 360, avgCadence: 154, avgHR: 142),
+                        PhaseSegment(startSeconds: 780, endSeconds: 1080, kind: "work", avgPace: 265, avgCadence: 176, avgHR: 172),
+                        PhaseSegment(startSeconds: 1080, endSeconds: 1260, kind: "recovery", avgPace: 365, avgCadence: 152, avgHR: 145),
+                        PhaseSegment(startSeconds: 1260, endSeconds: 1560, kind: "work", avgPace: 260, avgCadence: 178, avgHR: 175),
+                        PhaseSegment(startSeconds: 1560, endSeconds: 1800, kind: "steady", avgPace: 340, avgCadence: 158, avgHR: 140)
+                    ]
+                    floor = 152
+                } else if index == 36 {
+                    segments = [
+                        PhaseSegment(startSeconds: 0, endSeconds: 300, kind: "steady", avgPace: 320, avgCadence: 162, avgHR: 140),
+                        PhaseSegment(startSeconds: 300, endSeconds: 900, kind: "work", avgPace: 280, avgCadence: 172, avgHR: 165),
+                        PhaseSegment(startSeconds: 900, endSeconds: 1200, kind: "recovery", avgPace: 350, avgCadence: 155, avgHR: 142),
+                        PhaseSegment(startSeconds: 1200, endSeconds: 1800, kind: "work", avgPace: 275, avgCadence: 174, avgHR: 168)
+                    ]
+                    floor = 155
+                } else {
+                    segments = [
+                        PhaseSegment(startSeconds: 0, endSeconds: 300, kind: "steady", avgPace: rawAvgPace, avgCadence: workingCadence, avgHR: workingHR),
+                        PhaseSegment(startSeconds: 300, endSeconds: rawDurationSec, kind: "steady", avgPace: rawAvgPace, avgCadence: workingCadence, avgHR: workingHR)
+                    ]
+                    floor = max(140, workingCadence - 6)
+                }
+                let sig = RunSignature(
+                    classification: effectiveType,
+                    confidence: classificationConfidence,
+                    probabilities: [effectiveType: classificationConfidence],
+                    anomalies: index == 37 ? ["Cardiovascular drift on flat belt"] : [],
+                    cadenceFloor: floor,
+                    phaseSegments: segments,
+                    dataSource: dataSource,
+                    isIndoor: isIndoor,
+                    needsInclineReview: needsInclineReview
+                )
+                return try? JSONEncoder().encode(sig)
+            }()
+
             let seededStride = (distanceMeters > 0 && workingCadence > 0 && workingSec > 0)
                 ? (distanceMeters / ((workingCadence / 60.0) * workingSec))
                 : 1.15
@@ -500,18 +555,19 @@ class HealthKitSeeder {
                 workingAvgPace: workingAvgPace,
                 workingAvgCadence: workingCadence,
                 workingAvgHeartRate: workingHR,
-                workingAvgVerticalOscillation: vertOsc,
-                rawAvgVerticalOscillation: rawOsc,
-                rawAvgStrideLength: seededStride,
-                workingAvgStrideLength: seededStride,
+                workingAvgVerticalOscillation: isIndoor ? nil : vertOsc,
+                rawAvgVerticalOscillation: isIndoor ? nil : rawOsc,
+                rawAvgStrideLength: isIndoor ? nil : seededStride,
+                workingAvgStrideLength: isIndoor ? nil : seededStride,
                 workingDistanceMeters: distanceMeters,
                 workingDurationSeconds: workingSec,
+                isIndoor: isIndoor,
                 paceCV: paceCV,
                 paceSlope: paceSlope,
                 percentZone4: percentZone4,
-                detectedTypeRaw: effectiveClassification,
+                detectedTypeRaw: effectiveType,
                 framboiseTags: {
-                    var tags = [effectiveClassification]
+                    var tags = [effectiveType]
                     if let drill = prescribed {
                         tags.append("prescribedDrill")
                         tags.append(drill.rawValue)
@@ -520,7 +576,11 @@ class HealthKitSeeder {
                     }
                     return tags
                 }(),
-                insight: insight
+                insight: insight,
+                dataSourceRaw: dataSource,
+                classificationConfidence: classificationConfidence,
+                needsInclineReview: needsInclineReview,
+                runSignatureData: seededSignatureData
             )
 
             context.insert(record)

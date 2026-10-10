@@ -276,6 +276,14 @@ final class PrescribedDrillRecognitionTests: XCTestCase {
         XCTAssertEqual(DrillAdherenceTier.met.badgeIcon, "checkmark")
         XCTAssertEqual(DrillAdherenceTier.partiallyMet.badgeIcon, "minus")
         XCTAssertEqual(DrillAdherenceTier.notMet.badgeIcon, "xmark")
+
+        // Recovery / Zone 1 & Zone 2 heart rate targeted drills
+        XCTAssertEqual(DrillAdherenceTier.exceeded.badgeText(for: .aerobicFlush), "Optimal")
+        XCTAssertEqual(DrillAdherenceTier.met.badgeText(for: .aerobicFlush), "Target Met")
+        XCTAssertEqual(DrillAdherenceTier.exceeded.badgeIcon(for: .aerobicFlush), "checkmark.seal.fill")
+        XCTAssertEqual(DrillAdherenceTier.exceeded.badgeText(for: .zone2Run), "Optimal")
+        XCTAssertEqual(DrillAdherenceTier.met.badgeText(for: .zone2Run), "Target Met")
+        XCTAssertEqual(DrillAdherenceTier.exceeded.badgeText(for: .cadencePyramids), "Exceeded")
     }
 
     func testDrillTitlesAreUniqueAndZone2RunAppearsOnce() {

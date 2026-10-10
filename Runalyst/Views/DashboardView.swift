@@ -39,6 +39,7 @@ struct DashboardView: View {
     @State private var pendingWatchDrillDTO: DrillPrescriptionDTO?
     @State private var activeExplainer: MetricExplainerInfo?
     @State private var activeReadoutItem: ActiveDrillReadoutItem?
+    @State private var showingAnalystChat = false
 
     private var timeRangeRuns: [RunRecord] {
         let now = Date()
@@ -283,7 +284,11 @@ struct DashboardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(Color(UIColor.secondarySystemGroupedBackground))
-            .cornerRadius(16)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color(UIColor.separator).opacity(0.2), lineWidth: 0.5)
+            )
             .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         }
         .onAppear {
@@ -631,11 +636,20 @@ struct DashboardView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
+            let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+            let adaptedTarget = ReadinessModifier.adaptTarget(computedTarget, baselineCadence: baseCadence, drillId: primerId, state: readiness.state)
+            let primerDrill = PreRunDrill(
+                id: primerId,
+                previousCadence: baseCadence,
+                targetCadence: adaptedTarget.targetCadence,
+                readinessState: readiness.state
+            )
+
             HStack(spacing: 16) {
-                Label(template.defaultWork, systemImage: "repeat")
+                Label(primerDrill.defaultWorkString, systemImage: "repeat")
                     .font(.caption.bold())
                     .foregroundColor(.primary)
-                Label(template.defaultRecovery, systemImage: "moon.zzz")
+                Label(primerDrill.defaultRecoveryString, systemImage: "moon.zzz")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Label(template.defaultEffort, systemImage: "bolt.fill")
@@ -643,89 +657,42 @@ struct DashboardView: View {
                     .foregroundColor(.secondary)
             }
 
-            let cue = template.generateInstructionalCue(computedTarget)
+            let cue = template.generateInstructionalCue(adaptedTarget.targetCadence)
             if !cue.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(cue)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                DrillCoachingCueBox(cue: cue)
             }
 
-            if primerId == .aerobicFlush || primerId == .recoveryJog {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    Text("Target: Zone 1 HR")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
+            let isZone1 = primerId == .aerobicFlush || primerId == .recoveryJog
+            let isZone2 = primerId == .zone2Run
+            let targetExplainerTitle: String? = {
+                if isZone1 { return "Zone 1 Heart Rate" }
+                if isZone2 { return "Zone 2 Heart Rate" }
+                return "Target Cadence"
+            }()
+            let targetText: String? = {
+                if isZone1 {
+                    return "Target: Zone 1 HR"
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Zone 1 Heart Rate", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
+                if isZone2 {
+                    return "Target: Zone 2 HR"
                 }
-            } else if primerId == .zone2Run {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    Text("Target: Zone 2 HR")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Zone 2 Heart Rate", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "target")
-                        .foregroundColor(.orange)
-                        .font(.caption.bold())
-                    if let target = computedTarget, let base = baseCadence {
-                        Text("Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                if let target = adaptedTarget.targetCadence, let base = baseCadence {
+                    if adaptedTarget.isCadenceRelaxed, let std = adaptedTarget.standardTargetCadence {
+                        return "Target: \(target) SPM (Relaxed from \(std))"
                     } else {
-                        Text("Target: Dynamic cadence")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        return "Target: \(target) SPM (\(timeRange) Baseline: \(base) SPM)"
                     }
-                    Image(systemName: "info.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
+                } else {
+                    return "Target: Dynamic cadence"
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activeExplainer = MetricExplainerInfo(
-                        explainer: MetricDetailExplainer.explainer(for: "Target Cadence", isWorkoutStats: false),
-                        mode: "Working Stats"
-                    )
-                }
-            }
+            }()
 
-            let primerDrill = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget)
+            DrillPrescriptionPanel(
+                targetText: targetText,
+                targetExplainerTitle: targetExplainerTitle,
+                runRecords: runRecords
+            )
+
             WorkoutPhaseTimelineView(phases: primerDrill.generatePhases())
 
             HStack(spacing: 12) {
@@ -760,14 +727,15 @@ struct DashboardView: View {
                 }
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            openDrillReadout(primerId: primerId, template: template, computedTarget: computedTarget, baseCadence: baseCadence)
-        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.2), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         .sheet(item: $activeReadoutItem) { item in
             DrillInterstitialReadoutView(
                 readout: item.readout,
@@ -794,24 +762,16 @@ struct DashboardView: View {
     }
 
     private func openDrillReadout(primerId: PreRunDrillId, template: DrillTemplate, computedTarget: String?, baseCadence: Int?) {
-        let primerDrill = PreRunDrill(id: primerId, previousCadence: baseCadence, targetCadence: computedTarget)
-        let plan = primerDrill.buildWorkoutPlan()
-        let dto = DrillPrescriptionDTO(
+        let standardDTO = DrillPrescriptionDTO(
             title: template.title,
             preRunDrillId: primerId.rawValue,
             purpose: template.defaultPurpose,
             targetCadence: computedTarget,
             previousCadence: baseCadence,
-            durationMinutes: primerDrill.duration.rawValue
+            durationMinutes: PreRunDrill(id: primerId).duration.rawValue
         )
-        let readout = DrillReadout.readout(
-            for: primerId,
-            customTitle: template.title,
-            targetCadence: computedTarget,
-            previousCadence: baseCadence,
-            customDuration: primerDrill.duration
-        )
-        activeReadoutItem = ActiveDrillReadoutItem(readout: readout, plan: plan, dto: dto)
+        let readiness = ReadinessEvaluator.assess(runRecords: runRecords)
+        activeReadoutItem = ActiveDrillReadoutItem.adaptive(dto: standardDTO, readiness: readiness)
     }
 
     private func scheduleDashboardDrillToWatch(dto: DrillPrescriptionDTO) {
@@ -895,39 +855,41 @@ struct DashboardView: View {
                 Image(systemName: "heart.fill")
                     .foregroundColor(.red)
                     .font(.caption)
-                Text("VO2 Max")
+                Text("VO2 MAX")
                     .font(.caption.bold())
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.secondary)
                 Image(systemName: "info.circle")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary.opacity(0.7))
             }
 
             if let vo2Val = globalVO2Max {
                 Text(String(format: "%.1f", vo2Val))
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(.primary)
 
                 if let base = baselineVO2Max {
                     let diff = vo2Val - base
                     if abs(diff) > 0.05 {
-                        HStack(spacing: 4) {
-                            Image(systemName: diff >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                .font(.caption2.bold())
-                            Text(String(format: "%@%.1f", diff >= 0 ? "+" : "", diff))
+                        let isPositive = diff >= 0
+                        HStack(spacing: 3) {
+                            Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(String(format: "%@%.1f", isPositive ? "+" : "", diff))
                                 .font(.caption2.bold())
                         }
-                        .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.12))
+                        .foregroundColor(isPositive ? .green : .red)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background((isPositive ? Color.green : Color.red).opacity(0.12))
                         .clipShape(Capsule())
                     }
                 }
             } else {
                 Text("—")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.6))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -949,37 +911,39 @@ struct DashboardView: View {
                     .font(.caption)
                 Text("AVG CADENCE")
                     .font(.caption.bold())
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.secondary)
                 Image(systemName: "info.circle")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary.opacity(0.7))
             }
 
             if let cadenceVal = baselineCadence, cadenceVal > 0 {
                 Text("\(cadenceVal) SPM")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .monospacedDigit()
+                    .foregroundColor(.primary)
 
                 if let prevCadence = previousBaselineCadence {
                     let diff = cadenceVal - prevCadence
                     if diff != 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: diff > 0 ? "arrow.up.right" : "arrow.down.right")
-                                .font(.caption2.bold())
-                            Text(String(format: "%@%d SPM", diff > 0 ? "+" : "", diff))
+                        let isPositive = diff > 0
+                        HStack(spacing: 3) {
+                            Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(String(format: "%@%d SPM", isPositive ? "+" : "", diff))
                                 .font(.caption2.bold())
                         }
-                        .foregroundColor(diff >= 0 ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.12))
+                        .foregroundColor(isPositive ? .green : .orange)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background((isPositive ? Color.green : Color.orange).opacity(0.12))
                         .clipShape(Capsule())
                     }
                 }
             } else {
                 Text("—")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1001,39 +965,40 @@ struct DashboardView: View {
                     .font(.caption)
                 Text("AVG PACE")
                     .font(.caption.bold())
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.secondary)
                 Image(systemName: "info.circle")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary.opacity(0.7))
             }
 
             if let paceVal = baselinePace, paceVal > 0 {
                 let displayPace = PaceFormatter.formatPace(secondsPerKilometer: paceVal)
                 Text(displayPace)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .monospacedDigit()
+                    .foregroundColor(.primary)
 
                 if let prevPace = previousBaselinePace {
                     let diffSecs = Int(round(paceVal - prevPace))
                     if diffSecs != 0 {
                         let isFaster = diffSecs < 0
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             Image(systemName: isFaster ? "arrow.down.right" : "arrow.up.right")
-                                .font(.caption2.bold())
+                                .font(.system(size: 10, weight: .bold))
                             Text(String(format: "%@%ds", diffSecs > 0 ? "+" : "", diffSecs))
                                 .font(.caption2.bold())
                         }
-                        .foregroundColor(isFaster ? Color(red: 0.1, green: 0.85, blue: 0.75) : .pink)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.12))
+                        .foregroundColor(isFaster ? .green : .orange)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background((isFaster ? Color.green : Color.orange).opacity(0.12))
                         .clipShape(Capsule())
                     }
                 }
             } else {
                 Text("—")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1055,20 +1020,20 @@ struct DashboardView: View {
                     .font(.caption)
                 Text("WORKOUT DENSITY")
                     .font(.caption.bold())
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.secondary)
                 Image(systemName: "info.circle")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.secondary.opacity(0.7))
             }
 
             let density = workoutDensityTier
             Text(density)
                 .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundColor(density == "Optimal" ? Color(red: 0.1, green: 0.85, blue: 0.75) : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .white.opacity(0.6)))))
+                .foregroundColor(density == "Optimal" ? .green : (density == "Moderate" ? .yellow : (density == "High" ? .orange : (density == "Low" ? .orange : .secondary))))
 
             Text(timeRangeRuns.isEmpty ? "No runs in \(timeRange.lowercased())" : "\(timeRangeRuns.count) runs in \(timeRange.lowercased())")
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -1087,15 +1052,15 @@ struct DashboardView: View {
                 HStack(alignment: .top, spacing: 20) {
                     quadrantVO2Max
                     Divider()
-                        .background(Color.white.opacity(0.15))
+                        .background(Color(UIColor.separator).opacity(0.3))
                         .frame(height: 70)
                     quadrantCadence
                     Divider()
-                        .background(Color.white.opacity(0.15))
+                        .background(Color(UIColor.separator).opacity(0.3))
                         .frame(height: 70)
                     quadrantPace
                     Divider()
-                        .background(Color.white.opacity(0.15))
+                        .background(Color(UIColor.separator).opacity(0.3))
                         .frame(height: 70)
                     quadrantDensity
                 }
@@ -1106,7 +1071,7 @@ struct DashboardView: View {
                 }
 
                 Divider()
-                    .background(Color.white.opacity(0.15))
+                    .background(Color(UIColor.separator).opacity(0.3))
 
                 HStack(alignment: .top) {
                     quadrantPace
@@ -1115,9 +1080,13 @@ struct DashboardView: View {
             }
         }
         .padding(18)
-        .background(Color(red: 11/255, green: 27/255, blue: 51/255))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.2), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
         .padding(.horizontal)
         .sheet(item: $activeExplainer) { info in
             MetricExplainerSheet(info: info)
@@ -1134,9 +1103,13 @@ struct DashboardView: View {
                             .font(.caption.bold())
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedFilter == nil ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
+                            .background(selectedFilter == nil ? Color.accentColor : Color(UIColor.secondarySystemGroupedBackground))
                             .foregroundColor(selectedFilter == nil ? .white : .primary)
                             .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color(UIColor.separator).opacity(0.3), lineWidth: selectedFilter == nil ? 0 : 0.5)
+                            )
                     }
 
                     ForEach(availableFilters, id: \.self) { filter in
@@ -1156,9 +1129,13 @@ struct DashboardView: View {
                             .font(.caption.bold())
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedFilter == filter ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
+                            .background(selectedFilter == filter ? Color.accentColor : Color(UIColor.secondarySystemGroupedBackground))
                             .foregroundColor(selectedFilter == filter ? .white : .primary)
                             .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color(UIColor.separator).opacity(0.3), lineWidth: selectedFilter == filter ? 0 : 0.5)
+                            )
                         }
                     }
                 }
@@ -1354,6 +1331,43 @@ struct DashboardView: View {
                 cachedBodyAllTime = ""
                 fetchInsight()
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 80) {
+                if !runRecords.isEmpty {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showingAnalystChat = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .font(.headline)
+                                Text("AI Analyst")
+                                    .font(.subheadline.bold())
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.indigo],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(Capsule())
+                            .shadow(color: Color.purple.opacity(0.35), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 8)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAnalystChat) {
+                if let latestRun = runRecords.first {
+                    AnalystChatView(runRecord: latestRun)
+                }
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
@@ -1724,7 +1738,11 @@ struct RunListRowView: View {
         }
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.15), lineWidth: 0.5)
+        )
         .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
     }

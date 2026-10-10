@@ -29,6 +29,8 @@ struct DrillPrescriptionDTO: Sendable, Codable {
     let previousCadence: Int?
     var durationMinutes: Int? = 15
     var hapticMode: String? = "On"
+    /// `ReadinessState.rawValue` when the prescription was modulated by acute readiness (nil = productive).
+    var readinessState: String?
 }
 
 /// Represents an active or recent intent to execute a prescribed drill on Apple Watch.
