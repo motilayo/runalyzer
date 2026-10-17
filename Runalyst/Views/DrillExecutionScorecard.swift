@@ -64,6 +64,7 @@ struct DrillExecutionScorecard: View {
     let baselineCadence: Double?
     let baselineOscillation: Double?
     var customTitle: String?
+    @State private var isSetsExpanded: Bool = false
 
     var body: some View {
         let template = DrillTemplate.template(for: drillId)
@@ -255,31 +256,51 @@ struct DrillExecutionScorecard: View {
                         Text("\(summary.intervalsMet) of \(summary.totalIntervals) on Target (\(summary.adherencePercentage)%)")
                             .font(.caption.bold())
                             .foregroundColor(summary.tier.tintColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
 
                     // Pips (R1, R2, ...)
-                    HStack(spacing: 6) {
-                        ForEach(summary.reps, id: \.repIndex) { rep in
-                            HStack(spacing: 3) {
-                                Image(systemName: rep.isMet ? "checkmark.circle.fill" : "circle")
-                                    .font(.caption2)
-                                    .foregroundColor(rep.isMet ? .green : .orange)
-                                Text("R\(rep.repIndex)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(rep.isMet ? .primary : .secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(summary.reps, id: \.repIndex) { rep in
+                                HStack(spacing: 3) {
+                                    Image(systemName: rep.isMet ? "checkmark.circle.fill" : "circle")
+                                        .font(.caption2)
+                                        .foregroundColor(rep.isMet ? .green : .orange)
+                                    Text("R\(rep.repIndex)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(rep.isMet ? .primary : .secondary)
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(rep.isMet ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
+                                .clipShape(Capsule())
                             }
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(rep.isMet ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
-                            .clipShape(Capsule())
                         }
-                        Spacer()
+                        .padding(.horizontal, 1)
                     }
+                    .mask(
+                        HStack(spacing: 0) {
+                            Rectangle().fill(Color.black)
+                            if summary.reps.count > 6 {
+                                LinearGradient(
+                                    colors: [Color.black, Color.clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(width: 18)
+                            }
+                        }
+                    )
                 }
                 .padding(10)
                 .background(Color(UIColor.tertiarySystemGroupedBackground))
                 .cornerRadius(10)
             }
+
+            // Secondary Form Availability
+            let hasFormDelta = abs(oscDelta) > 0.01 && runRecord.workingAvgVerticalOscillation != nil
 
             // Primary Target vs Actual Metric Tiles
             if let summary = intervalSummary, isIntervalDrill {
@@ -294,7 +315,7 @@ struct DrillExecutionScorecard: View {
                 let workColor: Color = workCadenceTargetMet ? .green : (summary.tier == .notMet ? .red : .orange)
 
                 VStack(spacing: 8) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         metricTile(
                             label: "WORK CADENCE",
                             value: "\(workCadenceVal) SPM",
@@ -302,11 +323,19 @@ struct DrillExecutionScorecard: View {
                             subtitle: "Target: \(targetCadenceStr) SPM"
                         )
                         metricTile(
-                            label: "RECOVERY CADENCE",
+                            label: "REC CADENCE",
                             value: "\(summary.recoveryCadenceAvg > 0 ? summary.recoveryCadenceAvg : max(130, actualCadence - 20)) SPM",
                             valueColor: .secondary,
                             subtitle: drillId.recoveryLabel
                         )
+                        if hasFormDelta {
+                            metricTile(
+                                label: "FORM DELTA",
+                                value: String(format: "%+.1f cm", oscDelta),
+                                valueColor: oscDelta <= 0 ? Color(red: 0.0, green: 0.75, blue: 0.65) : .orange,
+                                subtitle: oscDelta <= 0 ? "Controlled" : "Elevated bounce"
+                            )
+                        }
                     }
 
                     if isDualTarget {
@@ -354,22 +383,30 @@ struct DrillExecutionScorecard: View {
                     }
                 }
             } else if isHRTarget {
-                // Heart Rate Hero Metric
-                HStack(spacing: 10) {
+                // Heart Rate Hero Metric (Target Zone, Actual HR, Turnover)
+                HStack(spacing: 8) {
                     metricTile(
                         label: "TARGET ZONE",
-                        value: drillId.targetHeartRateZoneName ?? "Zone 2",
-                        valueColor: .primary
+                        value: drillId.targetHeartRateZoneName ?? "Zone 1",
+                        valueColor: .primary,
+                        subtitle: "Active Recovery"
                     )
                     metricTile(
                         label: "ACTUAL HEART RATE",
                         value: actualHR > 0 ? "\(actualHR) BPM" : "--",
-                        valueColor: tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green)
+                        valueColor: Color(red: 1.0, green: 0.22, blue: 0.55),
+                        subtitle: actualHR <= 135 ? "Zero cardiac strain" : "Elevated strain"
+                    )
+                    metricTile(
+                        label: "TURNOVER",
+                        value: actualCadence > 0 ? "\(actualCadence) SPM" : "--",
+                        valueColor: Color(red: 0.0, green: 0.75, blue: 0.65),
+                        subtitle: "Relaxed cadence"
                     )
                 }
             } else {
                 // Cadence Hero Metric
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     metricTile(
                         label: "TARGET CADENCE",
                         value: "\(targetCadenceStr) SPM",
@@ -380,60 +417,31 @@ struct DrillExecutionScorecard: View {
                         value: "\(actualCadence) SPM",
                         valueColor: tier == .notMet ? .red : (tier == .partiallyMet ? .orange : .green)
                     )
+                    if hasFormDelta {
+                        metricTile(
+                            label: "FORM DELTA",
+                            value: String(format: "%+.1f cm", oscDelta),
+                            valueColor: oscDelta <= 0 ? Color(red: 0.0, green: 0.75, blue: 0.65) : .orange,
+                            subtitle: oscDelta <= 0 ? "Controlled" : "Elevated bounce"
+                        )
+                    }
                 }
             }
 
-            // Secondary Form / Guardrail Chips
-            let hasFormDelta = abs(oscDelta) > 0.01 && runRecord.workingAvgVerticalOscillation != nil
-            let hasTurnoverChip = isHRTarget && actualCadence > 0
-            let hasZone4Chip = !isDualTarget && runRecord.percentZone4 > 0.15
-
-            if hasFormDelta || hasTurnoverChip || hasZone4Chip {
-                HStack(spacing: 8) {
-                    if hasFormDelta {
-                        HStack(spacing: 4) {
-                            Image(systemName: oscDelta < 0 ? "arrow.down.right" : "arrow.up.right")
-                                .font(.caption2.bold())
-                            Text(String(format: "Form Delta: %+.1f cm", oscDelta))
-                                .font(.caption2.bold())
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(oscDelta < 0 ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
-                        .foregroundColor(oscDelta < 0 ? .green : .orange)
-                        .clipShape(Capsule())
-                    }
-
-                    if hasTurnoverChip {
-                        HStack(spacing: 4) {
-                            Image(systemName: "shoeprints.fill")
-                                .font(.caption2)
-                            Text("Turnover: \(actualCadence) SPM")
-                                .font(.caption2.bold())
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.12))
-                        .foregroundColor(.secondary)
-                        .clipShape(Capsule())
-                    }
-
-                    if hasZone4Chip {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bolt.fill")
-                                .font(.caption2)
-                            Text(String(format: "Zone 4 Spike: %.0f%%", runRecord.percentZone4 * 100))
-                                .font(.caption2.bold())
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.12))
-                        .foregroundColor(.orange)
-                        .clipShape(Capsule())
-                    }
-
+            // High threshold guardrail chip (if unexpected Zone 4 spike)
+            if !isDualTarget && runRecord.percentZone4 > 0.15 {
+                HStack(spacing: 4) {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                    Text(String(format: "Zone 4 Spike: %.0f%% (elevated threshold effort)", runRecord.percentZone4 * 100))
+                        .font(.caption2.bold())
                     Spacer()
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.12))
+                .foregroundColor(.orange)
+                .clipShape(Capsule())
             }
 
             // Coaching Verdict Callout Banner
@@ -451,7 +459,78 @@ struct DrillExecutionScorecard: View {
             .padding(10)
             .background(tier.tintColor.opacity(0.08))
             .cornerRadius(8)
+
+            // Expandable Rep-by-Rep Breakdown (SETS)
+            if let summary = intervalSummary, isIntervalDrill, !summary.reps.isEmpty {
+                Divider()
+
+                HStack {
+                    Text("SETS (\(summary.totalIntervals))")
+                        .font(.caption.bold())
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    if summary.totalIntervals > 2 {
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                isSetsExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(isSetsExpanded ? "Show Less" : "Show All (\(summary.totalIntervals))")
+                                    .font(.caption.bold())
+                                Image(systemName: isSetsExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.caption2.bold())
+                            }
+                            .foregroundColor(drillId.iconColor)
+                        }
+                    }
+                }
+
+                let displayedReps = isSetsExpanded ? summary.reps : Array(summary.reps.prefix(2))
+                VStack(spacing: 6) {
+                    ForEach(displayedReps, id: \.repIndex) { rep in
+                        HStack(spacing: 8) {
+                            Text("R\(rep.repIndex)")
+                                .font(.caption.bold())
+                                .foregroundColor(.primary)
+                                .frame(width: 26, alignment: .leading)
+
+                            Image(systemName: rep.isMet ? "checkmark.circle.fill" : "circle")
+                                .font(.caption2)
+                                .foregroundColor(rep.isMet ? .green : .orange)
+
+                            Text("\(rep.workCadence) SPM")
+                                .font(.caption.bold())
+                                .monospacedDigit()
+                                .foregroundColor(rep.isMet ? Color(red: 0.0, green: 0.75, blue: 0.65) : .orange)
+
+                            if rep.recoveryCadence > 0 {
+                                Text("Rec: \(rep.recoveryCadence) SPM")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Text(rep.isMet ? "On Target" : "Developing")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(rep.isMet ? .green : .orange)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(rep.isMet ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color(UIColor.tertiarySystemGroupedBackground))
+                        .cornerRadius(8)
+                    }
+                }
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
